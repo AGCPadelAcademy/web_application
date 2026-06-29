@@ -71,29 +71,6 @@ const translations = {
   }
 };
 
-const createLesson = (id, titles, price, priceId, duration, credits, details, isSingular = false, isKid = false, timeRestriction = null) => {
-    return { id, titles, price, priceId, duration, credits, creditExpiry: 6, details, cancellation: "48 h", isSingular, isKid, timeRestriction };
-};
-
-const lessonDefinitions = [
-    createLesson("sub_morning", 
-      { ES: "Afterwork Group (>18:00)", EN: "Afterwork Group (>18:00 PM)" },
-        "260", "price_1SfIEG1JMsLDc1io1ylusZS5", 90, 4, 
-        { ES: "1 grupo/semana", EN: "1 group/week" }, false, false, null),
-    createLesson("sub_morning_light", 
-        { ES: "Morning Group (<15:00)", EN: "Morning Group (<15:00)" },
-        "240", "price_1SfIEd1JMsLDc1ioQzbvz85r", 90, 4, 
-        { ES: "1 grupo/semana", EN: "1 group/week" }, false, false, null),
-    createLesson("sub_day_ind_light", 
-        { ES: "Individual Diurno – Light (<15:00)", EN: "Daytime Individual – Light (<15:00)" },
-        "255", "price_1SfIDk1JMsLDc1ioYj2IgEJV", 60, 2, 
-        { ES: "2 clases/mes", EN: "2 lessons/month" }, false, false, null),
-    createLesson("single_priv_60", 
-        { ES: "Privado 60 min (<15:00)", EN: "Private 60 min (<15:00)" },
-        "140", "price_1SfHwo1JMsLDc1ionUd5nC1M", 60, 1, 
-        { ES: "1 Sesión privada", EN: "1 Private Session" }, true, false, 'morning'),
-];
-
 const LessonsPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -113,6 +90,21 @@ const LessonsPage = () => {
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [cachedProfile, setCachedProfile] = useState(null);
+
+  const [lessonDefinitions, setLessonDefinitions] = useState([]);
+  const [loadingLessons, setLoadingLessons] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('lessons')
+      .select('*')
+      .eq('is_active', true)
+      .order('price_amount', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setLessonDefinitions(data);
+        setLoadingLessons(false);
+      });
+  }, []);
 
   // State management for Invoice Preview Modal
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -209,12 +201,12 @@ const LessonsPage = () => {
         const bookingData = {
             user_id: user.id,
             lesson_id: selectedLesson.id,
-            lesson_name: selectedLesson.titles[lang],
-            price: selectedLesson.price + " CHF",
+            lesson_name: selectedLesson.name,
+            price: selectedLesson.price_amount + " CHF",
             booking_date: bookingDate,
             start_time: selectedTime ? selectedTime.time : null,
-            end_time: selectedTime ? format(addMinutes(selectedTime.date, selectedLesson.duration), 'HH:mm') : null,
-            duration_minutes: selectedLesson.duration,
+            end_time: selectedTime ? format(addMinutes(selectedTime.date, selectedLesson.duration_minutes), 'HH:mm') : null,
+            duration_minutes: selectedLesson.duration_minutes,
             status: 'pending_payment',
             payment_status: 'pending',
             client_email: profileData.email,
@@ -233,7 +225,7 @@ const LessonsPage = () => {
         const { data: efData, error: efError } = await supabase.functions.invoke('generate-invoice-pdf', {
             body: {
                 booking_id,
-                amount: selectedLesson.price,
+                amount: selectedLesson.price_amount,
                 invoice_date: bookingDate,
                 customer_fullname: profileData.full_name,
                 customer_address: profileData.address,
@@ -278,26 +270,22 @@ const LessonsPage = () => {
     executeBookingAndInvoice(cachedProfile);
   };
 
-  const adultMemberships = lessonDefinitions.filter(l => !l.isSingular && !l.isKid);
-  const singularSessions = lessonDefinitions.filter(l => l.isSingular);
+  const subscriptionLessons = lessonDefinitions.filter(l => l.is_subscription);
+  const singleSessions      = lessonDefinitions.filter(l => !l.is_subscription);
 
-  const LessonCard = ({ lesson }) => {
-    const localizedTitle = lesson.titles[lang];
-    const localizedDetails = lesson.details[lang];
-    return (
-        <motion.div whileHover={{ scale: 1.03, y: -5 }} className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 flex flex-col h-full">
-            <h3 className="text-xl font-bold mb-2 min-h-[3.5rem]">{localizedTitle}</h3>
-            <div className="text-4xl font-bold text-green-400 mb-4">{lesson.price} CHF</div>
-            <p className="text-gray-400 mb-2 text-sm"><Info className="inline w-4 h-4 mr-2" />{localizedDetails}</p>
-            <p className="text-xs text-yellow-400/80 mb-4 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> {t.cancellation}: {lesson.cancellation}
-            </p>
-            <Button onClick={() => handleBookNow(lesson)} className="w-full mt-auto bg-green-500 hover:bg-green-600 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2">
-                <CalendarIcon size={20}/> {t.bookBtn}
-            </Button>
-        </motion.div>
-    );
-  };
+  const LessonCard = ({ lesson }) => (
+    <motion.div whileHover={{ scale: 1.03, y: -5 }} className="bg-gray-900/50 rounded-2xl p-6 border border-gray-800 flex flex-col h-full">
+        <h3 className="text-xl font-bold mb-2 min-h-[3.5rem]">{lesson.name}</h3>
+        <div className="text-4xl font-bold text-green-400 mb-4">{lesson.price_amount} CHF</div>
+        <p className="text-gray-400 mb-2 text-sm"><Info className="inline w-4 h-4 mr-2" />{lesson.description}</p>
+        <p className="text-xs text-yellow-400/80 mb-4 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" /> {t.cancellation}: 48 h
+        </p>
+        <Button onClick={() => handleBookNow(lesson)} className="w-full mt-auto bg-green-500 hover:bg-green-600 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+            <CalendarIcon size={20}/> {t.bookBtn}
+        </Button>
+    </motion.div>
+  );
 
   return (
     <>
@@ -346,19 +334,30 @@ const LessonsPage = () => {
             </div>
         </section>
 
-        <div className="mb-24">
-            <h2 className="text-3xl font-bold font-serif mb-8">{t.sectionAdults}</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {adultMemberships.map((lesson, index) => <LessonCard key={index} lesson={lesson} />)}
-            </div>
-        </div>
-
-        <div className="mb-24">
-            <h2 className="text-3xl font-bold font-serif mb-8">{t.sectionSingular}</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {singularSessions.map((lesson, index) => <LessonCard key={index} lesson={lesson} />)}
-            </div>
-        </div>
+        {loadingLessons ? (
+          <div className="flex justify-center items-center py-24">
+            <Loader2 className="w-10 h-10 animate-spin text-green-500" />
+          </div>
+        ) : (
+          <>
+            {subscriptionLessons.length > 0 && (
+              <div className="mb-24">
+                <h2 className="text-3xl font-bold font-serif mb-8">{t.sectionAdults}</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {subscriptionLessons.map(lesson => <LessonCard key={lesson.id} lesson={lesson} />)}
+                </div>
+              </div>
+            )}
+            {singleSessions.length > 0 && (
+              <div className="mb-24">
+                <h2 className="text-3xl font-bold font-serif mb-8">{t.sectionSingular}</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {singleSessions.map(lesson => <LessonCard key={lesson.id} lesson={lesson} />)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
@@ -369,7 +368,7 @@ const LessonsPage = () => {
                 <DialogDescription className="text-gray-400">{t.confirmDesc}</DialogDescription>
               </DialogHeader>
               <div className="my-4 space-y-4">
-                  <p className="font-semibold text-lg">{selectedLesson?.titles[lang]}</p>
+                  <p className="font-semibold text-lg">{selectedLesson?.name}</p>
                   
                   <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 space-y-2">
                     <p className="text-sm text-gray-400 uppercase tracking-wider">Billing Profile</p>
@@ -390,7 +389,7 @@ const LessonsPage = () => {
                         <p className="text-xs text-gray-500">{t.paymentInfo}</p>
                       </div>
                   </div>
-                  <p className="text-2xl font-bold text-green-400 pt-2 text-right">{t.total}: {selectedLesson?.price} CHF</p>
+                  <p className="text-2xl font-bold text-green-400 pt-2 text-right">{t.total}: {selectedLesson?.price_amount} CHF</p>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isBooking} className="text-white border-gray-600 hover:bg-gray-800">

@@ -204,12 +204,13 @@ const LessonsPage = () => {
   const executeBookingAndInvoice = async (profileData) => {
     setIsBooking(true);
     try {
+        const bookingDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
         const bookingData = {
             user_id: user.id,
             lesson_id: selectedLesson.id,
             lesson_name: selectedLesson.titles[lang],
             price: selectedLesson.price + " CHF",
-            booking_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null,
+            booking_date: bookingDate,
             start_time: selectedTime ? selectedTime.time : null,
             end_time: selectedTime ? format(addMinutes(selectedTime.date, selectedLesson.duration), 'HH:mm') : null,
             duration_minutes: selectedLesson.duration,
@@ -230,69 +231,50 @@ const LessonsPage = () => {
 
         const booking_id = insertedBooking.id;
         const invoice_number = `INV-${Date.now()}`;
-        
+
         const pdfPayload = {
             booking_id,
             invoice_number,
             amount: selectedLesson.price,
-            booking_date: bookingData.booking_date,
+            invoice_date: bookingDate,
             customer_fullname: profileData.full_name,
             customer_address: profileData.address,
             customer_postal_city: `${profileData.postal_code} ${profileData.city}`,
             customer_country: profileData.country,
             lesson_name: bookingData.lesson_name,
-            user_id: user.id
+            qty: 1,
+            user_id: user.id,
         };
 
-        const { data: efData, error: efError } = await supabase.functions.invoke('generate-invoice-pdf-v2', {
+        const { data: efData, error: efError } = await supabase.functions.invoke('generate-invoice-pdf', {
             body: pdfPayload
         });
 
         if (efError || !efData?.success) {
-             throw new Error(efError?.message || efData?.error || "Failed to generate invoice");
+            throw new Error(efError?.message || efData?.error || "Failed to generate invoice");
         }
-        
+
         setIsConfirmOpen(false);
 
-        // Convert base64 PDF into a local Blob URL for immediate high-quality preview & download
-        let displayUrl = efData.url;
-        
-        if (efData.pdfBase64) {
-          try {
-            const byteCharacters = atob(efData.pdfBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/pdf' });
-            displayUrl = URL.createObjectURL(blob);
-          } catch (blobErr) {
-            console.error("Failed to generate blob from base64 PDF, falling back to URL.", blobErr);
-          }
-        }
+        const invoiceUrl = efData.url;
 
-        if (displayUrl) {
-          // Update DB with the cloud URL if available
-          if (efData.url) {
-            await supabase.from('bookings').update({ receipt_url: efData.url }).eq('id', booking_id);
-          }
-          
-          toast({
-              title: "Booking Successful",
-              description: efData.warning 
-                ? "Your invoice has been generated, but the QR code was missing. You can still download it." 
-                : "Your invoice has been generated. Please download it before continuing.",
-              variant: "default",
-          });
+        if (invoiceUrl) {
+            // Keep bookings.receipt_url in sync with the generated PDF
+            await supabase.from('bookings').update({ receipt_url: invoiceUrl }).eq('id', booking_id);
 
-          // Show the generated merged invoice modal
-          setSelectedBookingId(booking_id);
-          setSelectedInvoiceUrl(displayUrl);
-          setIsInvoiceModalOpen(true);
+            toast({
+                title: "Booking Successful",
+                description: efData.warning
+                    ? "Invoice generated — QR code page was unavailable but the invoice is ready to download."
+                    : "Your invoice has been generated. Please download it before continuing.",
+                variant: "default",
+            });
+
+            setSelectedBookingId(booking_id);
+            setSelectedInvoiceUrl(invoiceUrl);
+            setIsInvoiceModalOpen(true);
         } else {
-          // Fallback if no URL/base64 returned for some reason
-          navigate('/payments');
+            navigate('/payments');
         }
 
     } catch (error) {

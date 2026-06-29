@@ -204,6 +204,7 @@ const LessonsPage = () => {
   const executeBookingAndInvoice = async (profileData) => {
     setIsBooking(true);
     try {
+        // 1. Insert booking record
         const bookingDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
         const bookingData = {
             user_id: user.id,
@@ -218,67 +219,52 @@ const LessonsPage = () => {
             payment_status: 'pending',
             client_email: profileData.email,
             client_phone: profileData.phone,
-            notes: questionnaire.comments
+            notes: questionnaire.comments,
         };
 
         const { data: insertedBooking, error: insertError } = await supabase
-            .from('bookings')
-            .insert(bookingData)
-            .select()
-            .single();
-
+            .from('bookings').insert(bookingData).select().single();
         if (insertError) throw insertError;
 
         const booking_id = insertedBooking.id;
         const invoice_number = `INV-${Date.now()}`;
 
-        const pdfPayload = {
-            booking_id,
-            invoice_number,
-            amount: selectedLesson.price,
-            invoice_date: bookingDate,
-            customer_fullname: profileData.full_name,
-            customer_address: profileData.address,
-            customer_postal_city: `${profileData.postal_code} ${profileData.city}`,
-            customer_country: profileData.country,
-            lesson_name: bookingData.lesson_name,
-            qty: 1,
-            user_id: user.id,
-        };
-
+        // 2. Edge Function: generate invoice PDF server-side and return public URL
         const { data: efData, error: efError } = await supabase.functions.invoke('generate-invoice-pdf', {
-            body: pdfPayload
+            body: {
+                booking_id,
+                invoice_number,
+                amount: selectedLesson.price,
+                invoice_date: bookingDate,
+                customer_fullname: profileData.full_name,
+                customer_address: profileData.address,
+                customer_postal_city: `${profileData.postal_code} ${profileData.city}`,
+                customer_country: profileData.country,
+                lesson_name: bookingData.lesson_name,
+                qty: 1,
+                user_id: user.id,
+            },
         });
 
         if (efError || !efData?.success) {
-            throw new Error(efError?.message || efData?.error || "Failed to generate invoice");
+            throw new Error(efError?.message || efData?.error || 'Invoice generation failed');
         }
+
+        const { url: invoiceUrl, invoice_id } = efData;
 
         setIsConfirmOpen(false);
+        toast({
+            title: 'Booking Successful',
+            description: 'Your invoice has been generated.',
+            variant: 'default',
+        });
 
-        const invoiceUrl = efData.url;
-
-        if (invoiceUrl) {
-            // Keep bookings.receipt_url in sync with the generated PDF
-            await supabase.from('bookings').update({ receipt_url: invoiceUrl }).eq('id', booking_id);
-
-            toast({
-                title: "Booking Successful",
-                description: efData.warning
-                    ? "Invoice generated — QR code page was unavailable but the invoice is ready to download."
-                    : "Your invoice has been generated. Please download it before continuing.",
-                variant: "default",
-            });
-
-            setSelectedBookingId(booking_id);
-            setSelectedInvoiceUrl(invoiceUrl);
-            setIsInvoiceModalOpen(true);
-        } else {
-            navigate('/payments');
-        }
+        setSelectedBookingId(booking_id);
+        setSelectedInvoiceUrl(invoiceUrl);
+        setIsInvoiceModalOpen(true);
 
     } catch (error) {
-        console.error("Booking error:", error);
+        console.error('Booking error:', error);
         toast({ title: t.bookError, description: error.message, variant: 'destructive' });
     } finally {
         setIsBooking(false);

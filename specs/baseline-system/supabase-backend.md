@@ -414,6 +414,8 @@ All 14 functions are **ACTIVE** and run with `verify_jwt: false` (unauthenticate
 | `invoices` | *(none)* | — | — | **No policies — inaccessible to clients** ⚠️ |
 | `lessons` | *(none)* | — | — | **No policies — inaccessible to clients** ⚠️ |
 
+> **Applied to remote on 2026-07-07** via the Supabase MCP: `supabase/migrations/0001_add_roles_and_admin_rls.sql` is now tracked in `supabase_migrations`. It added a `profiles.role` column, an `is_admin()` helper, and admin-only UPDATE policies on `payment_proofs` and `bookings`. It also dropped the permissive "Service Role Full Access Payment Proofs" policy on the `public` role (advisor warning 0024) and consolidated `payment_proofs` SELECT/INSERT into single permissive policies (advisor warning 0006). The table below still reflects the *pre-migration* state for traceability; update it on the next baseline refresh.
+
 ---
 
 ## 6. Security Findings
@@ -453,7 +455,7 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 
 ## 8. Open Items / Deferred Decisions
 
-- **Role system:** The only `role` column in the DB is `public.users.role` on the legacy `users` table (1 row). When implementing `coach` and `accounting` roles (see `specs/project-context/overview.md §2`), decide whether to add a `role` column to `profiles`, use a separate `user_roles` join table, or leverage Supabase Auth custom claims (JWT).
+- **Role system:** Implemented as a `role` column on `public.profiles` (`student`, `coach`, `accounting`, `admin`; default `student`). Applied to remote on 2026-07-07 as migration `0001_add_roles_and_admin_rls` (tracked in `supabase_migrations`). A helper `public.is_admin()` is used by RLS policies on `payment_proofs` and `bookings` to enforce admin-only writes server-side. The frontend reads `profile.role` via `useAuth().role`. JWT custom claims and a separate `user_roles` join table were considered and rejected (claims require session refresh on role change; the join table adds complexity for a single-role-per-user model). The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
 - **`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:** Both are active. Determine which is the canonical generator and deprecate the other.
 - **`cleanup-pending-bookings`:** Unclear if this is triggered by a Supabase cron job (`pg_cron`) or an external scheduler. `pg_cron` extension is available but not installed.
 - **Migrations table is empty:** No migrations are tracked in `supabase_migrations`. All schema changes were applied directly through the Supabase dashboard. This means there is no reproducible migration history. Creating a migration baseline should be a priority before adding new schema changes.

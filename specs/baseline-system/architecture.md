@@ -138,7 +138,8 @@ graph TD
 Authentication is handled entirely by **Supabase Auth** via `SupabaseAuthContext.jsx`. On mount, the `AuthProvider`:
 1. Calls `supabase.auth.getSession()` to restore any existing session.
 2. Subscribes to `supabase.auth.onAuthStateChange()` for all future events.
-3. On each session change, **upserts `public.profiles`** with `full_name` and `phone` from `user_metadata`.
+3. On each session change, runs `ensureProfile(user)` to **upsert `public.profiles`** with `id`, `email`, `full_name`, `phone` and `updated_at`. (Previously this was duplicated in three places and the session-sync path omitted `email` — both fixed.)
+4. Loads the user's application `role` from `public.profiles.role` and exposes it via `useAuth().role`. Falls back to `student` if the column does not exist yet (i.e. before `supabase/migrations/0001_add_roles_and_admin_rls.sql` is applied).
 
 ```mermaid
 sequenceDiagram
@@ -150,40 +151,70 @@ sequenceDiagram
     Browser->>AuthProvider: mount (App.jsx wraps everything in AuthProvider)
     AuthProvider->>SupabaseAuth: getSession()
     SupabaseAuth-->>AuthProvider: session | null
-    AuthProvider->>ProfilesTable: upsert(id, full_name, phone, updated_at)
-    AuthProvider->>Browser: user/session state available via useAuth()
+    AuthProvider->>ProfilesTable: ensureProfile(upsert id, email, full_name, phone, updated_at)
+    AuthProvider->>ProfilesTable: fetch role
+    AuthProvider->>Browser: user/session/role available via useAuth()
 
     Note over Browser,SupabaseAuth: Subsequent login
     Browser->>AuthProvider: signIn(email, password)
     AuthProvider->>SupabaseAuth: signInWithPassword()
     SupabaseAuth-->>AuthProvider: onAuthStateChange fires
-    AuthProvider->>ProfilesTable: upsert(...)
+    AuthProvider->>ProfilesTable: ensureProfile(...) + fetch role
     AuthProvider->>Browser: user state updated
 ```
 
 **Supported auth methods (current):**
-- Email + password sign-up (`supabase.auth.signUp`)
-- Email + password sign-in (`supabase.auth.signInWithPassword`)
-- Sign-out (`supabase.auth.signOut`)
-- Email confirmation redirect to `https://agcpadelacademy.com`
+- Email + password sign-up (`supabase.auth.signUp`) with `emailRedirectTo` set to `${window.location.origin}/auth/callback`.
+- Email + password sign-in (`supabase.auth.signInWithPassword`).
+- Sign-out (`supabase.auth.signOut`).
+- Email confirmation handled by the `/auth/callback` route (`AuthCallbackPage.jsx`); Supabase v2 PKCE auto-exchanges the code in the URL via `detectSessionInUrl: true`.
+- Resend confirmation email (`supabase.auth.resend({ type: 'signup', ... })`) — exposed as "Resend confirmation email" on `LoginPage`.
+- Password reset: `supabase.auth.resetPasswordForEmail(email, { redirectTo: ${origin}/reset-password })` triggered from the "Forgot password?" link on `LoginPage`; the new password is set on the `/reset-password` route via `supabase.auth.updateUser({ password })`.
 
-**Planned:** OAuth (provider TBD — see `specs/project-context/overview.md §2`).
+**Supabase client config:** the URL and anon key are read from Vite env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) — see `.env.example`. Previously they were hardcoded in `src/lib/customSupabaseClient.js`. The client is also explicitly configured with `persistSession: true`, `detectSessionInUrl: true`, `autoRefreshToken: true`.
 
-### 3.2 Dead legacy auth context
+**Planned:** OAuth (provider TBD — see `specs/project-context/overview.md §2`). The next decision the user wants to make is which Supabase Auth providers to enable; this section will be updated once that is decided.
 
-`src/contexts/AuthContext.jsx` is a **fully local, localStorage-based** auth implementation (login/register/logout using a password stored in plain JSON in `localStorage`). It is **not mounted in `App.jsx`** and is therefore completely unused. It should be deleted.
+### 3.2 Legacy auth context
 
-### 3.3 Admin access control — CRITICAL SECURITY GAP ⚠️
+The legacy `src/contexts/AuthContext.jsx` (a fully local, `localStorage`-based auth implementation) referenced in earlier versions of this document has been **deleted from the repo**. `SupabaseAuthContext.jsx` is the only auth context. No action needed.
 
-`src/components/auth/ProtectedRoute.jsx` contains this code:
+### 3.3 Admin access control
 
-```jsx
-if (requireAdmin && user.email !== 'admin@agcpadelacademy.com') {
-   // return <Navigate to="/" replace />; // Disabled strict check for demo purposes
-}
-```
+`src/components/auth/ProtectedRoute.jsx` now checks the application role exposed by `useAuth()` (`role === 'admin'`) instead of hardcoding `admin@agcpadelacademy.com`. For backward compatibility, the legacy admin email fallback is `josep.barbera.reverte.1999@gmail.com` (the actual project owner — note that the original `admin@agcpadelacademy.com` address was hardcoded in the old code but no such user existed in `auth.users`, so the legacy check was effectively broken). Once `supabase/migrations/0001_add_roles_and_admin_rls.sql` is applied, the role column is the source of truth and the email fallback is irrelevant.
 
-**The redirect is commented out.** Any authenticated user can currently access `/admin/payment-verification` by navigating to it directly. This is the most critical security finding in the frontend codebase. The guard must be uncommented (or replaced with a proper role check against the DB) before any real traffic reaches the admin panel.
+**Important:** `ProtectedRoute` is a UX guard, not a security boundary. Server-side authorization is enforced by **Supabase RLS**:
+- `payment_proofs` UPDATE: only `public.is_admin()` (admins).
+- `bookings` UPDATE: owner OR `public.is_admin()`.
+- The permissive "Service Role Full Access Payment Proofs" policy on the `public` role is dropped (it previously bypassed RLS for everyone — Supabase advisor warning 0024).
+
+Until that migration is applied, the admin panel's writes still rely on the old permissive policies, so applying the migration is the actual fix for the security gap. See `supabase/migrations/0001_add_roles_and_admin_rls.sql` for the full SQL (review-only — apply via Supabase MCP or dashboard).
+
+### 3.4 Auth-related routes
+
+| Route | Component | Purpose |
+|---|---|---|
+| `/login` | `LoginPage` | Sign in / sign up / forgot password / resend confirmation |
+| `/auth/callback` | `AuthCallbackPage` | Landing page for email-confirmation and OAuth redirects |
+| `/reset-password` | `ResetPasswordPage` | Set a new password after clicking the reset email link |
+| `/profile` | `ProfileManagementPage` (guarded) | View / edit own profile |
+| `/payments` | `PaymentsPage` (guarded) | View own payments |
+| `/admin/payment-verification` | `AdminDashboard` (guarded, admin-only) | Payment proof verification |
+
+### 3.5 OAuth / social sign-in
+
+The frontend includes a generic OAuth button (`src/components/auth/OAuthButtons.jsx`) rendered on both the `LoginPage` and the `AuthDialog`. The list of providers shown is controlled by the `OAUTH_PROVIDERS` constant in each file (currently `['google']`). The auth context exposes `signInWithOAuth(provider)` which calls `supabase.auth.signInWithOAuth({ provider, options: { redirectTo: ${origin}/auth/callback } })`.
+
+**Provider enablement is dashboard-side** — the Supabase MCP does not expose tools for toggling Auth providers, so each provider must be enabled in the Supabase dashboard → Authentication → Providers. Until a provider is enabled there, clicking its button returns an error from Supabase.
+
+**Google OAuth setup (manual, one-time):**
+1. Google Cloud Console → APIs & Services → Credentials → Create Credentials → OAuth client ID → Application type: Web application.
+2. Add `https://jokjxpogvwxbwdaroqkc.supabase.co/auth/v1/callback` to "Authorized redirect URIs".
+3. Copy the Client ID and Client Secret.
+4. Supabase dashboard → Authentication → Providers → Google → enable, paste Client ID + Secret, save.
+5. Add `https://agcpadelacademy.com/auth/callback` and `http://localhost:3000/auth/callback` to Authentication → URL Configuration → Allowed Redirect URLs (also covers the email-confirmation and password-reset flows).
+
+After step 4 the "Continue with Google" button works end-to-end. New Google users get a `profiles` row via the same `ensureProfile` path (full_name and email are populated from the OAuth `user_metadata`).
 
 ---
 

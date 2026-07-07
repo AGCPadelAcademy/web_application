@@ -1,13 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://jokjxpogvwxbwdaroqkc.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impva2p4cG9ndnd4YndkYXJvcWtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxNzM5MjUsImV4cCI6MjA3Nzc0OTkyNX0.Y8mtJNVFpnSOUnEZV83OBaCldacW9N-khDVO7Mewxeg';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const customSupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file (see .env.example).'
+  );
+}
+
+const customSupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    // Persist session in localStorage (Supabase default) and auto-detect
+    // auth tokens in the URL so the email-confirmation and password-reset
+    // redirect flows work without a dedicated server route.
+    persistSession: true,
+    detectSessionInUrl: true,
+    autoRefreshToken: true,
+  },
+});
 
 export default customSupabaseClient;
 
-export { 
-    customSupabaseClient,
-    customSupabaseClient as supabase,
+export {
+  customSupabaseClient,
+  customSupabaseClient as supabase,
 };

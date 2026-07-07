@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 
 const ProfileManagementPage = () => {
   const { user, loading: authLoading } = useAuth();
-  console.log("AUTH DEBUG:", { user, authLoading });
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
@@ -27,10 +26,6 @@ const ProfileManagementPage = () => {
     city: '',
     country: ''
   });
-
-  useEffect(() => {
-    console.log("ProfileManagementPage mounted");
-  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {

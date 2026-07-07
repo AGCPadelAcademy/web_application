@@ -14,6 +14,8 @@ import TermsPage from '@/pages/TermsPage';
 import AdminDashboard from '@/pages/AdminDashboard';
 import ProfileManagementPage from '@/pages/ProfileManagementPage';
 import PaymentsPage from '@/pages/PaymentsPage';
+import AuthCallbackPage from '@/pages/AuthCallbackPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
@@ -43,6 +45,8 @@ function App() {
             <Route path="contact" element={<ContactPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="terms" element={<TermsPage />} />
+            <Route path="auth/callback" element={<AuthCallbackPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
 
             <Route path="profile" element={
               <ProtectedRoute>

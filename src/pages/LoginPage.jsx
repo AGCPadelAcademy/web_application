@@ -17,7 +17,9 @@ import PasswordField from '@/components/auth/PasswordField';
 // Providers rendered on the login screen. Each must also be enabled in the
 // Supabase dashboard → Authentication → Providers, otherwise Supabase will
 // return an error when the button is clicked.
-const OAUTH_PROVIDERS = ['google'];
+// Google OAuth disabled until provider is configured in Supabase dashboard.
+// Re-enable by setting to ['google'] once Client ID/Secret are in place.
+const OAUTH_PROVIDERS = [];
 
 const passwordInputClass = 'bg-gray-800 border-gray-700 text-white';
 

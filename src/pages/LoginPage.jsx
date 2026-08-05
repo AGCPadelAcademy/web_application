@@ -12,11 +12,14 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 import OAuthButtons from '@/components/auth/OAuthButtons';
+import PasswordField from '@/components/auth/PasswordField';
 
 // Providers rendered on the login screen. Each must also be enabled in the
 // Supabase dashboard → Authentication → Providers, otherwise Supabase will
 // return an error when the button is clicked.
 const OAUTH_PROVIDERS = ['google'];
+
+const passwordInputClass = 'bg-gray-800 border-gray-700 text-white';
 
 const LoginPage = () => {
   const [searchParams] = useSearchParams();
@@ -233,18 +236,15 @@ const LoginPage = () => {
                       className="bg-gray-800 border-gray-700 text-white"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                      className="bg-gray-800 border-gray-700 text-white"
-                    />
-                  </div>
+                  <PasswordField
+                    id="password"
+                    label="Password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    inputClassName={passwordInputClass}
+                    required
+                  />
                   <Button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-black font-bold" disabled={loading}>
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In'}
                   </Button>
@@ -300,10 +300,15 @@ const LoginPage = () => {
                     <Label htmlFor="reg-phone">Phone</Label>
                     <Input id="reg-phone" type="tel" placeholder="+1 555 000 000" value={registerPhone} onChange={(e) => setRegisterPhone(e.target.value)} required minLength="9" className="bg-gray-800 border-gray-700 text-white" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-pass">Password</Label>
-                    <Input id="reg-pass" type="password" placeholder="••••••••" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} required className="bg-gray-800 border-gray-700 text-white" />
-                  </div>
+                  <PasswordField
+                    id="reg-pass"
+                    label="Password"
+                    placeholder="••••••••"
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
+                    inputClassName={passwordInputClass}
+                    required
+                  />
                   <div className="flex items-center space-x-2 pt-2">
                     <Checkbox id="terms" checked={acceptTerms} onCheckedChange={setAcceptTerms} />
                     <Label htmlFor="terms" className="text-sm text-gray-400 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">

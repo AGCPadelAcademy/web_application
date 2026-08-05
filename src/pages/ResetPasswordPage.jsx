@@ -1,38 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import PasswordField from '@/components/auth/PasswordField';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Helmet } from 'react-helmet';
-
-function PasswordField({ id, label, value, onChange, show, onToggleShow, ...props }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={onChange}
-          className="bg-gray-800 border-gray-700 text-white pr-10"
-          {...props}
-        />
-        <button
-          type="button"
-          onClick={onToggleShow}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
-          aria-label={show ? 'Hide password' : 'Show password'}
-        >
-          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Landing page for the password-reset email link. Supabase auto-exchanges the
@@ -47,8 +20,6 @@ const ResetPasswordPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // If the user ends up here without a session (link expired/used), send
   // them back to the forgot-password flow.
@@ -83,6 +54,8 @@ const ResetPasswordPage = () => {
     setDone(true);
     setTimeout(() => navigate('/login', { replace: true }), 2500);
   };
+
+  const passwordInputClass = 'bg-gray-800 border-gray-700 text-white';
 
   return (
     <div className="container mx-auto flex items-center justify-center min-h-[80vh] px-4">
@@ -123,8 +96,7 @@ const ResetPasswordPage = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                show={showPassword}
-                onToggleShow={() => setShowPassword((prev) => !prev)}
+                inputClassName={passwordInputClass}
                 required
                 minLength="6"
               />
@@ -134,8 +106,7 @@ const ResetPasswordPage = () => {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                show={showConfirmPassword}
-                onToggleShow={() => setShowConfirmPassword((prev) => !prev)}
+                inputClassName={passwordInputClass}
                 required
                 minLength="6"
               />

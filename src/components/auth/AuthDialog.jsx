@@ -14,8 +14,10 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/lib/customSupabaseClient';
 import { Loader2 } from 'lucide-react';
+import OAuthButtons from '@/components/auth/OAuthButtons';
+
+const OAUTH_PROVIDERS = ['google'];
 
 const AuthDialog = () => {
   const [open, setOpen] = useState(false);
@@ -27,7 +29,7 @@ const AuthDialog = () => {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerPhone, setRegisterPhone] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
-  
+
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
 
@@ -45,27 +47,20 @@ const AuthDialog = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!acceptTerms) {
-        toast({ title: 'Terms not accepted', description: 'You must accept the terms and privacy policy.', variant: 'destructive' });
-        return;
+      toast({
+        title: 'Terms not accepted',
+        description: 'You must accept the terms and privacy policy.',
+        variant: 'destructive',
+      });
+      return;
     }
     setLoading(true);
-    const { data, error } = await signUp(registerEmail, registerPassword, registerName, registerPhone);
+    const { error } = await signUp(registerEmail, registerPassword, registerName, registerPhone);
     setLoading(false);
-    
-    if (!error) {
-      if (data?.user) {
-        // Automatically insert into profiles table
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: registerName,
-          email: registerEmail,
-          phone: registerPhone
-        });
 
-        if (profileError) {
-          console.error("Profile auto-creation error:", profileError);
-        }
-      }
+    if (!error) {
+      // Profile row is created inside signUp (single source of truth), so no
+      // duplicate upsert here.
       toast({ title: 'Registration completed!', description: 'Check your email to confirm your account.' });
       setOpen(false);
     }
@@ -93,6 +88,19 @@ const AuthDialog = () => {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Sign In
               </Button>
             </form>
+            {OAUTH_PROVIDERS.length > 0 && (
+              <div className="pt-3">
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-700" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-gray-900 px-2 text-gray-500">or</span>
+                  </div>
+                </div>
+                <OAuthButtons enabledProviders={OAUTH_PROVIDERS} />
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="register">
             <form onSubmit={handleRegister} className="space-y-4 pt-4">
@@ -108,6 +116,19 @@ const AuthDialog = () => {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Sign Up
               </Button>
             </form>
+            {OAUTH_PROVIDERS.length > 0 && (
+              <div className="pt-3">
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-700" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-gray-900 px-2 text-gray-500">or</span>
+                  </div>
+                </div>
+                <OAuthButtons enabledProviders={OAUTH_PROVIDERS} />
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

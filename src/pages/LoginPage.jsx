@@ -87,15 +87,19 @@ const LoginPage = () => {
     }
   };
 
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
+  const sendResetLink = async (email) => {
     setLoading(true);
     try {
-      const { error } = await resetPassword(resetEmail);
+      const { error } = await resetPassword(email);
       if (!error) setShowForgotPassword(false);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    await sendResetLink(resetEmail);
   };
 
   const handleResendConfirmation = async (e) => {
@@ -133,6 +137,15 @@ const LoginPage = () => {
         type="button"
         variant="link"
         className="w-full text-gray-400"
+        disabled={loading || !resetEmail}
+        onClick={() => sendResetLink(resetEmail)}
+      >
+        Didn&apos;t receive it? Resend reset link
+      </Button>
+      <Button
+        type="button"
+        variant="link"
+        className="w-full text-gray-400"
         onClick={() => setShowForgotPassword(false)}
       >
         Back to sign in
@@ -143,7 +156,20 @@ const LoginPage = () => {
   const renderResendConfirmation = () => (
     <form onSubmit={handleResendConfirmation} className="space-y-4 pt-4">
       <p className="text-sm text-gray-400">
-        Did not receive the confirmation email? Enter your address to resend it.
+        Only for new accounts that have <strong className="text-gray-300">not confirmed their email yet</strong>.
+        If you forgot your password, use{' '}
+        <button
+          type="button"
+          className="text-green-400 hover:underline"
+          onClick={() => {
+            setResetEmail(resendEmail);
+            setShowResendConfirmation(false);
+            setShowForgotPassword(true);
+          }}
+        >
+          Forgot password
+        </button>{' '}
+        instead.
       </p>
       <div className="space-y-2">
         <Label htmlFor="resend-email">Email</Label>
@@ -241,7 +267,7 @@ const LoginPage = () => {
                         setShowResendConfirmation(true);
                       }}
                     >
-                      Resend confirmation email
+                      Resend sign-up confirmation (new accounts only)
                     </button>
                   </div>
                 </form>

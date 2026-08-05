@@ -183,7 +183,9 @@ export const AuthProvider = ({ children }) => {
 
     toast({
       title: 'Confirmation email sent',
-      description: 'Check your inbox (and spam folder) for the confirmation link.',
+      description:
+        'If your account is already confirmed, no email is sent — try signing in. ' +
+        'For password reset, use Forgot password instead.',
     });
     return { error: null };
   }, [toast]);
@@ -194,17 +196,20 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (error) {
+      const isRateLimit = /once every|rate limit|too many/i.test(error.message || '');
       toast({
         variant: 'destructive',
         title: 'Could not send reset email',
-        description: error.message || 'Something went wrong.',
+        description: isRateLimit
+          ? 'Please wait about 60 seconds before requesting another reset link.'
+          : error.message || 'Something went wrong.',
       });
       return { error };
     }
 
     toast({
       title: 'Reset email sent',
-      description: 'Check your inbox for a link to reset your password.',
+      description: 'Check your inbox (and spam folder) for a link to reset your password.',
     });
     return { error: null };
   }, [toast]);

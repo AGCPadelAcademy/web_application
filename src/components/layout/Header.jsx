@@ -4,7 +4,6 @@ import { NavLink, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogOut, User, Loader2, Settings, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,11 +12,9 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import AuthDialog from '@/components/auth/AuthDialog';
 import { supabase } from '@/lib/customSupabaseClient';
 
 const Header = () => {
-  const { toast } = useToast();
   const { user, signOut, loading } = useAuth();
   const [profile, setProfile] = useState(null);
 
@@ -110,7 +107,11 @@ const Header = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <AuthDialog />
+          <Link to="/login">
+            <Button variant="outline" className="border-gray-600 hover:bg-gray-800 text-white">
+              Login
+            </Button>
+          </Link>
         )}
       </div>
     </motion.header>

@@ -118,6 +118,19 @@ export const AuthProvider = ({ children }) => {
       return { error };
     }
 
+    // Supabase returns HTTP 200 with an empty identities array when the email
+    // is already registered (anti-enumeration). No confirmation email is sent.
+    const isDuplicateSignup = data?.user?.identities?.length === 0;
+    if (isDuplicateSignup) {
+      toast({
+        variant: 'destructive',
+        title: 'Account already exists',
+        description:
+          'This email is already registered. Sign in with your password, or use "Resend sign-up confirmation" if you have not verified your email yet.',
+      });
+      return { error: null, data, duplicateAccount: true };
+    }
+
     // When email confirmation is required, no session exists yet. We still
     // create the profile row up-front so the user exists in `public.profiles`
     // once they confirm. If confirmation is disabled, onAuthStateChange will
@@ -126,12 +139,16 @@ export const AuthProvider = ({ children }) => {
       await ensureProfile(data.user);
     }
 
+    const needsConfirmation = !data?.session;
+
     toast({
-      title: 'Registration completed!',
-      description: 'Check your email to confirm your account.',
+      title: needsConfirmation ? 'Almost there!' : 'Registration completed!',
+      description: needsConfirmation
+        ? 'We sent a confirmation link to your email. Open it before signing in.'
+        : 'Your account is ready — you are now signed in.',
     });
 
-    return { error: null, data };
+    return { error: null, data, needsConfirmation };
   }, [toast]);
 
   const signIn = useCallback(async (email, password) => {
@@ -141,10 +158,22 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (error) {
+      let description = error.message || 'Something went wrong.';
+      if (error.message?.includes('Email not confirmed') || error.code === 'email_not_confirmed') {
+        description =
+          'Please confirm your email first (check inbox and spam). Use "Resend sign-up confirmation" on this page if needed.';
+      } else if (
+        error.message?.includes('Invalid login credentials') ||
+        error.code === 'invalid_credentials'
+      ) {
+        description =
+          'Wrong email or password. If you recently signed up, confirm your email first. Use "Forgot password" if you need to reset it.';
+      }
+
       toast({
         variant: 'destructive',
         title: 'Sign-in failed',
-        description: error.message || 'Something went wrong.',
+        description,
       });
     }
 

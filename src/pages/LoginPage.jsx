@@ -23,6 +23,9 @@ const OAUTH_PROVIDERS = [];
 
 const passwordInputClass = 'bg-gray-800 border-gray-700 text-white';
 
+/** Strip formatting so mobile keyboards (spaces, dashes) do not fail validation. */
+const phoneDigitCount = (value) => value.replace(/\D/g, '').length;
+
 const LoginPage = () => {
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('return_to') || '/';
@@ -73,13 +76,38 @@ const LoginPage = () => {
       });
       return;
     }
+
+    const normalizedPhone = registerPhone.trim();
+    if (phoneDigitCount(normalizedPhone) < 9) {
+      toast({
+        title: 'Invalid phone number',
+        description: 'Enter at least 9 digits (country code optional).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const { error } = await signUp(registerEmail, registerPassword, registerName, registerPhone);
+      const { error, needsConfirmation, duplicateAccount } = await signUp(
+        registerEmail,
+        registerPassword,
+        registerName,
+        normalizedPhone
+      );
       if (error) throw error;
+      if (duplicateAccount) {
+        setLoginEmail(registerEmail);
+        setActiveTab('login');
+        return;
+      }
 
-      // Profile row is created inside signUp (single source of truth), so no
-      // duplicate upsert here.
+      if (needsConfirmation) {
+        setLoginEmail(registerEmail);
+        setActiveTab('login');
+        return;
+      }
+
       if (returnTo && returnTo !== '/') {
         navigate(returnTo);
       } else {
@@ -300,7 +328,17 @@ const LoginPage = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-phone">Phone</Label>
-                    <Input id="reg-phone" type="tel" placeholder="+1 555 000 000" value={registerPhone} onChange={(e) => setRegisterPhone(e.target.value)} required minLength="9" className="bg-gray-800 border-gray-700 text-white" />
+                    <Input
+                      id="reg-phone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="+41 76 611 40 61"
+                      value={registerPhone}
+                      onChange={(e) => setRegisterPhone(e.target.value)}
+                      required
+                      className="bg-gray-800 border-gray-700 text-white"
+                    />
                   </div>
                   <PasswordField
                     id="reg-pass"

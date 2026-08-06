@@ -169,7 +169,7 @@ const LessonsPage = () => {
 
   const handleBookNow = async (lesson) => {
     if (!user) {
-        navigate(`/login?return_to=${encodeURIComponent(`/lessons?product=${lesson.id}`)}`);
+        navigate(`/login?return_to=${encodeURIComponent(`/lessons?product=${lesson.lesson_code}`)}`);
         return;
     }
     
@@ -200,7 +200,7 @@ const LessonsPage = () => {
         const bookingDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
         const bookingData = {
             user_id: user.id,
-            lesson_id: selectedLesson.id,
+            lesson_code: selectedLesson.lesson_code,
             lesson_name: selectedLesson.name,
             price: selectedLesson.price_amount + " CHF",
             booking_date: bookingDate,

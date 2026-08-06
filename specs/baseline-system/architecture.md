@@ -1,6 +1,7 @@
 # Architecture — AGC Padel Academy Web Application
 
 > Snapshot captured: 2026-06-28.
+> Refreshed 2026-08-06: corrected stale findings (lessons catalogue is DB-driven, Supabase keys are in env vars, admin guard uses `role === 'admin'` with RLS enforcement).
 > Sources analyzed: all files under `src/`, `vite.config.js`, `package.json`, `plugins/`, Supabase MCP (project `jokjxpogvwxbwdaroqkc`).
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
 
@@ -47,7 +48,7 @@ src/
 │
 ├── pages/                 ROUTE LAYER — one file per route; own data-fetching logic
 │   ├── HomePage.jsx       Static marketing landing (no data fetching)
-│   ├── LessonsPage.jsx    Lesson catalogue + booking flow + invoice generation
+│   ├── LessonsPage.jsx    Lesson catalogue (fetched from `lessons` table) + booking flow + invoice generation
 │   ├── TripsPage.jsx      Padel trips display (static/hardcoded content — assumption)
 │   ├── TournamentsPage.jsx Tournaments display (static/hardcoded — assumption)
 │   ├── ContactPage.jsx    Contact form → submit-contact-form Edge Function
@@ -285,11 +286,11 @@ These are confirmed findings from source code analysis, not assumptions.
 
 | Severity | Location | Issue |
 |---|---|---|
-| 🔴 CRITICAL | `src/components/auth/ProtectedRoute.jsx:19` | Admin guard is **commented out** — any logged-in user can access `/admin/payment-verification` |
-| 🔴 CRITICAL | `src/lib/customSupabaseClient.js:3-4` | Supabase URL and anon key are **hardcoded** in source. They should be in env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`). Anon key is now also visible in the `specs/baseline-system/supabase-backend.md` snapshot — rotate if that file is ever made public. |
+| ✅ RESOLVED | `src/components/auth/ProtectedRoute.jsx:19` | ~~Admin guard is **commented out** — any logged-in user can access `/admin/payment-verification`~~ **Stale finding — corrected.** `ProtectedRoute` now checks `useAuth().role === 'admin'` (see §3.3). Server-side authorization is enforced by RLS (`public.is_admin()` on `payment_proofs` UPDATE and `bookings` UPDATE). The permissive public-role policy on `payment_proofs` has been dropped. |
+| ✅ RESOLVED | `src/lib/customSupabaseClient.js:3-4` | ~~Supabase URL and anon key are **hardcoded** in source~~ **Stale finding — corrected.** Keys are now read from Vite env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) with a startup guard that throws if missing. See `.env.example`. |
 | 🟠 HIGH | `src/contexts/AuthContext.jsx` | Dead legacy auth context — stores passwords in plain JSON in `localStorage`. **Delete it.** |
 | 🟠 HIGH | `src/contexts/BookingContext.jsx` | Dead legacy booking context — uses `localStorage`. Not mounted in `App.jsx`. **Delete it.** |
-| 🟠 HIGH | `src/pages/LessonsPage.jsx:78-95` | **Lesson catalogue is hardcoded** as a JS array in the page file, not fetched from the `lessons` DB table (which has 14 rows). Any price or product change requires a code deployment. |
+| ✅ RESOLVED | `src/pages/LessonsPage.jsx:97-107` | ~~**Lesson catalogue is hardcoded** as a JS array in the page file~~ **Stale finding — corrected 2026-08-06.** The page now fetches from the `lessons` DB table via `supabase.from('lessons').select('*').eq('is_active', true).order('price_amount')`. The catalogue is DB-driven; no code deployment is needed for price/product changes. |
 | 🟡 MEDIUM | `src/contexts/SupabaseAuthContext.jsx:67-79` | Toast messages for sign-up errors and success are in **Spanish** (`"Fallo en el registro"`, `"¡Registro completado!"`) while the rest of the UI is in English. |
 | 🟡 MEDIUM | `src/pages/LessonsPage.jsx:101` | `const [lang] = useState("EN")` — the language is hardcoded to EN. The ES/EN translation object exists but the language-switcher UI is not implemented. |
 | 🟡 MEDIUM | `src/pages/LessonsPage.jsx:232` | `invoice_number` is generated client-side as `` `INV-${Date.now()}` `` — not guaranteed unique under concurrent bookings, and not atomic with the DB insert. Should be generated server-side. |
@@ -389,7 +390,7 @@ npm run build
 
 The following items were inferred rather than confirmed from source:
 
-- **`TripsPage.jsx` and `TournamentsPage.jsx` are likely static/hardcoded** (no Supabase calls detected at the import level), similar to how `LessonsPage.jsx` has a hardcoded lesson catalogue. They were not read in full — confirm when writing `specs/baseline-system/` for those pages.
+- **`TripsPage.jsx` and `TournamentsPage.jsx` are likely static/hardcoded** (no Supabase calls detected at the import level). Note: the original assumption that `LessonsPage.jsx` had a hardcoded catalogue was **incorrect and has been corrected** — `LessonsPage.jsx` fetches from the `lessons` table. The trips/tournaments pages should be re-verified individually when writing `specs/baseline-system/` for those pages; do not assume they follow the same pattern as the (now-corrected) lessons page.
 - **Apache `.htaccess` contains SPA fallback routing** (`RewriteRule . /index.html` or similar) — standard for Vite SPAs on Apache. Not yet read.
 - **No CI/CD pipeline exists** — deployment appears to be manual. No `Dockerfile`, `.github/`, `vercel.json`, or equivalent was found in the repo root.
 - **The Supabase Edge Functions source code is not in this repository** — function source is stored and deployed directly via the Supabase dashboard. There is no `supabase/` directory in this repo.

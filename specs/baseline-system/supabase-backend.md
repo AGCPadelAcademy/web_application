@@ -1,6 +1,7 @@
 # Baseline System — Supabase Backend
 
 > Snapshot captured: 2026-06-28 via Supabase MCP.
+> Refreshed 2026-08-06: `profiles.role` column added (was missing from the original snapshot); `users` table deleted; NOT NULL constraints tightened (migration `0002`); `lessons.stripe_price_id` column dropped; `bookings.lesson_id` renamed to `lesson_code` with FK to `lessons.lesson_code` (migration `0003`); 135 old/null-dated bookings deleted (29 remain); `notifications_log` FK changed from ON DELETE SET NULL to ON DELETE CASCADE.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -36,63 +37,54 @@ All other extensions (PostGIS, vector, pg_cron, pg_net, etc.) are available but 
 
 ### Tables — `public` schema
 
-#### `profiles` (33 rows) — RLS enabled
-Primary user profile. Linked 1:1 to `auth.users`.
+#### `profiles` (44 rows) — RLS enabled
+Primary user profile. Linked 1:1 to `auth.users`. Holds the canonical `role` field.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | FK → `auth.users.id` |
-| `full_name` | `text` | nullable |
-| `email` | `text` | nullable |
-| `phone` | `text` | nullable |
-| `address` | `text` | nullable |
-| `postal_code` | `text` | nullable |
-| `city` | `text` | nullable |
-| `country` | `text` | nullable |
-| `updated_at` | `timestamptz` | default `now()` |
+| `full_name` | `text` NOT NULL | |
+| `email` | `text` | nullable (27 incomplete profiles) |
+| `phone` | `text` | nullable (20 incomplete profiles) |
+| `address` | `text` | nullable (26 incomplete profiles) |
+| `postal_code` | `text` | nullable (26 incomplete profiles) |
+| `city` | `text` | nullable (26 incomplete profiles) |
+| `country` | `text` | nullable (26 incomplete profiles) |
+| `role` | `text` NOT NULL | default `'student'`, CHECK constraint: `student`, `coach`, `accounting`, `admin`. Current values: `student` (43), `admin` (1). |
+| `updated_at` | `timestamptz` NOT NULL | default `now()` |
 
 Referenced by: `bookings`, `availability`, `memberships`, `credits`.
 
-> **Schema debt:** There is also a separate `public.users` table (see below). Two profile tables exist simultaneously — likely a migration artifact. Recommend consolidating into `profiles` only.
+> **Profile completion:** contact/address fields remain nullable because 20–27 existing profiles are incomplete (users who never finished profile completion). The "profile must be complete before booking" invariant is enforced only in the UI layer (`ProfileCompletionModal` + `ProfileValidation.js`), not in the DB.
 
 ---
 
-#### `users` (1 row) — RLS enabled — **LEGACY**
-Duplicate user table, pre-dates `profiles`. Only 1 row. Likely orphaned.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | `uuid` PK | FK → `auth.users.id` (implied by RLS policy) |
-| `name`, `surname` | `text` | split name (vs `profiles.full_name`) |
-| `email`, `phone`, `address`, `postal_code`, `city`, `country` | `text` | mirrors `profiles` |
-| `role` | `text` | nullable — the **only** role field found in the DB |
-| `created_at` | `timestamptz` | |
-
-> **Important:** `users.role` is the only column that could support the `admin` / `coach` / `accounting` role system. It is currently on the **legacy** table. This needs to move to (or be mirrored on) `profiles` as part of the roles & permissions feature.
+#### ~~`users`~~ — **DELETED 2026-08-06**
+The legacy `public.users` table (pre-`profiles`, 1 mock row) has been dropped. `profiles.role` is the sole canonical role field. See `specs/project-context/domain-model.md` for the role-system decision.
 
 ---
 
-#### `bookings` (178 rows) — RLS enabled — **Main transactional table**
+#### `bookings` (29 rows) — RLS enabled — **Main transactional table**
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `user_id` | `uuid` | FK → `profiles.id` |
-| `lesson_id` | `text` | references `lessons` by code (loose FK) |
-| `lesson_name` | `text` | denormalized name |
-| `price` | `text` | stored as text — no numeric validation |
-| `amount_paid` | `numeric` | actual amount paid |
-| `duration_minutes` | `integer` | |
-| `group_size` | `integer` | default 1 |
-| `status` | `text` CHECK | `pending`, `pending_payment`, `confirmed`, `cancelled` — default `pending_payment` |
-| `payment_status` | `text` CHECK | `pending`, `confirmed`, `cancelled` — default `pending` |
-| `verification_status` | `text` | no CHECK constraint — free text |
-| `booking_type` | `booking_type_enum` | `with_time` or `without_time` — default `with_time` |
-| `booking_date` | `date` | nullable |
-| `start_time` / `end_time` | `time` | nullable |
+| `user_id` | `uuid` NOT NULL | FK → `profiles.id` |
+| `lesson_code` | `text` | nullable — FK → `lessons.lesson_code` (enforced, migration `0003`). Application layer should always set it. |
+| `lesson_name` | `text` NOT NULL | denormalized name |
+| `price` | `text` NOT NULL | stored as text — no numeric validation |
+| `amount_paid` | `numeric` | nullable — set when paid |
+| `duration_minutes` | `integer` NOT NULL | |
+| `group_size` | `integer` NOT NULL | default 1 |
+| `status` | `text` NOT NULL CHECK | `pending`, `pending_payment`, `confirmed`, `cancelled` — default `pending_payment` |
+| `payment_status` | `text` NOT NULL CHECK | `pending`, `confirmed`, `cancelled` — default `pending` |
+| `verification_status` | `text` NOT NULL | no CHECK constraint — free text — default `pending` |
+| `booking_type` | `booking_type_enum` NOT NULL | `with_time` or `without_time` — default `with_time` |
+| `booking_date` | `date` | nullable (without_time bookings) |
+| `start_time` / `end_time` | `time` | nullable (without_time bookings) |
 | `time_slot` | `text` | nullable (redundant with start/end?) |
-| `time_slot_id` | `uuid` | nullable |
-| `requires_scheduling` | `boolean` | default false |
+| `time_slot_id` | `uuid` | nullable — orphaned, to be dropped |
+| `requires_scheduling` | `boolean` NOT NULL | default false |
 | `client_email` | `text` | nullable (may differ from user's profile email) |
 | `client_phone` | `text` | nullable |
 | `email` | `text` | nullable (duplicate of `client_email`?) |
@@ -104,7 +96,7 @@ Duplicate user table, pre-dates `profiles`. Only 1 row. Likely orphaned.
 | `terms_version` | `text` | nullable |
 | `proof_uploaded_at` | `timestamptz` | nullable |
 | `payment_date` | `timestamptz` | nullable |
-| `created_at` / `updated_at` | `timestamptz` | |
+| `created_at` / `updated_at` | `timestamptz` NOT NULL | default `now()` |
 
 Referenced by: `payment_proofs`, `invoices`, `notifications_log`.
 
@@ -123,23 +115,24 @@ Old booking table from before the current schema. Zero rows; safe to drop after 
 ---
 
 #### `lessons` (14 rows) — RLS enabled — **NO RLS POLICIES** ⚠️
-The lesson catalogue.
+The lesson catalogue. Fetched by `LessonsPage.jsx` via `supabase.from('lessons').select('*').eq('is_active', true)`.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `lesson_code` | `text` UNIQUE | |
-| `name` | `text` | |
+| `lesson_code` | `text` UNIQUE NOT NULL | business key |
+| `name` | `text` NOT NULL | |
 | `description` | `text` | nullable |
-| `price_amount` | `numeric` | |
-| `currency` | `text` | default `CHF` |
-| `duration_minutes` | `integer` | |
-| `sessions_per_week` | `integer` | default 1 |
-| `is_group_lesson` | `boolean` | default false |
-| `is_subscription` | `boolean` | default false |
-| `is_active` | `boolean` | default true |
-| `stripe_price_id` | `text` | nullable — Stripe legacy, to be removed |
-| `created_at` / `updated_at` | `timestamptz` | |
+| `price_amount` | `numeric` NOT NULL | |
+| `currency` | `text` NOT NULL | default `CHF` |
+| `duration_minutes` | `integer` NOT NULL | |
+| `sessions_per_week` | `integer` NOT NULL | default 1 |
+| `is_group_lesson` | `boolean` NOT NULL | default false |
+| `is_subscription` | `boolean` NOT NULL | default false |
+| `is_active` | `boolean` NOT NULL | default true |
+| `created_at` / `updated_at` | `timestamptz` NOT NULL | default `now()` |
+
+> ~~`stripe_price_id`~~ — column **dropped** (Stripe deprecation).
 
 > **Security:** RLS is enabled but **no policies exist** — this means the table is inaccessible to all client-side queries. If the lessons list is currently rendering, either the Edge Functions use the service role key (bypassing RLS), or this table is not the actual data source for the lessons page. Needs investigation.
 
@@ -151,14 +144,14 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `booking_id` | `uuid` | FK → `bookings.id` |
-| `invoice_number` | `text` UNIQUE | |
-| `amount` | `numeric` | |
-| `currency` | `text` | default `CHF` |
-| `status` | `text` CHECK | `pending`, `paid`, `cancelled` — default `pending` |
+| `booking_id` | `uuid` NOT NULL | FK → `bookings.id` |
+| `invoice_number` | `text` UNIQUE NOT NULL | |
+| `amount` | `numeric` NOT NULL | |
+| `currency` | `text` NOT NULL | default `CHF` |
+| `status` | `text` NOT NULL CHECK | `pending`, `paid`, `cancelled` — default `pending` |
 | `pdf_url` | `text` | nullable — link to generated PDF in Storage |
 | `paid_at` | `timestamptz` | nullable |
-| `created_at` | `timestamptz` | |
+| `created_at` | `timestamptz` NOT NULL | default `now()` |
 
 > **Security:** RLS enabled but **no policies**. Same concern as `lessons` — client-side access is currently blocked. The `pdf_url` references the `invoices` Storage bucket (see §4).
 
@@ -169,11 +162,11 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `booking_id` | `uuid` | FK → `bookings.id` |
-| `file_url` | `text` | URL to uploaded file in `payment-proofs` bucket |
-| `verification_status` | `text` | default `pending` |
+| `booking_id` | `uuid` NOT NULL | FK → `bookings.id` |
+| `file_url` | `text` NOT NULL | URL to uploaded file in `payment-proofs` bucket |
+| `verification_status` | `text` NOT NULL | default `pending` |
 | `admin_notes` | `text` | nullable |
-| `upload_date` / `created_at` | `timestamptz` | |
+| `upload_date` / `created_at` | `timestamptz` NOT NULL | default `now()` |
 
 ---
 
@@ -182,10 +175,10 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `trainer_id` | `uuid` | FK → `profiles.id` |
-| `date` | `date` | |
-| `start_time` / `end_time` | `time` | |
-| `status` | `text` | default `open` |
+| `trainer_id` | `uuid` NOT NULL | FK → `profiles.id` (where `role = 'coach'`) |
+| `date` | `date` NOT NULL | |
+| `start_time` / `end_time` | `time` NOT NULL | |
+| `status` | `text` NOT NULL | default `open` |
 
 > No rows currently. Trainer-availability scheduling is not yet in use.
 
@@ -196,11 +189,11 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `user_id` | `uuid` | FK → `profiles.id` |
-| `balance` | `integer` | default 0 |
+| `user_id` | `uuid` NOT NULL | FK → `profiles.id` |
+| `balance` | `integer` NOT NULL | default 0 — tokens, not currency |
 | `expiry_date` | `timestamptz` | nullable |
 | `source` | `text` | nullable |
-| `created_at` | `timestamptz` | |
+| `created_at` | `timestamptz` NOT NULL | default `now()` |
 
 > No rows currently. Credit system is not yet in use.
 
@@ -211,10 +204,11 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `user_id` | `uuid` | FK → `profiles.id` |
-| `plan_id` | `text` | nullable |
-| `start_date` / `next_charge_date` | `timestamptz` | nullable |
-| `active` | `boolean` | default true |
+| `user_id` | `uuid` NOT NULL | FK → `profiles.id` |
+| `plan_id` | `text` | nullable — will reference a future `plans` table |
+| `start_date` | `timestamptz` NOT NULL | |
+| `next_charge_date` | `timestamptz` | nullable |
+| `active` | `boolean` NOT NULL | default true |
 
 > No rows currently. Membership / subscription system is not yet in use.
 
@@ -225,14 +219,15 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `booking_id` | `uuid` | FK → `bookings.id` |
-| `notification_type` | `text` CHECK | `email`, `sms` |
-| `recipient_type` | `text` CHECK | `client`, `admin` |
+| `booking_id` | `uuid` NOT NULL | FK → `bookings.id` |
+| `notification_type` | `text` NOT NULL CHECK | `email`, `sms` |
+| `recipient_type` | `text` NOT NULL CHECK | `client`, `admin` |
 | `recipient_email` / `recipient_phone` | `text` | nullable |
 | `message_subject` | `text` | nullable |
-| `status` | `text` CHECK | `sent`, `failed`, `pending` |
+| `status` | `text` NOT NULL CHECK | `sent`, `failed`, `pending` |
 | `error_message` | `text` | nullable |
-| `sent_at` / `created_at` | `timestamptz` | |
+| `sent_at` | `timestamptz` | nullable |
+| `created_at` | `timestamptz` NOT NULL | default `now()` |
 
 ---
 
@@ -241,11 +236,11 @@ Invoice records, one per booking.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | |
-| `name`, `email` | `text` | |
+| `name`, `email` | `text` NOT NULL | |
 | `phone` | `text` | nullable |
-| `subject`, `message` | `text` | |
-| `status` | `text` | default `new` |
-| `created_at` | `timestamptz` | |
+| `subject`, `message` | `text` NOT NULL | |
+| `status` | `text` NOT NULL | default `new` |
+| `created_at` | `timestamptz` NOT NULL | default `now()` |
 
 ---
 
@@ -262,12 +257,7 @@ erDiagram
         text email
         text phone
         text address
-    }
-    users_legacy {
-        uuid id PK
-        text role
-        text name
-        text email
+        text role "NOT NULL default student"
     }
     lessons {
         uuid id PK
@@ -280,7 +270,7 @@ erDiagram
     bookings {
         uuid id PK
         uuid user_id FK
-        text lesson_id
+        text lesson_code "FK -> lessons.lesson_code"
         text status
         text payment_status
         text verification_status
@@ -334,7 +324,6 @@ erDiagram
     }
 
     auth_users ||--|| profiles : "id"
-    auth_users ||--o| users_legacy : "id (legacy)"
     profiles ||--o{ bookings : "user_id"
     profiles ||--o{ availability : "trainer_id"
     profiles ||--o{ credits : "user_id"
@@ -396,8 +385,6 @@ All 14 functions are **ACTIVE** and run with `verify_jwt: false` (unauthenticate
 | `profiles` | Users can update own profile | public | UPDATE | `auth.uid() = id` |
 | `profiles` | Users can update own stripe_customer_id | public | UPDATE | `auth.uid() = id` (**duplicate of above — merge**) |
 | `profiles` | Users can view their own stripe_customer_id | public | SELECT | `auth.uid() = id` (**redundant with public SELECT**) |
-| `users` (legacy) | Users can see their own profile | public | SELECT | `auth.uid() = id` |
-| `users` (legacy) | Users can update their own profile | public | UPDATE | `auth.uid() = id` |
 | `bookings` | Public read bookings | public | SELECT | `true` (**all bookings visible to all — security concern**) |
 | `bookings` | Users insert own bookings | public | INSERT | (no row filter) |
 | `bookings` | Users update own bookings | public | UPDATE | `auth.uid() = user_id` |

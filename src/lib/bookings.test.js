@@ -16,6 +16,11 @@ const { mockSupabase, makeChain } = vi.hoisted(() => {
   const mockSupabase = {
     from: vi.fn(),
     functions: { invoke: vi.fn() },
+    auth: {
+      getSession: vi.fn(() =>
+        Promise.resolve({ data: { session: { access_token: 'test-token' } } })
+      ),
+    },
   };
   return { mockSupabase, makeChain };
 });
@@ -148,6 +153,7 @@ describe('requestInvoice', () => {
     const result = await requestInvoice({ booking, lesson, profile, userId: 'user-1' });
 
     expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('generate-invoice-pdf', {
+      headers: { Authorization: 'Bearer test-token' },
       body: {
         booking_id: 'booking-1',
         amount: 60,
@@ -172,5 +178,11 @@ describe('requestInvoice', () => {
   it('throws on invoke error', async () => {
     mockSupabase.functions.invoke.mockResolvedValue({ data: null, error: { message: 'network down' } });
     await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('network down');
+  });
+
+  it('throws without invoking when there is no session', async () => {
+    mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('signed in');
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
   });
 });

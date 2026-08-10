@@ -48,7 +48,16 @@ export async function createBooking(payload) {
 // The Edge Function allocates the invoice number atomically (INV-YYYY/MM/DD-XX)
 // and returns the public PDF URL.
 export async function requestInvoice({ booking, lesson, profile, userId }) {
+  // The function runs with verify_jwt: true — attach the session token
+  // explicitly; functions.invoke does not reliably refresh its captured
+  // Authorization header when sign-in happens after client construction.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('You must be signed in to generate an invoice.');
+  }
+
   const { data, error } = await supabase.functions.invoke('generate-invoice-pdf', {
+    headers: { Authorization: `Bearer ${session.access_token}` },
     body: {
       booking_id: booking.id,
       amount: lesson.price_amount,

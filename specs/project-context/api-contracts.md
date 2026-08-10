@@ -49,7 +49,7 @@ These are invoked from `src/` via `supabase.functions.invoke(...)`.
 #### `generate-invoice-pdf` (v21) ✅ confirmed from source
 **Purpose:** generate an invoice PDF (A4, branded, with logo and an appended Swiss QR payment page), store it in the `invoices` bucket, persist/refresh the `invoices` row, and set `bookings.receipt_url`.
 **Invoked from:** `src/lib/bookings.js` (`requestInvoice()`, called by `src/pages/LessonsPage.jsx`).
-**Auth (v21, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function verification: the caller's JWT (auto-attached by `supabase.functions.invoke`) is validated via `auth.getUser()`, and the caller must **own the booking** (`bookings.user_id = auth user`) or have `profiles.role = 'admin'`.
+**Auth (v21, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function verification: the caller's JWT is validated via `auth.getUser()`, and the caller must **own the booking** (`bookings.user_id = auth user`) or have `profiles.role = 'admin'`. ⚠️ Callers must attach the token explicitly (`headers: { Authorization: 'Bearer <session.access_token>' }`): `functions.invoke` does not reliably refresh its captured Authorization header when sign-in happens after client construction (this caused 401s on 2026-08-10 and is why `src/lib/bookings.js` and `PaymentVerificationPanel.jsx` fetch the session before invoking).
 
 **Request** — `POST /functions/v1/generate-invoice-pdf`, body JSON:
 ```json

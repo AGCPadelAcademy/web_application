@@ -68,17 +68,22 @@ const PaymentVerificationPanel = () => {
         .eq('id', proof.booking_id);
       if (bookingError) throw bookingError;
 
-      // Notify User via Edge Function
+      // Notify User via Edge Function (verify_jwt: true — attach session token explicitly)
       const userEmail = proof.bookings?.profiles?.email;
       if (userEmail) {
-        supabase.functions.invoke('notify-payment-verification', {
-          body: { 
-            booking_id: proof.booking_id, 
-            user_email: userEmail, 
-            status, 
-            admin_notes: note 
-          }
-        }).catch(err => console.warn('Notification error:', err));
+        supabase.auth.getSession().then(({ data: { session } }) =>
+          supabase.functions.invoke('notify-payment-verification', {
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+            body: {
+              booking_id: proof.booking_id,
+              user_email: userEmail,
+              status,
+              admin_notes: note
+            }
+          })
+        ).catch(err => console.warn('Notification error:', err));
       }
 
       toast({ title: 'Success', description: `Payment proof ${status} successfully.` });

@@ -73,7 +73,18 @@ export async function requestInvoice({ booking, lesson, profile, userId }) {
   });
 
   if (error || !data?.success) {
-    throw new Error(error?.message || data?.error || 'Invoice generation failed');
+    // FunctionsHttpError carries the raw Response on .context — surface the
+    // function's (or gateway's) real message instead of the generic
+    // "Edge function returned a non-2xx status code".
+    let detail = error?.message;
+    const response = error?.context;
+    if (response && typeof response.json === 'function') {
+      try {
+        const body = await response.json();
+        detail = body?.error || body?.message || detail;
+      } catch { /* body already consumed or not JSON */ }
+    }
+    throw new Error(detail || data?.error || 'Invoice generation failed');
   }
   return data;
 }

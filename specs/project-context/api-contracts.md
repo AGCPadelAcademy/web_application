@@ -3,7 +3,7 @@
 > Captured 2026-08-07 from: frontend source (`src/`), live Supabase Edge Function source (via MCP), and the DB schema baseline (`specs/baseline-system/supabase-backend.md`).
 > Updated 2026-08-07 (PM): all open contract questions resolved by project owner decisions — see §7. Stripe artifacts removed (migration `0004`), atomic invoice numbering added (migration `0005`), `generate-invoice-pdf` v18 and `notify-payment-verification` v2 deployed.
 > Updated 2026-08-10: the five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the legacy `receipts` storage bucket were **deleted** by the owner. 8 functions remain.
-> Updated 2026-08-10 (PM): **RLS hardening executed** (migration `0006`): `booking_slots` non-PII view created, `bookings` public-read policy replaced by owner/admin SELECT policies, availability grid switched to the view. **Edge Function auth hardened**: `generate-invoice-pdf` v21 and `notify-payment-verification` v5 now run with `verify_jwt: true` (gateway) plus in-function JWT + authorization checks.
+> Updated 2026-08-10 (PM): **RLS hardening executed** (migration `0006`): `booking_slots` non-PII view created, `bookings` public-read policy replaced by owner/admin SELECT policies, availability grid switched to the view. **Edge Function auth hardened**: `generate-invoice-pdf` v22 and `notify-payment-verification` v6 now run with `verify_jwt: true` (gateway) plus in-function JWT + authorization checks. **Evening fix**: the in-function check must pass the caller JWT **explicitly** (`auth.getUser(token)`) — the implicit global-header variant returns `AuthSessionMissingError` for valid tokens in the pinned `supabase-js@2.39.3` Deno runtime (v21/v5 bug, fixed in v22/v6).
 > This document presents the **integration surface** of the application: Edge Function endpoints, direct database (PostgREST) calls, Storage operations, Auth flows, and external services. It is the contract layer referenced by future feature specs.
 > Convention: ✅ contract confirmed from source · ⚠️ inferred or unverified, marked with TODO.
 
@@ -46,10 +46,10 @@ These are invoked from `src/` via `supabase.functions.invoke(...)`.
 
 ---
 
-#### `generate-invoice-pdf` (v21) ✅ confirmed from source
+#### `generate-invoice-pdf` (v22) ✅ confirmed from source
 **Purpose:** generate an invoice PDF (A4, branded, with logo and an appended Swiss QR payment page), store it in the `invoices` bucket, persist/refresh the `invoices` row, and set `bookings.receipt_url`.
 **Invoked from:** `src/lib/bookings.js` (`requestInvoice()`, called by `src/pages/LessonsPage.jsx`).
-**Auth (v21, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function verification: the caller's JWT is validated via `auth.getUser()`, and the caller must **own the booking** (`bookings.user_id = auth user`) or have `profiles.role = 'admin'`. ⚠️ Callers must attach the token explicitly (`headers: { Authorization: 'Bearer <session.access_token>' }`): `functions.invoke` does not reliably refresh its captured Authorization header when sign-in happens after client construction (this caused 401s on 2026-08-10 and is why `src/lib/bookings.js` and `PaymentVerificationPanel.jsx` fetch the session before invoking).
+**Auth (v22, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function verification: the caller's JWT is validated via `auth.getUser(token)` (**explicit token argument required** — the implicit-header variant fails in this supabase-js runtime), and the caller must **own the booking** (`bookings.user_id = auth user`) or have `profiles.role = 'admin'`. ⚠️ Callers must attach the token explicitly (`headers: { Authorization: 'Bearer <session.access_token>' }`): `functions.invoke` does not reliably refresh its captured Authorization header when sign-in happens after client construction (this caused 401s on 2026-08-10 and is why `src/lib/bookings.js` and `PaymentVerificationPanel.jsx` fetch the session before invoking).
 
 **Request** — `POST /functions/v1/generate-invoice-pdf`, body JSON:
 ```json
@@ -122,10 +122,10 @@ These are invoked from `src/` via `supabase.functions.invoke(...)`.
 
 ---
 
-#### `notify-payment-verification` (v5) ✅ confirmed from source
+#### `notify-payment-verification` (v6) ✅ confirmed from source
 **Purpose:** email the customer after an admin approves/rejects their payment proof, and record the outcome in `notifications_log`.
 **Invoked from:** `src/components/admin/PaymentVerificationPanel.jsx:73`.
-**Auth (v5, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function JWT verification and an **admin-only** check (`profiles.role = 'admin'` for the caller). Returns 401 without a valid token, 403 for non-admin callers.
+**Auth (v6, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function JWT verification (`auth.getUser(token)` with explicit token — same supabase-js@2.39.3 caveat as `generate-invoice-pdf`) and an **admin-only** check (`profiles.role = 'admin'` for the caller). Returns 401 without a valid token, 403 for non-admin callers.
 
 **Request** — body JSON:
 ```json
@@ -371,4 +371,4 @@ RLS is **already enabled on all 10 business tables** plus `invoice_counters`. Li
 
 ## 8. Baseline Reconciliation
 
-`specs/baseline-system/supabase-backend.md §3` previously listed 14 Edge Functions including `create-booking-with-invoice` and `generate-invoice-pdf-v2`, neither of which exists in the live project. The live set is the **8 functions listed in §1 above** (5 unused/legacy functions were deleted on 2026-08-10). The baseline was reconciled on 2026-08-07 and 2026-08-10 (edge functions, storage buckets, RLS policies, dropped Stripe column, `invoice_counters`, `bookings_old` no longer present in the live schema, `booking_slots` view + `bookings` RLS tightening in migration `0006`, Edge Function auth hardening in `generate-invoice-pdf` v21 / `notify-payment-verification` v5).
+`specs/baseline-system/supabase-backend.md §3` previously listed 14 Edge Functions including `create-booking-with-invoice` and `generate-invoice-pdf-v2`, neither of which exists in the live project. The live set is the **8 functions listed in §1 above** (5 unused/legacy functions were deleted on 2026-08-10). The baseline was reconciled on 2026-08-07 and 2026-08-10 (edge functions, storage buckets, RLS policies, dropped Stripe column, `invoice_counters`, `bookings_old` no longer present in the live schema, `booking_slots` view + `bookings` RLS tightening in migration `0006`, Edge Function auth hardening in `generate-invoice-pdf` v22 / `notify-payment-verification` v6).

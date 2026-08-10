@@ -88,7 +88,14 @@ export const AuthProvider = ({ children }) => {
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        // Recovery links establish a session automatically (magic-link-like).
+        // If the user landed anywhere other than the reset form, send them there
+        // so they actually choose a new password instead of just being logged in.
+        if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/reset-password') {
+          window.location.replace('/reset-password');
+          return;
+        }
         await handleSession(session);
       }
     );

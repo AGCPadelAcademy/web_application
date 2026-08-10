@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -62,6 +62,7 @@ function App() {
               }
             />
 
+            <Route path="admin" element={<Navigate to="/admin/payment-verification" replace />} />
             <Route
               path="admin/payment-verification"
               element={
@@ -70,6 +71,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
 
           </Route>
         </Routes>

@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/Header';
@@ -11,7 +10,7 @@ import TournamentsPage from '@/pages/TournamentsPage';
 import ContactPage from '@/pages/ContactPage';
 import LoginPage from '@/pages/LoginPage';
 import TermsPage from '@/pages/TermsPage';
-import AdminDashboard from '@/pages/AdminDashboard';
+import AdminDashboard from '@/pages/AdminDashboardPage';
 import ProfileManagementPage from '@/pages/ProfileManagementPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import AuthCallbackPage from '@/pages/AuthCallbackPage';

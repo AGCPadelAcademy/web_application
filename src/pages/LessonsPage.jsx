@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { AlertTriangle, Info, Loader2, Calendar as CalendarIcon, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,11 +20,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/customSupabaseClient';
+import { fetchDayBookings, buildBookingPayload, createBooking, requestInvoice } from '@/lib/bookings';
+import { fetchProfile } from '@/lib/profileService';
 import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
 import ProfileCompletionModal from '@/components/modals/ProfileCompletionModal';
 import InvoicePreviewModal from '@/components/modals/InvoicePreviewModal.jsx';
-import { isProfileComplete } from '@/lib/ProfileValidation';
+import { isProfileComplete } from '@/lib/profileValidation';
 
 const translations = {
   ES: {
@@ -116,20 +118,12 @@ const LessonsPage = () => {
     setLoadingBookings(true);
     try {
         const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-        const { data, error } = await supabase
-          .from('bookings')
-          .select('booking_date, start_time, end_time, user_id, payment_status')
-          .eq('booking_date', formattedDate)
-          .in('payment_status', ['confirmed', 'pending']); 
+        const data = await fetchDayBookings(formattedDate);
 
-        if (error) throw error;
-        if (data) {
-          setBookings(data.map(b => ({ 
-                  start: new Date(`${b.booking_date}T${b.start_time}Z`), 
-                  end: new Date(`${b.booking_date}T${b.end_time}Z`), 
-                  isMine: user?.id === b.user_id 
-          })));
-        }
+        setBookings(data.map(b => ({
+                start: new Date(`${b.booking_date}T${b.start_time}Z`),
+                end: new Date(`${b.booking_date}T${b.end_time}Z`),
+        })));
     } catch (error) {
         toast({ title: t.bookError, description: "Could not load availability.", variant: "destructive" });
     } finally {
@@ -145,23 +139,23 @@ const LessonsPage = () => {
     const slotEnd = addMinutes(slotDate, duration);
     for (const booking of bookings) {
       if (slotDate < booking.end && slotEnd > booking.start) {
-        return { booked: true, isMine: booking.isMine };
+        return true;
       }
     }
-    return { booked: false, isMine: false };
+    return false;
   }, [bookings]);
 
   const timeSlots = useMemo(() => {
     if (!selectedDate || !isValid(selectedDate)) return [];
     const slots = [];
     let cursor = setMinutes(setHours(startOfDay(selectedDate), 8), 0);
-    const endOfBookableTime = setMinutes(setHours(startOfDay(selectedDate), 20), 30); 
-    
+    const endOfBookableTime = setMinutes(setHours(startOfDay(selectedDate), 20), 30);
+
     while (cursor <= endOfBookableTime) {
-      const { booked, isMine } = isSlotBooked(cursor, 30);
+      const booked = isSlotBooked(cursor, 30);
       const hour = cursor.getHours();
       const isBlocked = hour === 14;
-      slots.push({ date: new Date(cursor), time: format(cursor, 'HH:mm'), booked, isMine, isBlocked });
+      slots.push({ date: new Date(cursor), time: format(cursor, 'HH:mm'), booked, isBlocked });
       cursor = addMinutes(cursor, 30);
     }
     return slots;
@@ -175,7 +169,7 @@ const LessonsPage = () => {
     
     setSelectedLesson(lesson);
 
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const profile = await fetchProfile(user.id);
     if (!isProfileComplete(profile)) {
         setProfileModalOpen(true);
         return;
@@ -196,50 +190,26 @@ const LessonsPage = () => {
   const executeBookingAndInvoice = async (profileData) => {
     setIsBooking(true);
     try {
-        // 1. Insert booking record
         const bookingDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
-        const bookingData = {
-            user_id: user.id,
-            lesson_code: selectedLesson.lesson_code,
-            lesson_name: selectedLesson.name,
-            price: selectedLesson.price_amount + " CHF",
-            booking_date: bookingDate,
-            start_time: selectedTime ? selectedTime.time : null,
-            end_time: selectedTime ? format(addMinutes(selectedTime.date, selectedLesson.duration_minutes), 'HH:mm') : null,
-            duration_minutes: selectedLesson.duration_minutes,
-            status: 'pending_payment',
-            payment_status: 'pending',
-            client_email: profileData.email,
-            client_phone: profileData.phone,
-            notes: questionnaire.comments,
-        };
 
-        const { data: insertedBooking, error: insertError } = await supabase
-            .from('bookings').insert(bookingData).select().single();
-        if (insertError) throw insertError;
-
-        const booking_id = insertedBooking.id;
+        // 1. Insert booking record
+        const insertedBooking = await createBooking(buildBookingPayload({
+            userId: user.id,
+            lesson: selectedLesson,
+            bookingDate,
+            selectedTime,
+            profile: profileData,
+            comments: questionnaire.comments,
+        }));
 
         // 2. Edge Function: generate invoice PDF server-side and return public URL
         // invoice_number is generated by the Edge Function (sequential INV-YYYY/MM/DD-XX)
-        const { data: efData, error: efError } = await supabase.functions.invoke('generate-invoice-pdf', {
-            body: {
-                booking_id,
-                amount: selectedLesson.price_amount,
-                invoice_date: bookingDate,
-                customer_fullname: profileData.full_name,
-                customer_address: profileData.address,
-                customer_postal_city: `${profileData.postal_code} ${profileData.city}`,
-                customer_country: profileData.country,
-                lesson_name: bookingData.lesson_name,
-                qty: 1,
-                user_id: user.id,
-            },
+        const efData = await requestInvoice({
+            booking: insertedBooking,
+            lesson: selectedLesson,
+            profile: profileData,
+            userId: user.id,
         });
-
-        if (efError || !efData?.success) {
-            throw new Error(efError?.message || efData?.error || 'Invoice generation failed');
-        }
 
         const { url: invoiceUrl, invoice_id } = efData;
 
@@ -250,7 +220,7 @@ const LessonsPage = () => {
             variant: 'default',
         });
 
-        setSelectedBookingId(booking_id);
+        setSelectedBookingId(insertedBooking.id);
         setSelectedInvoiceUrl(invoiceUrl);
         setIsInvoiceModalOpen(true);
 

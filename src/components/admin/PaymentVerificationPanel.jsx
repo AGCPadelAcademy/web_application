@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle, Eye, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/customSupabaseClient';
+import { getSignedProofUrl } from '@/lib/storage';
 
 const PaymentVerificationPanel = () => {
   const [proofs, setProofs] = useState([]);
@@ -91,10 +92,10 @@ const PaymentVerificationPanel = () => {
   };
 
   const openSignedUrl = async (fileUrl) => {
-    const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(fileUrl, 86400);
-    if (!error && data?.signedUrl) {
-      window.open(data.signedUrl, '_blank');
-    } else {
+    try {
+      const url = await getSignedProofUrl(fileUrl);
+      window.open(url, '_blank');
+    } catch {
       toast({ title: 'Error', description: 'Could not open file', variant: 'destructive' });
     }
   };

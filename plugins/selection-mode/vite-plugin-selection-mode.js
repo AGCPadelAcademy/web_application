@@ -6,22 +6,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = resolve(__filename, '..');
 
 export default function selectionModePlugin() {
-	return {
-		name: 'vite:selection-mode',
-		apply: 'serve',
+  return {
+    name: 'vite:selection-mode',
+    apply: 'serve',
 
-		transformIndexHtml() {
-			const scriptPath = resolve(__dirname, 'selection-mode-script.js');
-			const scriptContent = readFileSync(scriptPath, 'utf-8');
+    transformIndexHtml() {
+      const scriptPath = resolve(__dirname, 'selection-mode-script.js');
+      const scriptContent = readFileSync(scriptPath, 'utf-8');
 
-			return [
-				{
-					tag: 'script',
-					attrs: { type: 'module' },
-					children: scriptContent,
-					injectTo: 'body',
-				},
-			];
-		},
-	};
+      return [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          children: scriptContent,
+          injectTo: 'body',
+        },
+      ];
+    },
+  };
 }

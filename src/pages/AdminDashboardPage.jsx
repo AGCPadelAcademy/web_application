@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Helmet } from 'react-helmet';
+import { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentVerificationPanel from '@/components/admin/PaymentVerificationPanel';
 

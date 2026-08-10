@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { CreditCard, Clock, Calendar, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/SupabaseAuthContext';

@@ -1,13 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/customSupabaseClient';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { fetchProfile, updateProfile, profileToFormData } from '@/lib/profileService';
 
 const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel }) => {
   const { user } = useAuth();
@@ -24,28 +24,10 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
   });
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user?.id || !open) return;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-        
-      if (data) {
-        setFormData({
-          full_name: data.full_name || user.user_metadata?.full_name || '',
-          email: data.email || user.email || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          postal_code: data.postal_code || '',
-          city: data.city || '',
-          country: data.country || ''
-        });
-      }
-    };
-    fetchProfile();
+    if (!user?.id || !open) return;
+    fetchProfile(user.id).then((data) => {
+      if (data) setFormData(profileToFormData(data, user));
+    });
   }, [user, open]);
 
   const handleChange = (e) => {
@@ -66,25 +48,12 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.full_name,
-          phone: formData.phone,
-          address: formData.address,
-          postal_code: formData.postal_code,
-          city: formData.city,
-          country: formData.country,
-          // email not updated, it's read-only and managed by auth
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      const updated = await updateProfile(user.id, formData);
 
       toast({ title: 'Profile Updated', description: 'Your profile has been completed successfully.' });
-      
+
       if (onSaveSuccess) {
-        onSaveSuccess(formData);
+        onSaveSuccess(updated);
       }
     } catch (error) {
       toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });

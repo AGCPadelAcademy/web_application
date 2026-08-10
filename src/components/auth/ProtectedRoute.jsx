@@ -1,8 +1,5 @@
-import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-
-const ADMIN_EMAIL_FALLBACK = 'josep.barbera.reverte.1999@gmail.com';
 
 /**
  * Client-side route guard. Authorization for actual data writes is enforced
@@ -12,9 +9,6 @@ const ADMIN_EMAIL_FALLBACK = 'josep.barbera.reverte.1999@gmail.com';
  *
  * `allowedRoles` lets a route accept more than one role (e.g. admin OR
  * accounting). When omitted, any authenticated user is allowed.
- *
- * For backward compatibility, until the profiles.role migration is applied,
- * the legacy admin email is still treated as an admin.
  */
 const ProtectedRoute = ({ children, requireAdmin = false, allowedRoles = [] }) => {
   const { user, role, loading } = useAuth();
@@ -31,7 +25,7 @@ const ProtectedRoute = ({ children, requireAdmin = false, allowedRoles = [] }) =
     return <Navigate to="/login" replace />;
   }
 
-  const isAdmin = role === 'admin' || user.email === ADMIN_EMAIL_FALLBACK;
+  const isAdmin = role === 'admin';
 
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/" replace />;

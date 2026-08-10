@@ -2,6 +2,9 @@
 
 > Snapshot captured: 2026-06-28 via Supabase MCP.
 > Refreshed 2026-08-06: `profiles.role` column added (was missing from the original snapshot); `users` table deleted; NOT NULL constraints tightened (migration `0002`); `lessons.stripe_price_id` column dropped; `bookings.lesson_id` renamed to `lesson_code` with FK to `lessons.lesson_code` (migration `0003`); 135 old/null-dated bookings deleted (29 remain); `notifications_log` FK changed from ON DELETE SET NULL to ON DELETE CASCADE.
+> Refreshed 2026-08-07: Stripe artifacts removed (migration `0004`: `bookings.stripe_session_id` column dropped, Stripe-named `profiles` policies dropped); atomic invoice numbering added (migration `0005`: `invoice_counters` table + `next_invoice_number()` RPC); `generate-invoice-pdf` v18 and `notify-payment-verification` v2 deployed; §3/§4/§5 reconciled with the live project (13 Edge Functions, 3 pending manual deletion; `receipts` bucket pending deletion; live RLS policies; `bookings_old` no longer present in the live schema). Live row counts updated.
+> Refreshed 2026-08-10: five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the `receipts` bucket deleted by the owner. 8 functions remain.
+> Refreshed 2026-08-10 (PM): RLS hardening (migration `0006`) — `booking_slots` non-PII view created; `bookings` public-read policy replaced by owner/admin SELECT policies. Edge Function auth hardened — `generate-invoice-pdf` v21 and `notify-payment-verification` v5 run with `verify_jwt: true` + in-function JWT/authorization checks.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -37,7 +40,7 @@ All other extensions (PostGIS, vector, pg_cron, pg_net, etc.) are available but 
 
 ### Tables — `public` schema
 
-#### `profiles` (44 rows) — RLS enabled
+#### `profiles` (45 rows) — RLS enabled
 Primary user profile. Linked 1:1 to `auth.users`. Holds the canonical `role` field.
 
 | Column | Type | Notes |
@@ -64,7 +67,7 @@ The legacy `public.users` table (pre-`profiles`, 1 mock row) has been dropped. `
 
 ---
 
-#### `bookings` (29 rows) — RLS enabled — **Main transactional table**
+#### `bookings` (31 rows) — RLS enabled — **Main transactional table**
 
 | Column | Type | Notes |
 |---|---|---|
@@ -89,8 +92,7 @@ The legacy `public.users` table (pre-`profiles`, 1 mock row) has been dropped. `
 | `client_phone` | `text` | nullable |
 | `email` | `text` | nullable (duplicate of `client_email`?) |
 | `notes` | `text` | nullable |
-| `stripe_session_id` | `text` | nullable — Stripe legacy, to be removed |
-| `receipt_url` | `text` | nullable |
+| `receipt_url` | `text` | nullable — public URL of the invoice PDF in the `invoices` bucket |
 | `product_name` | `text` | nullable |
 | `ip_address` | `text` | nullable |
 | `terms_version` | `text` | nullable |
@@ -105,16 +107,17 @@ Referenced by: `payment_proofs`, `invoices`, `notifications_log`.
 > - `verification_status` has no CHECK constraint (unlike `status` and `payment_status`).
 > - `email` column vs `client_email` — purpose is ambiguous; likely a migration artifact.
 > - `time_slot` (text) vs `time_slot_id` (uuid) vs `start_time`/`end_time` — three overlapping representations of the same concept.
-> - `stripe_session_id` is a dead column once Stripe is removed.
+>
+> ~~`stripe_session_id`~~ — column **dropped** 2026-08-07 (migration `0004`, Stripe decommission).
 
 ---
 
-#### `bookings_old` (0 rows) — RLS enabled — **ARCHIVED**
-Old booking table from before the current schema. Zero rows; safe to drop after confirming no foreign key dependencies.
+#### ~~`bookings_old`~~ — **DROPPED** (not present in the live schema as of 2026-08-07)
+The archived pre-migration booking table no longer exists in `public` (dropped at some point after the 2026-06-28 snapshot).
 
 ---
 
-#### `lessons` (14 rows) — RLS enabled — **NO RLS POLICIES** ⚠️
+#### `lessons` (14 rows) — RLS enabled
 The lesson catalogue. Fetched by `LessonsPage.jsx` via `supabase.from('lessons').select('*').eq('is_active', true)`.
 
 | Column | Type | Notes |
@@ -134,11 +137,11 @@ The lesson catalogue. Fetched by `LessonsPage.jsx` via `supabase.from('lessons')
 
 > ~~`stripe_price_id`~~ — column **dropped** (Stripe deprecation).
 
-> **Security:** RLS is enabled but **no policies exist** — this means the table is inaccessible to all client-side queries. If the lessons list is currently rendering, either the Edge Functions use the service role key (bypassing RLS), or this table is not the actual data source for the lessons page. Needs investigation.
+> **Security (resolved 2026-08-07):** a live policy `lessons_public_read` (SELECT, `true`) exists — public catalogue read is intentional. The earlier "no policies" finding was stale.
 
 ---
 
-#### `invoices` (21 rows) — RLS enabled — **NO RLS POLICIES** ⚠️
+#### `invoices` (31 rows) — RLS enabled — **NO RLS POLICIES** ⚠️
 Invoice records, one per booking.
 
 | Column | Type | Notes |
@@ -157,7 +160,7 @@ Invoice records, one per booking.
 
 ---
 
-#### `payment_proofs` (0 rows) — RLS enabled — policies exist but conflicting ⚠️
+#### `payment_proofs` (2 rows) — RLS enabled
 
 | Column | Type | Notes |
 |---|---|---|
@@ -214,7 +217,8 @@ Invoice records, one per booking.
 
 ---
 
-#### `notifications_log` (1 row) — RLS enabled
+#### `notifications_log` (0 rows) — RLS enabled
+Audit trail for outbound notifications. Populated by `notify-payment-verification` v2 (2026-08-07). Values constrained by CHECKs: `notification_type` (`email`, `sms`), `recipient_type` (`client`, `admin`), `status` (`sent`, `failed`, `pending`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -241,6 +245,16 @@ Invoice records, one per booking.
 | `subject`, `message` | `text` NOT NULL | |
 | `status` | `text` NOT NULL | default `new` |
 | `created_at` | `timestamptz` NOT NULL | default `now()` |
+
+---
+
+#### `invoice_counters` (17 rows) — RLS enabled, no policies (service-role only)
+Per-day invoice sequence allocation. **Added 2026-08-07 (migration `0005`)**; seeded from existing invoice numbers. Used exclusively by `generate-invoice-pdf` via the `next_invoice_number(p_date_key)` RPC (`SECURITY DEFINER`, EXECUTE granted to `service_role` only) — atomic under concurrent bookings.
+
+| Column | Type | Notes |
+|---|---|---|
+| `date_key` | `text` PK | e.g. `'2026/08/07'` (matches the `INV-YYYY/MM/DD-XX` number format) |
+| `next_seq` | `integer` NOT NULL | last allocated sequence for that day |
 
 ---
 
@@ -275,7 +289,6 @@ erDiagram
         text payment_status
         text verification_status
         booking_type_enum booking_type
-        text stripe_session_id
         numeric amount_paid
     }
     invoices {
@@ -335,33 +348,31 @@ erDiagram
 
 ---
 
+### Views — `public` schema
+
+#### `booking_slots` — **ADDED 2026-08-10 (migration `0006`)**
+Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `end_time`, `payment_status` only (no `client_email` / `client_phone` / `notes` / `user_id`). Granted SELECT to `anon` + `authenticated`; runs with view-owner rights so the public availability grid on `/lessons` keeps working after the `bookings` SELECT policy was tightened to owner/admin. Sole consumer: `src/lib/bookings.js` (`fetchDayBookings`).
+
+---
+
 ## 3. Edge Functions
 
-All 14 functions are **ACTIVE** and run with `verify_jwt: false` (unauthenticated calls are permitted at the HTTP level — trust is enforced inside each function).
+8 functions are **ACTIVE** (reconciled with the live project 2026-08-10). Since 2026-08-10 (PM), `generate-invoice-pdf` and `notify-payment-verification` run with **`verify_jwt: true`** at the gateway plus in-function JWT verification and authorization checks; the other 6 still run with `verify_jwt: false` (trust enforced inside each function, or not at all). Full request/response contracts: `specs/project-context/api-contracts.md §1`.
 
 | Function | Version | Purpose | Status |
 |---|---|---|---|
-| `create-booking` | v50 | Original booking creation (Stripe Checkout) | **Deprecate** (Stripe removal) |
-| `handle-stripe-webhook` | v20 | Stripe payment webhook handler | **Deprecate** (Stripe removal) |
-| `cleanup-pending-bookings` | v15 | Scheduled cleanup of stale pending bookings | Active |
-| `generate-booking-receipt` | v3 | Generate a receipt for a booking | Active |
-| `assign-booking-time` | v1 | Assign a time slot to a booking | Active |
-| `verify-booking-saved` | v9 | Confirm a booking was persisted correctly | Active |
-| `submit-contact-form` | v13 | Handle contact form submissions | Active |
-| `generate-invoice-pdf` | v9 | Generate invoice PDF (v1) | May be superseded by v2 |
-| `merge-invoice-qr` | v1 | Merge QR code into the invoice PDF | Active — explains `qrcode` dep |
-| `upload-invoice-to-storage` | v2 | Upload generated PDF to `invoices` bucket | Active |
-| `create-booking-with-invoice` | v2 | Combined: create booking + generate invoice | **Current main booking flow** |
-| `verify-invoice-generation` | v1 | Verify invoice was generated and stored | Active |
-| `notify-payment-verification` | v1 | Notify user/admin of payment verification result | Active |
-| `generate-invoice-pdf-v2` | v2 | Revised invoice PDF generator | Active — may replace v1 |
+| `generate-invoice-pdf` | v21 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — main invoice generator** (called via `src/lib/bookings.js` from `LessonsPage.jsx`). Auth: caller JWT + booking ownership (or admin). |
+| `submit-contact-form` | v13+ | Persist contact message + trainer/customer emails | **Active** (called by `ContactPage.jsx`) |
+| `notify-payment-verification` | v5 | Email customer on proof approval/rejection; audits to `notifications_log` | **Active** (called by `PaymentVerificationPanel.jsx`). Auth: caller JWT + admin role. |
+| `cleanup-pending-bookings` | v15+ | Time-based auto-cancel of pending bookings | **Dormant — do NOT schedule.** Rejected approach; to be replaced by an explicit cancel-reservation flow (decision 2026-08-07). |
+| `upload-invoice-to-storage` | v2+ | Verify invoice PDF in storage, set status | Active, no frontend caller. To become the flag-driven invoice status-transition helper (future spec). |
+| `merge-invoice-qr` | v1+ | Merge QR page into a base64 invoice PDF | Active, no frontend caller (QR merge now inline in `generate-invoice-pdf`) |
+| `verify-invoice-generation` | v1+ | Scan generated PDF for unresolved placeholders | Active — QA/debug utility |
+| `upload-logo-once` | v1+ | One-off upload of `assets/logo.png` to `invoices` bucket | Active — setup helper |
 
-> **Invoice pipeline (inferred):**
-> `create-booking-with-invoice` → `generate-invoice-pdf-v2` → `merge-invoice-qr` → `upload-invoice-to-storage` → `invoices.pdf_url` set → `InvoiceModal` renders the PDF in an iframe.
+> **Deleted 2026-08-10** (by owner, via dashboard/CLI): `create-booking` (Stripe), `handle-stripe-webhook` (Stripe), `verify-booking-saved` (validated the dropped Stripe column), `generate-booking-receipt` and `assign-booking-time` (verified unused — no callers, no invocations, broken source bundles). Earlier snapshots also listed `create-booking-with-invoice` and `generate-invoice-pdf-v2`, which no longer exist.
 >
-> `qrcode` and `pdf-lib`/`pdfkit` are server-side dependencies inside these Edge Functions — they are **not** needed in the frontend `package.json`.
->
-> **Deprecation backlog:** `create-booking` (v50) and `handle-stripe-webhook` (v20) should be deactivated once it is confirmed that the `create-booking-with-invoice` flow is the sole active entry point.
+> Remaining Stripe cleanup (owner to confirm): Stripe secrets in Edge Function secrets; any webhook endpoint still registered in the Stripe dashboard.
 
 ---
 
@@ -369,39 +380,48 @@ All 14 functions are **ACTIVE** and run with `verify_jwt: false` (unauthenticate
 
 | Bucket | Public | Purpose | File size limit | MIME restriction |
 |---|---|---|---|---|
-| `invoices` | Yes | Generated invoice PDFs | None | None |
-| `receipts` | Yes | Stripe receipts (legacy) | None | None |
-| `qr-codes` | Yes | QR codes embedded in invoices | None | None |
-| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs | None | None |
+| `invoices` | Yes | Generated invoice PDFs (`Pending/YYYY/MM/DD/` prefix; planned: `Paid/`, `Refused/` on finance verification) + `assets/logo.png` | None | None |
+| `qr-codes` | Yes | Swiss QR payment slips embedded in invoices (`QR_<amount>.pdf`) | None | None |
+| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/<booking_id>_<ts>.<ext>`), accessed via 24h signed URLs | None | None |
+
+> ~~`receipts`~~ bucket **deleted 2026-08-10** (legacy Stripe-era invoice PDFs; verified unreferenced before deletion).
+>
+> **Bucket structure decision 2026-08-07:** `invoices` and `payment-proofs` stay **separate** — bucket publicity is bucket-level and the two have opposite privacy requirements (public invoice URLs vs private signed proof URLs). See `api-contracts.md §3`.
 
 ---
 
 ## 5. RLS Policies Summary
 
+Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`). RLS is enabled on **all** tables.
+
 | Table | Policy | Role | Command | Condition |
 |---|---|---|---|---|
-| `profiles` | Public profiles are viewable by everyone | public | SELECT | `true` |
+| `profiles` | Public profiles are viewable by everyone | public | SELECT | `true` ⚠️ |
 | `profiles` | Users can insert their own profile | public | INSERT | (check via trigger) |
+| `profiles` | Users can read own profile role | authenticated | SELECT | `id = auth.uid()` OR `is_admin()` |
 | `profiles` | Users can update own profile | public | UPDATE | `auth.uid() = id` |
-| `profiles` | Users can update own stripe_customer_id | public | UPDATE | `auth.uid() = id` (**duplicate of above — merge**) |
-| `profiles` | Users can view their own stripe_customer_id | public | SELECT | `auth.uid() = id` (**redundant with public SELECT**) |
-| `bookings` | Public read bookings | public | SELECT | `true` (**all bookings visible to all — security concern**) |
-| `bookings` | Users insert own bookings | public | INSERT | (no row filter) |
+| `bookings` | ~~Public read bookings~~ | — | — | **DROPPED 2026-08-10 (migration `0006`)** — was `true`, exposed PII to anonymous callers |
+| `bookings` | Users can view own bookings | authenticated | SELECT | `auth.uid() = user_id` (added 2026-08-10) |
+| `bookings` | Admins can view all bookings | authenticated | SELECT | `is_admin()` (added 2026-08-10) |
+| `bookings` | Users insert own bookings | public | INSERT | `auth.uid() = user_id` |
 | `bookings` | Users update own bookings | public | UPDATE | `auth.uid() = user_id` |
-| `bookings_old` | Users can view their own bookings | public | SELECT | `auth.uid() = user_id` |
-| `bookings_old` | Users can create bookings for themselves | public | INSERT | — |
+| `bookings` | Admins can update any booking | authenticated | UPDATE | `is_admin()` |
+| `booking_slots` (view) | *(view grant)* | anon, authenticated | SELECT | view-owner rights over a non-PII projection (added 2026-08-10, migration `0006`) |
+| `lessons` | lessons_public_read | public | SELECT | `true` (intentional — public catalogue) |
 | `availability` | Public can view availability | public | SELECT | `true` |
 | `credits` | Users can view own credits | public | SELECT | `auth.uid() = user_id` |
 | `memberships` | Users can view own membership | public | SELECT | `auth.uid() = user_id` |
-| `payment_proofs` | Service Role Full Access Payment Proofs | public | ALL | `true` (**overly permissive — see §6**) |
-| `payment_proofs` | Users can insert their own payment proofs | public | INSERT | — |
-| `payment_proofs` | Users can view their own payment proofs | public | SELECT | via `bookings.user_id = auth.uid()` |
+| `payment_proofs` | Users can insert their own payment proofs | authenticated | INSERT | — |
+| `payment_proofs` | Users can view their own payment proofs | authenticated | SELECT | via `bookings.user_id = auth.uid()` OR `is_admin()` |
+| `payment_proofs` | Admins can update any payment proof | authenticated | UPDATE | `is_admin()` |
 | `contact_messages` | Service role full access | service_role | ALL | `true` |
 | `notifications_log` | Service Role Full Access | service_role | ALL | `true` |
-| `invoices` | *(none)* | — | — | **No policies — inaccessible to clients** ⚠️ |
-| `lessons` | *(none)* | — | — | **No policies — inaccessible to clients** ⚠️ |
+| `invoices` | *(none)* | — | — | **No policies — client reads blocked; writes are service-role only** |
+| `invoice_counters` | *(none)* | — | — | **No policies — service-role only (intended)** |
 
-> **Applied to remote on 2026-07-07** via the Supabase MCP: `supabase/migrations/0001_add_roles_and_admin_rls.sql` is now tracked in `supabase_migrations`. It added a `profiles.role` column, an `is_admin()` helper, and admin-only UPDATE policies on `payment_proofs` and `bookings`. It also dropped the permissive "Service Role Full Access Payment Proofs" policy on the `public` role (advisor warning 0024) and consolidated `payment_proofs` SELECT/INSERT into single permissive policies (advisor warning 0006). The table below still reflects the *pre-migration* state for traceability; update it on the next baseline refresh.
+> Dropped 2026-08-07 (migration `0004`): `profiles` policies "Users can update own stripe_customer_id" / "Users can view their own stripe_customer_id" (Stripe-era duplicates).
+>
+> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view now serves the `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only. Remaining hardening (`profiles` public SELECT, `invoices` read policy): `api-contracts.md §7.1`.
 
 ---
 
@@ -413,13 +433,13 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 |---|---|---|---|
 | ⚠️ WARN | `payment_proofs` has a service-role ALL policy targeting `public` role — effectively bypasses RLS for everyone | `payment_proofs` | Remove the "Service Role Full Access Payment Proofs" policy from the `public` role; service_role bypasses RLS by default anyway. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0024_permissive_rls_policy) |
 | ⚠️ WARN | `payment_proofs` has conflicting policies causing multiple permissive policy overhead | `payment_proofs` | Consolidate into a single SELECT and single INSERT policy. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies) |
-| ⚠️ WARN | `profiles` has duplicate SELECT and UPDATE policies (stripe_customer_id ones vs general) | `profiles` | Merge the stripe_customer_id policies into the general profile policies. |
+| ⚠️ WARN | ~~`profiles` has duplicate SELECT and UPDATE policies (stripe_customer_id ones vs general)~~ | `profiles` | **Resolved 2026-08-07** (migration `0004`): Stripe-named policies dropped. |
 | ℹ️ INFO | `invoices` — RLS enabled, zero policies | `invoices` | Add appropriate client-side read policy (e.g. users can read invoices for their own bookings). |
-| ℹ️ INFO | `lessons` — RLS enabled, zero policies | `lessons` | Add a public SELECT policy (lesson catalogue is public data). |
+| ℹ️ INFO | ~~`lessons` — RLS enabled, zero policies~~ | `lessons` | **Resolved** — live policy `lessons_public_read` (SELECT, `true`) verified 2026-08-07. |
 | ⚠️ WARN | `handle_new_user()` function has a mutable `search_path` | `public.handle_new_user` | Set `search_path = ''` and qualify all object names. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable) |
 | ⚠️ WARN | `handle_new_user()` is callable by `anon` and `authenticated` as `SECURITY DEFINER` | `public.handle_new_user` | Revoke `EXECUTE` from `anon`/`authenticated`, or switch to `SECURITY INVOKER`. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) |
-| ⚠️ WARN | `invoices` and `receipts` Storage buckets are public and allow directory listing | `storage.invoices`, `storage.receipts` | Remove broad SELECT storage policies; object URLs still work without listing. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0025_public_bucket_allows_listing) |
-| ⚠️ WARN | `bookings` SELECT policy is `true` — all bookings are readable by anyone (including unauthenticated) | `bookings` | Restrict to `auth.uid() = user_id` for customers; add admin bypass. |
+| ⚠️ WARN | `invoices` and `receipts` Storage buckets are public and allow directory listing | `storage.invoices`, `storage.receipts` | Remove broad SELECT storage policies; object URLs still work without listing. `receipts` is pending deletion (2026-08-07). [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0025_public_bucket_allows_listing) |
+| ⚠️ WARN | ~~`bookings` SELECT policy is `true` — all bookings are readable by anyone (including unauthenticated)~~ | `bookings` | **Resolved 2026-08-10** (migration `0006`): public-read policy dropped; owner (`auth.uid() = user_id`) + admin (`is_admin()`) SELECT policies added; public availability served by the non-PII `booking_slots` view. |
 | ⚠️ WARN | Leaked password protection is disabled in Supabase Auth | Auth settings | Enable HaveIBeenPwned.org check in Supabase Auth dashboard → Settings → Auth → Password. |
 
 ---
@@ -443,7 +463,8 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 ## 8. Open Items / Deferred Decisions
 
 - **Role system:** Implemented as a `role` column on `public.profiles` (`student`, `coach`, `accounting`, `admin`; default `student`). Applied to remote on 2026-07-07 as migration `0001_add_roles_and_admin_rls` (tracked in `supabase_migrations`). A helper `public.is_admin()` is used by RLS policies on `payment_proofs` and `bookings` to enforce admin-only writes server-side. The frontend reads `profile.role` via `useAuth().role`. JWT custom claims and a separate `user_roles` join table were considered and rejected (claims require session refresh on role change; the join table adds complexity for a single-role-per-user model). The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
-- **`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:** Both are active. Determine which is the canonical generator and deprecate the other.
-- **`cleanup-pending-bookings`:** Unclear if this is triggered by a Supabase cron job (`pg_cron`) or an external scheduler. `pg_cron` extension is available but not installed.
-- **Migrations table is empty:** No migrations are tracked in `supabase_migrations`. All schema changes were applied directly through the Supabase dashboard. This means there is no reproducible migration history. Creating a migration baseline should be a priority before adding new schema changes.
+- ~~**`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:**~~ **Resolved 2026-08-07** — the `-v2` function no longer exists in the live project; `generate-invoice-pdf` (v18) is the sole canonical generator.
+- ~~**`cleanup-pending-bookings`:**~~ **Resolved 2026-08-07** — no scheduler exists and none should be added; time-based auto-cancellation is rejected. To be replaced by an explicit cancel-reservation flow (customer/admin/coach), spec'd as a future feature.
+- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10.
 - **No-file-size or MIME-type restrictions on any Storage bucket:** Any file size / type can be uploaded to `payment-proofs`. Add limits when implementing the payment-proof upload feature spec.
+- **Stripe cleanup:** Edge Functions deleted 2026-08-10; DB artifacts dropped (migration `0004`); Stripe secrets removed from Edge Function secrets 2026-08-10. Last leftover: the webhook endpoint in the Stripe dashboard (Developers → Webhooks, pointing to `…/functions/v1/handle-stripe-webhook`) — delete it there; harmless while it exists (deliveries just fail).

@@ -1,24 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, Eye, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/customSupabaseClient';
+import { getSignedProofUrl } from '@/lib/storage';
 import { format } from 'date-fns';
 
 const PaymentProofPreview = ({ proof }) => {
   const [signedUrl, setSignedUrl] = useState(null);
 
   useEffect(() => {
-    const fetchSignedUrl = async () => {
-      const { data, error } = await supabase.storage
-        .from('payment-proofs')
-        .createSignedUrl(proof.file_url, 86400); // 24 hours
-        
-      if (!error && data) {
-        setSignedUrl(data.signedUrl);
-      }
-    };
-    fetchSignedUrl();
+    let cancelled = false;
+    getSignedProofUrl(proof.file_url)
+      .then((url) => { if (!cancelled) setSignedUrl(url); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [proof.file_url]);
 
   const getStatusDisplay = () => {

@@ -1,6 +1,5 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, FileText, Shield, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -77,7 +76,7 @@ const TermsPage = () => {
               <p className="font-semibold text-white">
                 Payments
               </p>
-              <p>Adults and single classes: online payment via Stripe (secure payment).</p>
+              <p>Adults and single classes: payment by bank transfer, based on an invoice issued by CAG Padel Academy GmbH.</p>
               <p>Children: payment by invoice issued by CAG Padel Academy GmbH.</p>
               <p className="font-semibold text-white">
                 Denial of Service
@@ -211,7 +210,8 @@ const TermsPage = () => {
                 <p className="font-semibold text-white">Types of Data Collected</p>
                 <p>
                   Personal data may include name, surname, email address, phone number,
-                  booking history, and payment information (processed exclusively by Stripe).
+                  booking history, and payment information (payments are made by bank
+                  transfer).
                   Medical data is processed only when voluntarily provided by the user for
                   credit eligibility purposes.
                 </p>
@@ -224,8 +224,9 @@ const TermsPage = () => {
 
                 <p className="font-semibold text-white">Data Storage & Processors</p>
                 <p>
-                  Data is stored securely using Supabase. Stripe acts as an independent payment
-                  processor. Data is retained only as long as required for contractual and legal
+                  Data is stored securely using Supabase. Payments are made by bank
+                  transfer to CAG Padel Academy GmbH; no third-party payment processor
+                  is used. Data is retained only as long as required for contractual and legal
                   obligations.
                 </p>
 
@@ -237,7 +238,7 @@ const TermsPage = () => {
 
                 <p className="font-semibold text-white">International Transfers</p>
                 <p>
-                  Stripe may process data outside Switzerland. In such cases, appropriate
+                  Where service providers process data outside Switzerland, appropriate
                   safeguards and contractual clauses apply.
                 </p>
               </div>

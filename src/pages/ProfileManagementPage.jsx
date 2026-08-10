@@ -1,99 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, User, Mail, Phone, MapPin, Map, Globe, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useProfile } from '@/hooks/useProfile';
+import { profileToFormData } from '@/lib/profileService';
+
+const EMPTY_FORM = {
+  full_name: '',
+  email: '',
+  phone: '',
+  address: '',
+  postal_code: '',
+  city: '',
+  country: ''
+};
 
 const ProfileManagementPage = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  
-  const [loading, setLoading] = useState(true);
+  const { profile, loading: profileLoading, error: profileError, saveProfile } = useProfile();
+
   const [saving, setSaving] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
-  
-  const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone: '',
-    address: '',
-    postal_code: '',
-    city: '',
-    country: ''
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (authLoading) return;
-      
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
+    if (profile) {
+      setFormData(profileToFormData(profile, user));
+    }
+  }, [profile, user]);
 
-      setLoading(true);
-      setFetchError(null);
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) {
-          if (error.code === 'PGRST116') {
-            const newProfileData = {
-              id: user.id,
-              full_name: user.user_metadata?.full_name || '',
-              email: user.email || '',
-            };
-            
-            const { data: newProfile, error: insertError } = await supabase
-              .from('profiles')
-              .insert([newProfileData])
-              .select()
-              .single();
-              
-            if (insertError) throw insertError;
-            
-            setFormData(prev => ({
-              ...prev,
-              full_name: newProfile.full_name || prev.full_name,
-              email: newProfile.email || user.email || prev.email,
-            }));
-            return;
-          }
-          throw error;
-        }
-        
-        if (data) {
-          setFormData(prev => ({
-            full_name: data.full_name || prev.full_name,
-            email: data.email || user.email || prev.email,
-            phone: data.phone || prev.phone,
-            address: data.address || prev.address,
-            postal_code: data.postal_code || prev.postal_code,
-            city: data.city || prev.city,
-            country: data.country || prev.country
-          }));
-        }
-      } catch (error) {
-        console.error("Profile fetch error:", error);
-        setFetchError("Could not load your profile details.");
-        toast({ title: 'Error loading profile', description: error.message, variant: 'destructive' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchProfile();
-  }, [user, authLoading, toast]);
+  useEffect(() => {
+    if (profileError) {
+      console.error("Profile fetch error:", profileError);
+      toast({ title: 'Error loading profile', description: profileError.message, variant: 'destructive' });
+    }
+  }, [profileError, toast]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -108,21 +54,7 @@ const ProfileManagementPage = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.full_name,
-          phone: formData.phone,
-          address: formData.address,
-          postal_code: formData.postal_code,
-          city: formData.city,
-          country: formData.country,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
+      await saveProfile(formData);
       toast({ title: 'Profile Updated', description: 'Your changes have been saved successfully.' });
     } catch (error) {
       console.error("Failed to update profile:", error);
@@ -132,7 +64,8 @@ const ProfileManagementPage = () => {
     }
   };
 
-  const isLoadingData = loading || authLoading;
+  const isLoadingData = profileLoading;
+  const fetchError = profileError ? "Could not load your profile details." : null;
 
   return (
     <div className="min-h-screen bg-gray-950 py-12 px-4 sm:px-6 lg:px-8 text-gray-100 flex justify-center w-full">

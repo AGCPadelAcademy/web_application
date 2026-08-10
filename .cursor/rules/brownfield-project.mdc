@@ -1,27 +1,79 @@
 ---
 alwaysApply: true
 ---
-# Repository Instructions
 
-You are working on a brownfield codebase.
+# Brownfield Project Instructions
 
-Objectives:
-1. Understand before modifying.
-2. Prefer incremental changes.
-3. Preserve backward compatibility.
-4. Never delete functionality unless explicitly instructed.
+You are working on an existing brownfield codebase.
 
-Architecture process:
-Read:
-/specs
-/src
+## Core Objectives
 
-When documentation is missing:
-- infer from code
-- mark assumptions
-- create TODO sections
+1. Understand the existing implementation before modifying code.
+2. Prefer incremental, minimal changes.
+3. Preserve existing behavior and backward compatibility.
+4. Never delete or rewrite existing functionality unless explicitly requested.
+5. Do not introduce architectural changes without first documenting and justifying them.
+6. Never assume undocumented behavior; inspect the codebase first.
 
-Documentation rules:
-- diagrams in Mermaid
-- use markdown
-- document uncertainty explicitly
+## Project Context
+
+Before making changes, read the relevant documentation under:
+
+- `/specs/project-context/`
+- `/specs/baseline-system/`
+
+When relevant, inspect the corresponding source code under:
+
+- `/src/`
+
+Documentation takes precedence for understanding the intended architecture, but verify it against the implementation. If documentation and implementation disagree, explicitly identify the discrepancy.
+
+## Working With Missing Documentation
+
+When information is not documented:
+
+1. Inspect the existing implementation.
+2. Infer the behavior only when there is sufficient evidence.
+3. Mark assumptions explicitly.
+4. Add `TODO` items for information that cannot be determined confidently.
+5. Do not invent requirements, architecture, APIs, or business rules.
+
+## Documentation Rules
+
+- Use Markdown.
+- Use Mermaid for diagrams.
+- Document assumptions and uncertainties explicitly.
+- Keep documentation synchronized with the implementation when changes are made.
+- Prefer concise, factual documentation over speculative descriptions.
+
+## Change Workflow
+
+Before implementing a new feature or significant change:
+
+1. Understand the relevant existing functionality.
+2. Identify affected modules, services, APIs, database entities, and integrations.
+3. Identify potential backward-compatibility risks.
+4. Create or update the corresponding specification under `/specs/features/`.
+5. Document the proposed design and implementation tasks.
+6. Only then modify the source code.
+
+For small bug fixes or trivial changes, use judgment and avoid unnecessary documentation overhead.
+
+## Implementation Rules
+
+- Reuse existing patterns before introducing new ones.
+- Follow existing project conventions.
+- Avoid unnecessary refactoring while implementing a feature.
+- Do not modify unrelated code.
+- Do not introduce new dependencies without justification.
+- Preserve existing APIs unless a breaking change is explicitly required.
+- Add or update tests when behavior changes.
+
+## Verification
+
+After making changes:
+
+1. Run the relevant tests.
+2. Run linting/type checks when applicable.
+3. Verify that existing functionality remains intact.
+4. Report any assumptions, unresolved TODOs, or risks introduced by the change.

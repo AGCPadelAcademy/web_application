@@ -11,20 +11,20 @@
 | Entity | Table | Status in domain | One-line definition |
 |---|---|---|---|
 | **User** (auth identity) | `auth.users` (Supabase-managed) | Active | Login identity (email + password). Technical concern, not business-managed. |
-| **Profile** | `public.profiles` | Active — 44 rows | The customer/student: contact details, address, and **role** (`student` / `coach` / `accounting` / `admin`). 1:1 with User. |
+| **Profile** | `public.profiles` | Active — 45 rows | The customer/student: contact details, address, and **role** (`student` / `coach` / `accounting` / `admin`). 1:1 with User. |
 | ~~**Legacy User**~~ | ~~`public.users`~~ | **Deleted** | Dropped 2026-08-06 — superseded by `profiles`. |
 | **Lesson** | `public.lessons` | Active — 14 rows | A bookable product in the lesson catalogue (private/group/kids, one-off or subscription). |
-| **Booking** | `public.bookings` | Active — 178 rows | A customer's purchase of a lesson — the central transactional entity. |
-| **Invoice** | `public.invoices` | Active — 21 rows | The financial document generated for a booking (PDF stored in Storage). |
-| **Payment Proof** | `public.payment_proofs` | Active — 0 rows | A bank-transfer receipt uploaded by the customer, pending admin verification. |
-| **Notification** | `public.notifications_log` | Active — 1 row | Audit log of emails/SMS sent about a booking. |
+| **Booking** | `public.bookings` | Active — 31 rows | **Pairs a lesson with a client** — a reservation, and the central transactional entity. |
+| **Invoice** | `public.invoices` | Active — 31 rows | The financial document generated for a booking (PDF stored in Storage). |
+| **Payment Proof** | `public.payment_proofs` | Active — 2 rows | A bank-transfer receipt uploaded by the customer, pending admin verification. |
+| **Notification** | `public.notifications_log` | Active — 0 rows | Audit log of emails/SMS sent about a booking (populated by `notify-payment-verification` v2). |
 | **Trainer Availability** | `public.availability` | Defined, **unused** — 0 rows | A date/time window in which a trainer (a Profile with role `coach`) can teach. |
 | **Credit** | `public.credits` | Defined, **unused** — 0 rows · **retained for future use** | Prepaid token balance a customer can spend on sessions of the **same membership** the tokens were acquired with. |
-| **Membership** | `public.memberships` | Defined, **unused** — 0 rows · **retained for future use** | A subscription plan tying a customer to recurring billing. Will need a `plans` reference. |
+| **Membership** | `public.memberships` | Defined, **unused** — 0 rows · **retained for future use** | A subscription plan tying a customer to recurring billing. **Future: holds the actual session bookings, drawing down the membership's credits.** Will need a `plans` reference. |
 | **Trip** | *(not yet created)* | **To be created** | A padel-trip product (flights, hotel, transfers, training in Spain). Dedicated table. |
 | **Tournament** | *(not yet created)* | **To be created** | A tournament in the AGC circuit. Dedicated table. |
 | **Contact Message** | `public.contact_messages` | Active — 12 rows | A message sent via the public contact form. Links to Profile by email when matched. |
-| **Archived Booking** | `public.bookings_old` | **Archived** — 0 rows | Previous booking schema. Drop candidate. |
+| ~~**Archived Booking**~~ | ~~`public.bookings_old`~~ | **Dropped** | No longer present in the live schema as of 2026-08-07. |
 
 > **Domain note:** `TripsPage` and `TournamentsPage` are two of the three business lines, yet **no tables exist for trips or tournaments**. `bookings.product_name` and `bookings.lesson_code` suggest they may be shoehorned into the booking flow.
 > TODO: Confirm how trips/tournaments are (or will be) modeled — dedicated tables, or generic "products" replacing `lessons`.
@@ -117,7 +117,9 @@ Grouped by concern (full column list in baseline §2 `bookings`):
 
 `id` · `user_id` (FK → Profile) · `plan_id` (text — references nothing yet) · `start_date` / `next_charge_date` · `active`
 
-> **TODO — when the membership feature is spec'd:** create a `plans` table first, then add an FK from `memberships.plan_id` → `plans.id` (or `plans.code`). Define the plans schema at that time.
+> **Domain rule (clarified 2026-08-07):** `bookings` pairs a lesson with a client (a reservation). In the future model, **memberships hold the actual session bookings** — sessions are consumed by spending the **credits (tokens) acquired with that same membership**. Cancellation of a reservation is always an **explicit action** (customer, admin, or coach), never a time-based auto-cleanup; the refund/credit-return logic on cancellation is to be defined in the cancellation feature spec.
+>
+> **TODO — when the membership feature is spec'd:** create a `plans` table first, then add an FK from `memberships.plan_id` → `plans.id` (or `plans.code`). Define how session bookings link to memberships and how credits are drawn down.
 
 ### 2.10 Contact Message
 

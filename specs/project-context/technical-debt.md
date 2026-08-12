@@ -20,7 +20,7 @@
 | 10 | `npm audit` reports 12 vulnerabilities (11 high) | Deprecated patterns | Medium | 🔶 12 → 3 (1 low esbuild dev-only, 2 moderate react-router — fixing needs the React Router 7 major upgrade, deferred to a feature spec) |
 | 11 | Signed-URL helper duplicated across admin/customer proof viewers | Duplication | Low | ✅ `src/lib/storage.js` (`getSignedProofUrl`); both call sites migrated |
 | 12 | `react-helmet` unmaintained | Deprecated patterns | Low | ✅ Replaced by `react-helmet-async` (12 pages + `HelmetProvider` in `main.jsx`) |
-| 13 | `vite.config.js` embeds ~200 lines of inline plugin scripts | Large module | Low | ✅ Extracted to `plugins/horizons/scripts/*.js` (5 files, loaded via `fs`) |
+| 13 | `vite.config.js` embeds ~200 lines of inline plugin scripts | Large module | Low | ✅ Fully removed 2026-08-12 — Horizons plugins, scripts, and Babel deps deleted; config is now ~60 lines of plain React setup |
 | 14 | Company identity hardcoded in two places (TermsPage + invoice EF) | Duplication | Low | ⏸️ Documented pairing kept (different runtimes); revisit with a settings table |
 | 15 | DB schema debt (text price, unconstrained statuses, duplicate email columns, orphan `time_slot_id`) | Deprecated patterns | Medium | ⏸️ Deferred — each item is a migration to ship with the feature that owns the table |
 | 16 | Local Node 20.9 below Vite 7's required 20.19 | Environment | Low | 🧑 Owner: upgrade local Node to ≥ 20.19 (build works today with an engine warning) |
@@ -76,7 +76,7 @@
 
 ## 4. Large Modules — ✅ RESOLVED 2026-08-10
 
-Post-cleanup state: the two largest files were **dead code** (`sidebar.jsx` 577 lines, `chart.jsx` 279 lines — both deleted); `vite.config.js` dropped from 343 to ~150 lines after extracting the five Horizons inline scripts to `plugins/horizons/scripts/`. Largest live modules now: `LessonsPage.jsx` (~370 lines after the `lib/bookings.js` extraction), `LoginPage.jsx` (360), `ProfileManagementPage.jsx` (~250 after the `useProfile` migration), `TermsPage.jsx` (267, static legal text — fine), `SupabaseAuthContext.jsx` (267 — watch it growing into a profile service; `useProfile` now exists for new work).
+Post-cleanup state: the two largest files were **dead code** (`sidebar.jsx` 577 lines, `chart.jsx` 279 lines — both deleted); `vite.config.js` dropped from 343 to ~60 lines (Horizons inline scripts were first extracted to `plugins/horizons/scripts/`, then the whole Horizons toolchain was removed 2026-08-12). Largest live modules now: `LessonsPage.jsx` (~370 lines after the `lib/bookings.js` extraction), `LoginPage.jsx` (360), `ProfileManagementPage.jsx` (~250 after the `useProfile` migration), `TermsPage.jsx` (267, static legal text — fine), `SupabaseAuthContext.jsx` (267 — watch it growing into a profile service; `useProfile` now exists for new work).
 
 ---
 
@@ -100,8 +100,8 @@ Replaced with `react-helmet-async` (`HelmetProvider` in `main.jsx`; 12 page impo
 From `supabase-backend.md §2` (not repeated in detail): `bookings.price` stored as `text` while `amount_paid` is `numeric`; `verification_status` has no CHECK constraint; `email` vs `client_email` duplicate columns; `time_slot` / `time_slot_id` / `start_time`+`end_time` triple representation (`time_slot_id` is an orphan with no target table); `invoices` has RLS enabled with zero policies.
 
 ### 5.6 Leftover platform artifacts (Low)
-- Stripe secrets may still exist in Edge Function secrets; Stripe-dashboard webhook endpoint may still be registered (`api-contracts.md §7.2`) — harmless but should be removed.
-- Hostinger Horizons dev plugins (`plugins/`) are dev-only and excluded from production builds — keep quarantined; remove when the project no longer uses that toolchain.
+- ✅ **Hostinger Horizons dev plugins** — **removed 2026-08-12**: `plugins/` directory deleted, `vite.config.js` reduced to a plain React config, `@babel/*` runtime deps uninstalled, generator meta tag removed from `index.html`.
+- ✅ **Stripe secrets** removed from Edge Function secrets (2026-08-10). Only remaining manual step: delete the webhook endpoint in the Stripe dashboard (harmless while it exists — the target function is gone).
 
 ### 5.7 Local toolchain (Low)
 Node 20.9.0 vs Vite 7's required `^20.19 || >=22.12` — builds work today with an engine warning; upgrade Node to silence and de-risk.
@@ -117,7 +117,7 @@ The prioritized list this document originally proposed has been **executed**. Wh
 3. **(Medium)** Next test suites (§3.1): admin verification flow, auth flows, `next_invoice_number` RPC integration test.
 4. **(Medium)** Harden the dormant/admin-only Edge Functions (`verify_jwt` or in-function checks) when they get real callers (§2.2).
 5. **(Low)** `profiles` public SELECT tightening + `invoices` own-read policy — remaining steps of the RLS rollout (`api-contracts.md §7.1`).
-6. **🧑 Owner actions (outside repo reach):** upgrade local Node to ≥ 20.19; confirm/remove Stripe secrets in Edge Function secrets and any Stripe-dashboard webhook endpoint.
+6. ~~**🧑 Owner actions (outside repo reach):** upgrade local Node to ≥ 20.19; confirm/remove Stripe secrets in Edge Function secrets~~ — Stripe secrets confirmed removed (2026-08-10); Node `engines` pin added to `package.json` (`>=20.19`). Only remaining manual step: delete the stale webhook endpoint in the Stripe dashboard (harmless — the target function is deleted).
 
 ## 7. What Is *Not* Debt (deliberate decisions, do not "fix")
 
@@ -125,4 +125,3 @@ The prioritized list this document originally proposed has been **executed**. Wh
 - `upload-invoice-to-storage` kept with a known-wrong status value, annotated for the invoice-lifecycle feature.
 - `merge-invoice-qr`, `verify-invoice-generation`, `upload-logo-once` retained as utilities despite no frontend caller.
 - `invoices` and `payment-proofs` as separate buckets (privacy boundary, decision 2026-08-07).
-- Dev-only Horizons plugins in `vite.config.js` (excluded from production).

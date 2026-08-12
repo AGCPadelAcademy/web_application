@@ -46,7 +46,7 @@ const HomePage = () => {
           >
             <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
               <div className="-m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 lg:-m-4 lg:rounded-2xl lg:p-4">
-                <img-replace src="https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/foto-grup-la-rapita-camp-gk3WD.jpeg" alt="AGC Padel Academy community group photo" className="w-[76rem] rounded-md shadow-2xl ring-1 ring-gray-900/10" />
+                <img src="https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/foto-grup-la-rapita-camp-gk3WD.jpeg" alt="AGC Padel Academy community group photo" className="w-[76rem] rounded-md shadow-2xl ring-1 ring-gray-900/10" />
               </div>
             </div>
           </motion.div>

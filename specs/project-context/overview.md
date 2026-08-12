@@ -2,7 +2,8 @@
 
 > Scope: high-level overview inferred from repository structure and top-level source files.
 > Methodology: Spec-Driven Development (SDD) on a brownfield codebase.
-> Sources analyzed: `package.json`, `index.html`, `src/App.jsx`, `src/pages/*`, `src/components/*`, `src/contexts/*`, `INVOICE_REPORT.md`.
+> Sources analyzed: `package.json`, `index.html`, `src/App.jsx`, `src/pages/*`, `src/components/*`, `src/contexts/*`.
+> Refreshed 2026-08-12: Hostinger Horizons dev tooling (`plugins/`, generator meta tag, Babel runtime deps) and all Stripe artifacts removed from the project; `sonner`, server-only PDF/QR packages, and dead dependencies also removed. Overview updated to the live state.
 
 ---
 
@@ -58,9 +59,9 @@ The workflows below are inferred from the page set, component names, and the exi
 ### 3.3 Booking & payment (customer side)
 - User browses `/lessons`, `/trips`, or `/tournaments` and initiates a booking.
 - **Current payment model (manual / proof-of-payment):** Users pay by **bank transfer** and upload proof of payment via `PaymentProofUpload.jsx` / `PaymentProofPreview.jsx` (`src/components/payments/`). The uploaded proof is reviewed by an admin (or accounting) before the booking is confirmed.
-- `/payments` page (`PaymentsPage.jsx`) lists the user's payment history and pending payments.
-- **Invoice PDFs:** An invoice PDF is generated and made available to the user. The frontend `InvoiceModal.jsx` simply renders the resulting PDF in an iframe via a URL (`invoiceUrl`), which means **PDF generation happens server-side** — almost certainly in the Supabase Edge Functions (out of this repo). The PDF libraries `pdf-lib` / `pdfkit` listed in this repo's `package.json` are **not imported by any frontend code** (confirmed by grep across `src/`, `tools/`, `plugins/`) and therefore appear to be **dead frontend dependencies** — they belong to the server-side generator, not the Vite bundle.
-- **Stripe is being deprecated.** Stripe Checkout is no longer the active payment path. No Stripe SDK is imported in this repo's frontend; the only remaining references are **legal copy in `src/pages/TermsPage.jsx`** (Impressum / Privacy sections at lines ~80, 81, 214, 227, 240) which still describe Stripe as the payment processor. The active Stripe code lives in the (out-of-tree) Supabase Edge Functions and must also be retired there. See **§7 Cleanup backlog** below.
+- `/payments` page (`PaymentsPage.jsx`) lists the user's payment history and pending payments, and lets the user re-download the invoice PDF.
+- **Invoice PDFs:** An invoice PDF is generated server-side by the `generate-invoice-pdf` Supabase Edge Function (out of this repo) and rendered in the frontend via `InvoiceModal.jsx` (iframe by URL). No PDF/QR libraries live in this repo's dependencies.
+- **Stripe is fully removed** (decommissioned 2026-08-07/10; project cleanup 2026-08-12). Payment is bank transfer only — no Stripe code, columns, policies, secrets, or webhook endpoints remain in the project.
 
 ### 3.4 Admin payment verification
 - Admin opens `/admin/payment-verification` → reviews uploaded payment proofs → approves or rejects via `PaymentVerificationPanel.jsx`.
@@ -98,39 +99,27 @@ flowchart LR
 - **shadcn/ui-style components** built on **Radix UI primitives** (`@radix-ui/react-*` — accordion, dialog, dropdown-menu, popover, select, toast, tabs, …) — see `src/components/ui/` and `components.json`.
 - **Framer Motion** — animations (used in `HomePage.jsx`).
 - **lucide-react** — icon set.
-- **react-hook-form** — form state/validation.
-- **react-helmet** — per-page `<head>` metadata.
-- **recharts** — charts (likely on admin / payments views).
+- **react-helmet-async** — per-page `<head>` metadata (replaced unmaintained `react-helmet` on 2026-08-10).
 - **date-fns**, **react-day-picker** — date utilities and pickers.
-- **sonner**, custom `Toaster` (`@/components/ui/toaster`), `use-toast` hook — notifications.
-- **embla-carousel-react**, **vaul**, **cmdk**, **input-otp**, **next-themes**, **react-resizable-panels** — additional UI primitives.
-- **qrcode** — QR code generation (purpose TBD — possibly tournament check-in or payment links).
+- Custom `Toaster` (`@/components/ui/toaster`) + `useToast` — notifications (`sonner` was removed 2026-08-10).
 
 ### Backend / Data
-- **Supabase** (`@supabase/supabase-js` 2.30.0) — auth, database, storage (for payment-proof uploads), and Edge Functions. Client lives at `src/lib/customSupabaseClient.js`.
-- **Stripe** — **being deprecated**. No SDK imported in the frontend. Currently still referenced in T&C copy and (presumed) in Supabase Edge Functions. See §7 cleanup backlog.
+- **Supabase** (`@supabase/supabase-js` 2.30.0) — auth, database, storage (payment proofs, invoices, QR codes), and Edge Functions. Client lives at `src/lib/customSupabaseClient.js`.
 
 ### PDF / Documents
-- **pdf-lib** and **pdfkit** are listed in `dependencies` but are **not imported by any file** under `src/`, `tools/`, or `plugins/` (verified by grep). They are used **server-side** to generate invoice PDFs in the Supabase Edge Functions; this repo only **renders** the resulting PDF via an iframe in `InvoiceModal.jsx`. Recommend **removing them from this repo's `package.json`** to slim down the frontend bundle and dependency surface (see §7).
+- Invoice PDFs are generated **server-side only** in the `generate-invoice-pdf` Edge Function; the frontend merely renders the resulting PDF URL. No PDF or QR libraries exist in this repo's `package.json` (removed 2026-08-10).
 
 ### Tooling & Build
 - **ESLint 9** with `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-import`, `eslint-import-resolver-alias` (config: `eslint.config.mjs`).
+- **Vitest 4** — unit tests for `src/lib/` services; integration suite for the invoice-numbering RPC (auto-skips without test-project secrets). CI (`.github/workflows/ci.yml`) runs lint + tests + build.
 - **PostCSS** + **autoprefixer**.
-- **Terser** — minifier (configured via Vite).
-- **Babel parser/traverse/generator/types** as runtime dependencies — unusual for a frontend app; likely used by the in-repo `plugins/` (see below) to perform AST manipulation on source code.
+- **Terser** — minifier (via Vite).
 - Custom build step: `tools/generate-llms.js` runs before `vite build` (per the `build` script).
-- Custom installer: `tools/install-missing-components.js` — presumably bootstraps shadcn-style UI components.
-
-### In-repo Vite plugins (`plugins/`)
-- `vite-plugin-iframe-route-restoration.js`
-- `selection-mode/`, `visual-editor/`, `utils/` — these plus the Babel dependencies strongly suggest **integration with a visual / in-browser editor**, likely **Hostinger Horizons** (referenced by `<meta name="generator" content="Hostinger Horizons" />` in `index.html` and the CDN URL in `HomePage.jsx`). This appears to be the platform on which the site was originally built / is being edited.
 
 ### Runtime / environment
-- **Node.js v22** (`.nvmrc`).
+- **Node.js ≥ 20.19** (`engines` pin in `package.json`; `.nvmrc` says v22).
 - App version **37** (`.version`) — purpose of this file (build/release counter?) to be documented in baseline-system.
-- **Apache** deployment hint via `public/.htaccess`.
-
-> Detailed reading of `vite.config.js`, `eslint.config.mjs`, `public/.htaccess`, and the `plugins/` directory is deferred to `specs/baseline-system/`.
+- **Deployment:** Vercel (production + preview, long-term host); `vercel.json` present.
 
 ---
 
@@ -138,17 +127,11 @@ flowchart LR
 
 Marking explicitly for the SDD process:
 
-- **Supabase backend lives outside this repo (confirmed).** The Edge Functions (`create-booking`, `handle-stripe-webhook`, and presumably the invoice-PDF generator) and the database schema are managed in a **separate Supabase project**.
-  - **Open action item — link the Supabase project to these specs.** Options to consider (decision pending):
-    1. Add the Supabase project as a **git submodule** under `supabase/` if its source lives in another git repo.
-    2. Add a `specs/baseline-system/supabase-backend.md` that documents the Supabase **project ref / URL / dashboard link** and lists the deployed Edge Functions + schema as captured snapshots (using `supabase db dump` / `supabase functions list`).
-    3. Use the Supabase MCP integration in Cursor to fetch the current schema / functions on demand and commit a snapshot to `specs/baseline-system/`.
-    > Recommended default: option **(2) + (3)** — store a snapshot in the spec and refresh it via the MCP when needed. A submodule is only worth it if a separate git repo already exists.
-- **Assumption — Hostinger Horizons is the originating editor**, based on the generator meta tag, the CDN hostname, and the in-repo visual-editor plugins. These plugins are likely development-only.
+- **Supabase backend lives outside this repo (confirmed).** The Edge Functions and the database schema are managed in the Supabase project `jokjxpogvwxbwdaroqkc`; snapshots live in `specs/baseline-system/supabase-backend.md` and are refreshed via the Supabase MCP.
+- **The project originated on Hostinger Horizons** (visual editor). All of that tooling was **removed 2026-08-12** (`plugins/` directory, generator meta tag in `index.html`, and the `@babel/*` runtime dependencies). The site is now a plain Vite + React project with no editor integration.
 - **i18n strategy — runtime translation via DeepL (planned).** The intent is to use the **DeepL API** to translate UI text at runtime when the user selects a language. Source language is **English** (current copy). Target languages for the Swiss market are not yet fixed but will likely include **French, German, and Italian**.
   - **Open question:** runtime translation has cost, latency, and quality trade-offs vs. a traditional static i18n bundle (e.g. `react-i18next`). To be decided in `specs/features/i18n.md`. Consider caching translated strings to avoid repeated API calls and to handle DeepL outages.
 - **Assumption — Single-tenant deployment**: one academy, one brand. No multi-tenant indicators found.
-- **`qrcode` and `recharts` usage** — both are installed but **not actively used in pages today**. `recharts` is wrapped by `src/components/ui/chart.jsx` (an unused shadcn helper); `qrcode` is not imported anywhere in `src/`. Both can stay (low cost, likely useful for future admin dashboards and tournament check-in QR codes) or be removed during the cleanup pass — defer to baseline-system.
 
 ---
 
@@ -168,13 +151,12 @@ web_application/
 │   │   ├── modals/              # Invoice, InvoicePreview, ProfileCompletion
 │   │   ├── payments/            # PaymentProofUpload, PaymentProofPreview
 │   │   └── admin/               # PaymentVerificationPanel
-│   ├── contexts/                # AuthContext, SupabaseAuthContext, BookingContext
-│   ├── hooks/                   # use-mobile, use-toast
-│   ├── lib/                     # customSupabaseClient, ProfileValidation, utils
+│   ├── contexts/                # SupabaseAuthContext (only auth context)
+│   ├── hooks/                   # useProfile
+│   ├── lib/                     # customSupabaseClient, profileValidation, profileService, bookings, storage, utils
 │   └── utils/                   # (empty directory)
-├── plugins/                     # Custom Vite plugins (visual editor, selection mode, iframe route restoration)
-├── tools/                       # generate-llms.js, install-missing-components.js
-├── public/                      # .htaccess (Apache deployment)
+├── tools/                       # generate-llms.js, find-dead-code.mjs
+├── public/                      # static assets (.htaccess is a legacy Apache leftover, unused by Vercel)
 ├── specs/                       # SDD specifications (this document lives in specs/project-context/)
 │   ├── project-context/
 │   ├── baseline-system/
@@ -184,9 +166,9 @@ web_application/
 ├── tailwind.config.js
 ├── eslint.config.mjs
 ├── components.json              # shadcn config
+├── vercel.json                  # Vercel deployment config
 ├── index.html
-├── AGENTS.md                    # Brownfield SDD instructions for AI agents
-└── INVOICE_REPORT.md            # Existing analysis: invoicing is Stripe-managed
+└── AGENTS.md                    # Brownfield SDD instructions for AI agents
 ```
 
 ---
@@ -195,15 +177,12 @@ web_application/
 
 These are confirmed decisions whose **implementation** is deliberately out of scope for this overview spec. They should be tracked as feature/refactor specs under `specs/features/` or as items in `specs/baseline-system/`.
 
-1. **Remove Stripe.** Stripe is no longer the active payment processor.
-   - Frontend: no SDK imported, but update the **Terms & Conditions copy** in `src/pages/TermsPage.jsx` (lines ~80, 81, 214, 227, 240) to remove or replace Stripe references.
-   - Backend: remove the `create-booking` Stripe Checkout logic and the `handle-stripe-webhook` Edge Function from the Supabase project, and remove the corresponding Stripe secrets / webhook endpoint.
-   - Per brownfield rule "Never delete functionality unless explicitly instructed" — this removal **is** explicitly instructed by the user.
-2. **Remove dead frontend dependencies.** `pdf-lib` and `pdfkit` are not used in this repo (PDF generation is server-side). They can be removed from `package.json`.
+1. ~~Remove Stripe~~ — **done** (code 2026-08-07/10, project cleanup 2026-08-12; secrets removed; the Stripe-dashboard webhook endpoint deletion is the only remaining manual step and is harmless while outstanding — the target function no longer exists).
+2. ~~Remove dead frontend dependencies~~ — **done** (`pdf-lib`, `pdfkit`, `qrcode`, `sonner`, `@babel/*`, and the unused UI/hook files).
 3. **Reconcile the AGC vs. CAG naming.** The product is branded "AGC Padel Academy" but the legal entity is "CAG Padel Academy GmbH". Decide which is canonical for product copy and align.
 4. **Decide OAuth provider strategy** (Vercel integration vs. Supabase native OAuth vs. external library) → `specs/features/oauth-signin.md`.
 5. **Define `coach` and `accounting` role permission matrices** → `specs/baseline-system/roles-and-permissions.md`.
-6. **Document the Supabase backend** (project ref, schema snapshot, Edge Functions inventory) → `specs/baseline-system/supabase-backend.md`.
+6. ~~Document the Supabase backend~~ — **done**: `specs/baseline-system/supabase-backend.md` (refreshed via Supabase MCP).
 7. **Specify the i18n strategy** (DeepL runtime translation, target languages, caching, fallback) → `specs/features/i18n.md`.
 
 ## 8. Next Steps for SDD

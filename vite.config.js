@@ -1,82 +1,6 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig, loadEnv } from 'vite';
-import inlineEditPlugin from './plugins/visual-editor/vite-plugin-react-inline-editor.js';
-import editModeDevPlugin from './plugins/visual-editor/vite-plugin-edit-mode.js';
-import iframeRouteRestorationPlugin from './plugins/vite-plugin-iframe-route-restoration.js';
-import selectionModePlugin from './plugins/selection-mode/vite-plugin-selection-mode.js';
-
-const isDev = process.env.NODE_ENV !== 'production';
-
-// Hostinger Horizons dev-tooling scripts injected into index.html.
-// Kept as real files under plugins/horizons/scripts/ so they are lintable/editable.
-const readHorizonsScript = (name) =>
-  fs.readFileSync(new URL(`./plugins/horizons/scripts/${name}`, import.meta.url), 'utf8');
-
-const configHorizonsViteErrorHandler = readHorizonsScript('vite-error-handler.js');
-const configHorizonsRuntimeErrorHandler = readHorizonsScript('runtime-error-handler.js');
-const configHorizonsConsoleErrorHandler = readHorizonsScript('console-error-handler.js');
-const configWindowFetchMonkeyPatch = readHorizonsScript('window-fetch-monkey-patch.js');
-const configNavigationHandler = readHorizonsScript('navigation-handler.js');
-
-const addTransformIndexHtml = {
-  name: 'add-transform-index-html',
-  transformIndexHtml(html) {
-    const tags = [
-      {
-        tag: 'script',
-        attrs: { type: 'module' },
-        children: configHorizonsRuntimeErrorHandler,
-        injectTo: 'head',
-      },
-      {
-        tag: 'script',
-        attrs: { type: 'module' },
-        children: configHorizonsViteErrorHandler,
-        injectTo: 'head',
-      },
-      {
-        tag: 'script',
-        attrs: {type: 'module'},
-        children: configHorizonsConsoleErrorHandler,
-        injectTo: 'head',
-      },
-      {
-        tag: 'script',
-        attrs: { type: 'module' },
-        children: configWindowFetchMonkeyPatch,
-        injectTo: 'head',
-      },
-      {
-        tag: 'script',
-        attrs: { type: 'module' },
-        children: configNavigationHandler,
-        injectTo: 'head',
-      },
-    ];
-
-    if (!isDev && process.env.TEMPLATE_BANNER_SCRIPT_URL && process.env.TEMPLATE_REDIRECT_URL) {
-      tags.push(
-        {
-          tag: 'script',
-          attrs: {
-            src: process.env.TEMPLATE_BANNER_SCRIPT_URL,
-            'template-redirect-url': process.env.TEMPLATE_REDIRECT_URL,
-          },
-          injectTo: 'head',
-        }
-      );
-    }
-
-    return {
-      html,
-      tags,
-    };
-  },
-};
-
-console.warn = () => {};
 
 const logger = createLogger()
 const loggerError = logger.error
@@ -120,9 +44,7 @@ export default defineConfig(({ mode }) => {
   },
   customLogger: logger,
   plugins: [
-    ...(isDev ? [inlineEditPlugin(), editModeDevPlugin(), iframeRouteRestorationPlugin(), selectionModePlugin()] : []),
     react(),
-    addTransformIndexHtml
   ],
   server: {
     cors: true,
@@ -139,16 +61,6 @@ export default defineConfig(({ mode }) => {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-  },
-  build: {
-    rollupOptions: {
-      external: [
-        '@babel/parser',
-        '@babel/traverse',
-        '@babel/generator',
-        '@babel/types'
-      ]
-    }
   },
   test: {
     environment: 'node',

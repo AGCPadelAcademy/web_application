@@ -36,13 +36,25 @@ const PaymentProofUpload = ({ bookingId, onUploadSuccess }) => {
     setIsUploading(true);
 
     try {
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${bookingId}_${Date.now()}.${fileExt}`;
-      const filePath = `${bookingId}/${fileName}`;
+      const fileExt = selectedFile.name.split('.').pop().toLowerCase();
+
+      // Semantic attempt numbering: count existing proofs for this booking
+      // (DB rows are append-only, one per upload) so the file name reflects
+      // the attempt — e.g. <booking_id>/attempt-2.jpg. Keeps the dashboard
+      // view in sync with the payment_proofs audit table.
+      const { count, error: countError } = await supabase
+        .from('payment_proofs')
+        .select('id', { count: 'exact', head: true })
+        .eq('booking_id', bookingId);
+
+      if (countError) throw countError;
+
+      const attempt = (count ?? 0) + 1;
+      const filePath = `${bookingId}/attempt-${attempt}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('payment-proofs')
-        .upload(filePath, selectedFile, { upsert: true });
+        .upload(filePath, selectedFile, { upsert: false });
 
       if (uploadError) throw uploadError;
 

@@ -372,7 +372,7 @@ Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `
 
 > **Deleted 2026-08-10** (by owner, via dashboard/CLI): `create-booking` (Stripe), `handle-stripe-webhook` (Stripe), `verify-booking-saved` (validated the dropped Stripe column), `generate-booking-receipt` and `assign-booking-time` (verified unused — no callers, no invocations, broken source bundles). Earlier snapshots also listed `create-booking-with-invoice` and `generate-invoice-pdf-v2`, which no longer exist.
 >
-> Remaining Stripe cleanup (owner to confirm): Stripe secrets in Edge Function secrets; any webhook endpoint still registered in the Stripe dashboard.
+> Stripe cleanup status: secrets confirmed removed from Edge Function secrets (2026-08-10). The only remaining manual step is deleting the stale webhook endpoint in the Stripe dashboard (Developers → Webhooks → endpoint pointing to `…/functions/v1/handle-stripe-webhook` → Delete; check Live and Test mode) — harmless while it exists since the target function is gone.
 
 ---
 

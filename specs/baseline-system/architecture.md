@@ -2,35 +2,31 @@
 
 > Snapshot captured: 2026-06-28.
 > Refreshed 2026-08-06: corrected stale findings (lessons catalogue is DB-driven, Supabase keys are in env vars, admin guard uses `role === 'admin'` with RLS enforcement).
-> Sources analyzed: all files under `src/`, `vite.config.js`, `package.json`, `plugins/`, Supabase MCP (project `jokjxpogvwxbwdaroqkc`).
+> Refreshed 2026-08-12: Hostinger Horizons dev tooling removed (plugins, meta tag, Babel deps); Stripe fully removed; deployment, build, and dependency sections updated to the live state (Vercel + CI + Vitest).
+> Sources analyzed: all files under `src/`, `vite.config.js`, `package.json`, Supabase MCP (project `jokjxpogvwxbwdaroqkc`).
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
 
 ---
 
 ## 1. System Overview
 
-The application is a **React 18 single-page application (SPA)** hosted on an Apache server. All backend logic runs inside **Supabase** (Postgres database, Auth, Storage, and Deno Edge Functions). There is no Node.js or custom API server — the frontend communicates directly with Supabase via the JS client SDK and via `supabase.functions.invoke()` calls to Edge Functions.
+The application is a **React 18 single-page application (SPA)** deployed on **Vercel**. All backend logic runs inside **Supabase** (Postgres database, Auth, Storage, and Deno Edge Functions). There is no Node.js or custom API server — the frontend communicates directly with Supabase via the JS client SDK and via `supabase.functions.invoke()` calls to Edge Functions.
 
 ```mermaid
 graph TD
     Browser["Browser (SPA)"]
-    Vite["Vite 7 Dev Server / Build"]
-    Apache["Apache Web Server (production)"]
     SupabaseAuth["Supabase Auth"]
     SupabaseDB["Supabase Postgres DB"]
     SupabaseStorage["Supabase Storage"]
     SupabaseFunctions["Supabase Edge Functions (Deno)"]
     DeepL["DeepL API (planned)"]
-    Stripe["Stripe (deprecated)"]
 
-    Browser -- "served by" --> Apache
     Browser -- "auth.signIn / signUp / signOut\ngetSession / onAuthStateChange" --> SupabaseAuth
     Browser -- "supabase.from().select/insert/update\n(RLS-filtered)" --> SupabaseDB
     Browser -- "storage.from().createSignedUrl\n(payment-proofs bucket)" --> SupabaseStorage
     Browser -- "supabase.functions.invoke()" --> SupabaseFunctions
     SupabaseFunctions -- "PDF generation, QR merge,\nuploads, notifications" --> SupabaseStorage
     SupabaseFunctions -- "insert/update bookings,\ninvoices, notifications_log" --> SupabaseDB
-    SupabaseFunctions -. "deprecated" .-> Stripe
     Browser -. "i18n (planned)" .-> DeepL
 ```
 
@@ -54,9 +50,9 @@ src/
 │   ├── ContactPage.jsx    Contact form → submit-contact-form Edge Function
 │   ├── LoginPage.jsx      Sign-in / sign-up forms
 │   ├── TermsPage.jsx      Static legal content (T&C, privacy, impressum)
-│   ├── PaymentsPage.jsx   Authenticated: list own bookings + upload payment proof
+│   ├── PaymentsPage.jsx   Authenticated: list own bookings + upload payment proof + re-download invoice PDF
 │   ├── ProfileManagementPage.jsx  Authenticated: edit profile (profiles table)
-│   └── AdminDashboard.jsx  Admin shell that renders PaymentVerificationPanel
+│   └── AdminDashboardPage.jsx  Admin shell that renders PaymentVerificationPanel
 │
 ├── components/
 │   ├── layout/
@@ -77,17 +73,17 @@ src/
 │   └── ScrollToTop.jsx    Scrolls window to top on route change
 │
 ├── contexts/
-│   ├── SupabaseAuthContext.jsx  ACTIVE — session, user, signUp, signIn, signOut + profile upsert
-│   ├── AuthContext.jsx          LEGACY / DEAD CODE — localStorage-based auth, not mounted anywhere
-│   └── BookingContext.jsx       LEGACY / DEAD CODE — localStorage-based booking state, not mounted
+│   └── SupabaseAuthContext.jsx  Session, user, role, signUp/signIn/signOut, profile ensure, PASSWORD_RECOVERY redirect
 │
 ├── hooks/
-│   ├── use-mobile.jsx     Returns boolean: viewport < 768px
-│   └── use-toast.js       Toast queue management (used by Sonner/Toaster)
+│   └── useProfile.js      Wraps profileService getOrCreateProfile/updateProfile
 │
 ├── lib/
 │   ├── customSupabaseClient.js  Creates and exports the Supabase JS client (singleton)
-│   ├── ProfileValidation.js     Pure functions: isProfileComplete(), getProfileCompletionStatus()
+│   ├── profileValidation.js     Pure functions: isProfileComplete(), getProfileCompletionStatus()
+│   ├── profileService.js        Profile fetch/create/update (single owner of query shapes)
+│   ├── bookings.js              Availability (booking_slots view), booking payload, insert, invoice invoke
+│   ├── storage.js               Signed URLs for the private payment-proofs bucket
 │   └── utils.js                 Re-exports shadcn cn() utility (clsx + tailwind-merge)
 │
 └── utils/                 Empty directory — no files
@@ -98,7 +94,7 @@ src/
 ```mermaid
 graph TD
     subgraph "Route Layer (pages/)"
-        Pages["Pages\nown useState + useEffect\ndirect supabase calls"]
+        Pages["Pages\nown useState + useEffect\ninline reads for one-off queries"]
     end
     subgraph "Component Layer (components/)"
         UI["UI primitives (components/ui/)"]
@@ -106,10 +102,10 @@ graph TD
         Layout["Layout (Header, Footer)"]
     end
     subgraph "Cross-cutting (contexts/ + hooks/ + lib/)"
-        Auth["SupabaseAuthContext\nglobal user/session state"]
+        Auth["SupabaseAuthContext\nglobal user/session/role state"]
         Client["customSupabaseClient\nSupabase JS singleton"]
-        Validation["ProfileValidation\npure utilities"]
-        Hooks["use-toast, use-mobile"]
+        Services["lib services\nprofileService · bookings · storage"]
+        Validation["profileValidation\npure utilities"]
     end
     subgraph "External services"
         Supa["Supabase\n(DB + Auth + Storage + Functions)"]
@@ -118,17 +114,18 @@ graph TD
     Pages --> Feature
     Pages --> UI
     Pages --> Auth
-    Pages --> Client
+    Pages --> Services
     Pages --> Validation
-    Feature --> Client
+    Feature --> Services
     Feature --> Auth
     Feature --> UI
     Layout --> Auth
     Auth --> Client
+    Services --> Client
     Client --> Supa
 ```
 
-> **Observation — no service / repository layer:** pages and components call `supabase.from()` and `supabase.functions.invoke()` directly inline. There is no abstraction layer (e.g. a `services/bookingService.js`) between the UI and the data access calls. This is a common SDD brownfield finding — not a blocker today, but it makes future refactoring harder and increases test surface. To note in the baseline; address in a future refactor spec if needed.
+> **Observation — thin service layer, not a full repository pattern:** shared query/mutation logic is centralized in `src/lib/` services (`profileService.js`, `bookings.js`, `storage.js`) and the `useProfile` hook, but one-off reads still happen inline in pages. There is no mandatory abstraction layer between UI and Supabase — adopt a service when logic is needed in more than one place.
 
 ---
 
@@ -140,7 +137,8 @@ Authentication is handled entirely by **Supabase Auth** via `SupabaseAuthContext
 1. Calls `supabase.auth.getSession()` to restore any existing session.
 2. Subscribes to `supabase.auth.onAuthStateChange()` for all future events.
 3. On each session change, runs `ensureProfile(user)` to **upsert `public.profiles`** with `id`, `email`, `full_name`, `phone` and `updated_at`. (Previously this was duplicated in three places and the session-sync path omitted `email` — both fixed.)
-4. Loads the user's application `role` from `public.profiles.role` and exposes it via `useAuth().role`. Falls back to `student` if the column does not exist yet (i.e. before `supabase/migrations/0001_add_roles_and_admin_rls.sql` is applied).
+4. Loads the user's application `role` from `public.profiles.role` and exposes it via `useAuth().role`, defaulting to `student` when no row/value exists.
+5. On a `PASSWORD_RECOVERY` event, redirects to `/reset-password` so the user sets a new password instead of being silently logged in (recovery links establish a session automatically — fixed 2026-08-10).
 
 ```mermaid
 sequenceDiagram
@@ -172,24 +170,24 @@ sequenceDiagram
 - Resend confirmation email (`supabase.auth.resend({ type: 'signup', ... })`) — exposed as "Resend confirmation email" on `LoginPage`.
 - Password reset: `supabase.auth.resetPasswordForEmail(email, { redirectTo: ${origin}/reset-password })` triggered from the "Forgot password?" link on `LoginPage`; the new password is set on the `/reset-password` route via `supabase.auth.updateUser({ password })`.
 
-**Supabase client config:** the URL and anon key are read from Vite env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) — see `.env.example`. Previously they were hardcoded in `src/lib/customSupabaseClient.js`. The client is also explicitly configured with `persistSession: true`, `detectSessionInUrl: true`, `autoRefreshToken: true`.
+**Supabase client config:** the URL and anon key are read from Vite env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) — see `.env.example`. The client is explicitly configured with `persistSession: true`, `detectSessionInUrl: true`, `autoRefreshToken: true`.
 
 **Planned:** OAuth (provider TBD — see `specs/project-context/overview.md §2`). The next decision the user wants to make is which Supabase Auth providers to enable; this section will be updated once that is decided.
 
 ### 3.2 Legacy auth context
 
-The legacy `src/contexts/AuthContext.jsx` (a fully local, `localStorage`-based auth implementation) referenced in earlier versions of this document has been **deleted from the repo**. `SupabaseAuthContext.jsx` is the only auth context. No action needed.
+The legacy `src/contexts/AuthContext.jsx` (localStorage-based) and `BookingContext.jsx` were **deleted** during the technical-debt cleanup. `SupabaseAuthContext.jsx` is the only context. No action needed.
 
 ### 3.3 Admin access control
 
-`src/components/auth/ProtectedRoute.jsx` now checks the application role exposed by `useAuth()` (`role === 'admin'`) instead of hardcoding `admin@agcpadelacademy.com`. For backward compatibility, the legacy admin email fallback is `josep.barbera.reverte.1999@gmail.com` (the actual project owner — note that the original `admin@agcpadelacademy.com` address was hardcoded in the old code but no such user existed in `auth.users`, so the legacy check was effectively broken). Once `supabase/migrations/0001_add_roles_and_admin_rls.sql` is applied, the role column is the source of truth and the email fallback is irrelevant.
+`src/components/auth/ProtectedRoute.jsx` checks the application role exposed by `useAuth()` (`role === 'admin'`); the legacy admin-email fallback was removed 2026-08-10. `profiles.role` is the single source of truth.
 
-**Important:** `ProtectedRoute` is a UX guard, not a security boundary. Server-side authorization is enforced by **Supabase RLS**:
+**Important:** `ProtectedRoute` is a UX guard, not a security boundary. Server-side authorization is enforced by **Supabase RLS** (migrations `0006`/`0007`, 2026-08-10):
+- `bookings` SELECT: owner or admin (`is_admin()`); public availability flows through the non-PII `booking_slots` view.
 - `payment_proofs` UPDATE: only `public.is_admin()` (admins).
-- `bookings` UPDATE: owner OR `public.is_admin()`.
 - The permissive "Service Role Full Access Payment Proofs" policy on the `public` role is dropped (it previously bypassed RLS for everyone — Supabase advisor warning 0024).
 
-Until that migration is applied, the admin panel's writes still rely on the old permissive policies, so applying the migration is the actual fix for the security gap. See `supabase/migrations/0001_add_roles_and_admin_rls.sql` for the full SQL (review-only — apply via Supabase MCP or dashboard).
+Additionally, the two user-invoked Edge Functions (`generate-invoice-pdf` v22, `notify-payment-verification` v6) run with `verify_jwt: true` and perform in-function JWT + authorization checks (booking ownership / admin role); the client passes the session token explicitly in the `Authorization` header.
 
 ### 3.4 Auth-related routes
 
@@ -199,8 +197,9 @@ Until that migration is applied, the admin panel's writes still rely on the old 
 | `/auth/callback` | `AuthCallbackPage` | Landing page for email-confirmation and OAuth redirects |
 | `/reset-password` | `ResetPasswordPage` | Set a new password after clicking the reset email link |
 | `/profile` | `ProfileManagementPage` (guarded) | View / edit own profile |
-| `/payments` | `PaymentsPage` (guarded) | View own payments |
-| `/admin/payment-verification` | `AdminDashboard` (guarded, admin-only) | Payment proof verification |
+| `/payments` | `PaymentsPage` (guarded) | View own payments, upload proof, re-download invoice PDF |
+| `/admin` | — (redirects to `/admin/payment-verification`) | Convenience redirect |
+| `/admin/payment-verification` | `AdminDashboardPage` (guarded, admin-only) | Payment proof verification |
 
 ### 3.5 OAuth / social sign-in
 
@@ -241,11 +240,11 @@ sequenceDiagram
 
     U->>LP: Accepts T&C → click "Generate Invoice"
     LP->>DB: INSERT bookings (status=pending_payment, payment_status=pending)
-    LP->>EF: invoke('generate-invoice-pdf-v2', { booking_id, invoice_number, amount, customer_data, lesson_name })
-    EF->>ST: Upload PDF to invoices bucket
-    EF->>ST: Upload QR code to qr-codes bucket (merge-invoice-qr)
-    EF-->>LP: { success, url, pdfBase64 }
-    LP->>DB: UPDATE bookings SET receipt_url = url
+    LP->>EF: invoke('generate-invoice-pdf', { booking_id, amount, customer_data, lesson_name }) [Authorization: Bearer <session token>]
+    EF->>DB: next_invoice_number(date) → INV-YYYY/MM/DD-XX (atomic)
+    EF->>ST: Upload PDF (with merged QR page) to invoices bucket
+    EF->>DB: INSERT invoices row; UPDATE bookings SET receipt_url
+    EF-->>LP: { success, url, pdfBase64, invoice_number }
     LP->>U: Show InvoicePreviewModal (PDF rendered from base64 blob)
 
     U->>LP: Close modal
@@ -271,7 +270,7 @@ stateDiagram-v2
     [*] --> pending_payment : INSERT on booking\n(after invoice generated)
     pending_payment --> pending_payment : proof rejected\n(payment_status stays pending)
     pending_payment --> confirmed : admin approves proof\n(payment_status=confirmed\nstatus=confirmed)
-    pending_payment --> cancelled : (manual / cleanup function)
+    pending_payment --> cancelled : explicit cancellation (customer/admin)\n(future cancel-reservation flow —\ntime-based auto-cancel rejected)
     confirmed --> [*]
     cancelled --> [*]
 ```
@@ -286,19 +285,16 @@ These are confirmed findings from source code analysis, not assumptions.
 
 | Severity | Location | Issue |
 |---|---|---|
-| ✅ RESOLVED | `src/components/auth/ProtectedRoute.jsx:19` | ~~Admin guard is **commented out** — any logged-in user can access `/admin/payment-verification`~~ **Stale finding — corrected.** `ProtectedRoute` now checks `useAuth().role === 'admin'` (see §3.3). Server-side authorization is enforced by RLS (`public.is_admin()` on `payment_proofs` UPDATE and `bookings` UPDATE). The permissive public-role policy on `payment_proofs` has been dropped. |
-| ✅ RESOLVED | `src/lib/customSupabaseClient.js:3-4` | ~~Supabase URL and anon key are **hardcoded** in source~~ **Stale finding — corrected.** Keys are now read from Vite env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) with a startup guard that throws if missing. See `.env.example`. |
-| 🟠 HIGH | `src/contexts/AuthContext.jsx` | Dead legacy auth context — stores passwords in plain JSON in `localStorage`. **Delete it.** |
-| 🟠 HIGH | `src/contexts/BookingContext.jsx` | Dead legacy booking context — uses `localStorage`. Not mounted in `App.jsx`. **Delete it.** |
-| ✅ RESOLVED | `src/pages/LessonsPage.jsx:97-107` | ~~**Lesson catalogue is hardcoded** as a JS array in the page file~~ **Stale finding — corrected 2026-08-06.** The page now fetches from the `lessons` DB table via `supabase.from('lessons').select('*').eq('is_active', true).order('price_amount')`. The catalogue is DB-driven; no code deployment is needed for price/product changes. |
-| 🟡 MEDIUM | `src/contexts/SupabaseAuthContext.jsx:67-79` | Toast messages for sign-up errors and success are in **Spanish** (`"Fallo en el registro"`, `"¡Registro completado!"`) while the rest of the UI is in English. |
-| 🟡 MEDIUM | `src/pages/LessonsPage.jsx:101` | `const [lang] = useState("EN")` — the language is hardcoded to EN. The ES/EN translation object exists but the language-switcher UI is not implemented. |
-| 🟡 MEDIUM | `src/pages/LessonsPage.jsx:232` | `invoice_number` is generated client-side as `` `INV-${Date.now()}` `` — not guaranteed unique under concurrent bookings, and not atomic with the DB insert. Should be generated server-side. |
-| 🟡 MEDIUM | `index.html` | `<title>Hostinger Horizons</title>` — the page title is the editor platform name, not the product name. |
-| 🟡 MEDIUM | `src/pages/TermsPage.jsx:80-81,214,227,240` | Stripe is still referenced as the payment processor in the legal copy, which no longer matches reality. |
-| 🟢 LOW | `src/contexts/SupabaseAuthContext.jsx` | Named `SupabaseAuthContext` but exports `AuthProvider` and `useAuth` — same names as the dead legacy `AuthContext.jsx`. A future rename of the legacy file could cause import confusion. |
+| ✅ RESOLVED | `src/components/auth/ProtectedRoute.jsx` | ~~Admin guard commented out~~ `ProtectedRoute` now checks `useAuth().role === 'admin'`; legacy email fallback removed. Server-side authorization enforced by RLS + hardened Edge Functions (§3.3). |
+| ✅ RESOLVED | `src/lib/customSupabaseClient.js` | ~~Hardcoded Supabase keys~~ Keys read from Vite env vars with fail-fast guard (`.env.example`). |
+| ✅ RESOLVED | `src/contexts/` | ~~Dead legacy `AuthContext.jsx` / `BookingContext.jsx`~~ Deleted during technical-debt cleanup. |
+| ✅ RESOLVED | `src/pages/LessonsPage.jsx` | ~~Hardcoded lesson catalogue~~ Fetches from `lessons` DB table. |
+| ✅ RESOLVED | `src/pages/LessonsPage.jsx` | ~~Client-side `invoice_number` generation~~ Atomic server-side numbering via `next_invoice_number()` RPC (migration `0005`) inside `generate-invoice-pdf`. |
+| ✅ RESOLVED | `index.html` | ~~`<title>Hostinger Horizons</title>`~~ Now `<title>AGC Padel Academy</title>`; Horizons generator meta tag and dev plugins removed (2026-08-12). |
+| ✅ RESOLVED | `src/pages/TermsPage.jsx` | ~~Stripe referenced in legal copy~~ Copy updated to bank transfer (2026-08-07); Stripe fully decommissioned. |
+| 🟡 MEDIUM | `src/contexts/SupabaseAuthContext.jsx` | Toast messages for sign-up errors and success are in **Spanish** (`"Fallo en el registro"`, `"¡Registro completado!"`) while the rest of the UI is in English. |
+| 🟡 MEDIUM | `src/pages/LessonsPage.jsx` | `const [lang] = useState("EN")` — the language is hardcoded to EN. The ES/EN translation object exists but the language-switcher UI is not implemented. |
 | 🟢 LOW | `src/utils/` | Empty directory — no purpose. |
-| 🟢 LOW | `package.json` | `pdf-lib`, `pdfkit`, `qrcode` are listed as frontend dependencies but are only used server-side in Edge Functions. They inflate the dependency manifest and confuse static analysis. |
 
 ---
 
@@ -306,14 +302,16 @@ These are confirmed findings from source code analysis, not assumptions.
 
 ### 6.1 Vite configuration
 
-The Vite config (`vite.config.js`) has two distinct modes:
+The Vite config (`vite.config.js`) is a plain React setup:
 
 | Context | Plugins active |
 |---|---|
-| **Development (`NODE_ENV !== production`)** | `inlineEditPlugin`, `editModeDevPlugin`, `iframeRouteRestorationPlugin`, `selectionModePlugin`, `react()`, Horizons error/fetch/navigation handlers injected into `<head>` |
-| **Production build** | `react()` only + Horizons error handlers (still injected) + Terser minification |
+| **Development** | `react()` |
+| **Production build** | `react()` + esbuild/Rollup minification |
 
-The four Horizons plugins (`plugins/visual-editor/`, `plugins/selection-mode/`, `plugins/vite-plugin-iframe-route-restoration.js`) are **development-only** — they are excluded from the production bundle via the `isDev` guard. The Babel runtime deps (`@babel/parser`, `@babel/traverse`, `@babel/generator`, `@babel/types`) are also **explicitly excluded from the Rollup bundle** in `build.rollupOptions.external`.
+The Hostinger Horizons dev plugins (visual editor, selection mode, iframe route restoration, error/fetch/navigation handlers) were **removed 2026-08-12** together with the `plugins/` directory and the `@babel/*` runtime dependencies that only they used.
+
+The config also **defines** `import.meta.env.VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` from `process.env` or `.env`, and **fails the production build** when either is missing, so a Preview/Production deploy can never ship an empty Supabase config.
 
 **Path alias:** `@` → `./src` (configured in `resolve.alias`).
 
@@ -326,18 +324,15 @@ npm run build
   │   └─ exits with 0 even on failure (|| true)
   │
   └─ vite build
-      ├─ Terser minification
-      ├─ Rollup bundles (Babel externalized)
       └─ Output: dist/
 ```
 
 ### 6.3 Deployment target
 
-- **Production server:** Apache (indicated by `public/.htaccess`)
-- **Domain:** `agcpadelacademy.com` (confirmed by `emailRedirectTo` in `SupabaseAuthContext.jsx`)
-- **SPA routing:** `.htaccess` presumably handles fallback redirects to `index.html` for client-side routes (standard SPA Apache config — not yet read in detail)
-
-> **Assumption:** Deployment is a static file upload (e.g. FTP or Git-push-to-hosting) of the `dist/` folder to an Apache host. No CI/CD pipeline has been observed in the repository. Confirm with the team.
+- **Platform:** Vercel (`vercel.json` in repo root) — production deploys from `main`, automatic preview deployments per branch/PR.
+- **CI:** `.github/workflows/ci.yml` runs lint, Vitest unit tests, and the production build on `main` pushes and PRs (integration tests auto-skip without test-project secrets).
+- **Domain:** `agcpadelacademy.com` (confirmed by `emailRedirectTo` in `SupabaseAuthContext.jsx`).
+- **Node runtime:** pinned via `engines: node >= 20.19` in `package.json`.
 
 ---
 
@@ -346,11 +341,9 @@ npm run build
 | Integration | Status | Entry point | Purpose |
 |---|---|---|---|
 | **Supabase Auth** | Active | `customSupabaseClient.js` → `SupabaseAuthContext.jsx` | User auth, session management |
-| **Supabase DB** | Active | `customSupabaseClient.js` → pages/components | All persistent data |
-| **Supabase Storage** | Active | `customSupabaseClient.js` → `PaymentProofUpload.jsx`, `PaymentVerificationPanel.jsx` | Payment proof uploads; invoice/QR PDFs stored server-side |
-| **Supabase Edge Functions** | Active | `supabase.functions.invoke()` in `LessonsPage.jsx`, `PaymentVerificationPanel.jsx` | Invoice generation, notifications, contact form, booking cleanup |
-| **Stripe** | Deprecated | `supabase/functions/create-booking`, `handle-stripe-webhook` (out-of-tree) | Originally Checkout payment; now superseded by manual bank transfer |
-| **Hostinger Horizons** | Dev-only | `vite.config.js` plugins, `index.html` meta tag | Visual in-browser editor; error reporting to parent iframe |
+| **Supabase DB** | Active | `customSupabaseClient.js` → pages/components + `src/lib/` services | All persistent data |
+| **Supabase Storage** | Active | `customSupabaseClient.js` → `PaymentProofUpload.jsx`, `src/lib/storage.js` | Payment proof uploads; invoice/QR PDFs stored server-side |
+| **Supabase Edge Functions** | Active | `supabase.functions.invoke()` in `src/lib/bookings.js`, `PaymentVerificationPanel.jsx` | Invoice generation, notifications, contact form |
 | **DeepL API** | Planned | Not yet implemented | Runtime UI translation (multilingual support) |
 
 ---
@@ -362,18 +355,12 @@ npm run build
 | Category | Libraries |
 |---|---|
 | **Core framework** | `react`, `react-dom`, `react-router-dom` |
-| **UI primitives** | All `@radix-ui/react-*`, `lucide-react`, `framer-motion`, `embla-carousel-react`, `vaul`, `cmdk`, `input-otp`, `react-resizable-panels` |
-| **Styling** | `tailwindcss` (build-time), `tailwind-merge`, `class-variance-authority`, `clsx`, `next-themes` |
-| **Forms** | `react-hook-form` |
-| **Charts** | `recharts` (wrapped, not yet used in any page) |
+| **UI primitives** | `@radix-ui/react-*` (only those with a live `ui/` consumer), `lucide-react`, `framer-motion` |
+| **Styling** | `tailwindcss` (build-time), `tailwind-merge`, `class-variance-authority`, `clsx` |
 | **Dates** | `date-fns`, `react-day-picker` |
-| **Notifications** | `sonner` |
-| **Meta / SEO** | `react-helmet` |
-| **Backend client** | `@supabase/supabase-js` |
-| **QR codes** | `qrcode` (not imported in frontend — server-side only) |
-| **PDF** | `pdf-lib`, `pdfkit` (not imported in frontend — server-side only) |
-| **Dead deps (frontend)** | `@babel/parser`, `@babel/generator`, `@babel/traverse`, `@babel/types` (excluded from bundle via Rollup `external`; used by dev plugins only) |
-| **Misc** | `terser` (used by Vite build) |
+| **Notifications** | custom shadcn `Toaster` + `useToast` (`sonner` removed 2026-08-10) |
+| **Meta / SEO** | `react-helmet-async` |
+| **Backend client** | `@supabase/supabase-js` (pinned `2.30.0`) |
 
 ### Dev dependencies
 
@@ -381,6 +368,7 @@ npm run build
 |---|---|
 | **Bundler** | `vite`, `@vitejs/plugin-react` |
 | **Linting** | `eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-import`, `eslint-import-resolver-alias`, `globals` |
+| **Testing** | `vitest` |
 | **CSS processing** | `postcss`, `autoprefixer` |
 | **Types** | `@types/node`, `@types/react`, `@types/react-dom` |
 
@@ -390,8 +378,6 @@ npm run build
 
 The following items were inferred rather than confirmed from source:
 
-- **`TripsPage.jsx` and `TournamentsPage.jsx` are likely static/hardcoded** (no Supabase calls detected at the import level). Note: the original assumption that `LessonsPage.jsx` had a hardcoded catalogue was **incorrect and has been corrected** — `LessonsPage.jsx` fetches from the `lessons` table. The trips/tournaments pages should be re-verified individually when writing `specs/baseline-system/` for those pages; do not assume they follow the same pattern as the (now-corrected) lessons page.
-- **Apache `.htaccess` contains SPA fallback routing** (`RewriteRule . /index.html` or similar) — standard for Vite SPAs on Apache. Not yet read.
-- **No CI/CD pipeline exists** — deployment appears to be manual. No `Dockerfile`, `.github/`, `vercel.json`, or equivalent was found in the repo root.
-- **The Supabase Edge Functions source code is not in this repository** — function source is stored and deployed directly via the Supabase dashboard. There is no `supabase/` directory in this repo.
-- **`cleanup-pending-bookings` Edge Function has no visible scheduler** — `pg_cron` is available but not installed; it may be triggered by a Supabase cron job configured in the dashboard, or it may be invoked manually.
+- **`TripsPage.jsx` and `TournamentsPage.jsx` are static/hardcoded** (no Supabase calls) — their images are hosted on the former Hostinger Horizons CDN, which still serves them; migrate assets into the repo or Supabase Storage if that CDN is ever retired.
+- **The Supabase Edge Functions source code is not in this repository** — function source is stored and deployed directly via the Supabase dashboard / MCP. There is no `supabase/` directory in this repo.
+- **`cleanup-pending-bookings` Edge Function has no visible scheduler** — `pg_cron` is available but not installed; per the 2026-08-07 decision it must NOT be scheduled (explicit cancellation only).

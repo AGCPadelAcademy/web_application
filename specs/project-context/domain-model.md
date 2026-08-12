@@ -78,7 +78,6 @@ Grouped by concern (full column list in baseline §2 `bookings`):
 - **Money:** `amount_paid` (numeric, nullable — set when paid), `payment_date` (nullable — set when paid)
 - **Documents:** `receipt_url` (nullable — set after invoice generation), `proof_uploaded_at` (nullable — set when proof uploaded)
 - **Compliance/audit:** `terms_version` (nullable), `ip_address` (nullable), `notes` (nullable)
-- **Legacy:** `stripe_session_id` (nullable — Stripe deprecated, column to be dropped)
 - **Audit:** `created_at` / `updated_at` (NOT NULL)
 
 > **TODO — drop orphaned column:** `time_slot_id` (uuid) has no target table and is no longer used. Drop it: `ALTER TABLE bookings DROP COLUMN time_slot_id;` — confirm no Edge Function or frontend code reads it first.

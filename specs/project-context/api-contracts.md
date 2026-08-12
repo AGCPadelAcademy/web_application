@@ -165,7 +165,7 @@ These functions exist and are ACTIVE but have **no caller in `src/`**. They are 
 
 ### 1.3 Stripe — fully decommissioned
 
-Stripe was removed (decision 2026-08-07: "remove anything that has correlation with Stripe"). Done: `bookings.stripe_session_id` column and the two Stripe-named RLS policies on `profiles` dropped (migration `0004`); `TermsPage.jsx` legal copy updated; the `create-booking` and `handle-stripe-webhook` Edge Functions **deleted 2026-08-10**. Possibly remaining (owner to confirm): Stripe-related secrets in Edge Function secrets and any webhook endpoint still registered in the Stripe dashboard — both harmless once the functions are gone, but should be cleaned up.
+Stripe was removed (decision 2026-08-07: "remove anything that has correlation with Stripe"). Done: `bookings.stripe_session_id` column and the two Stripe-named RLS policies on `profiles` dropped (migration `0004`); `TermsPage.jsx` legal copy updated; the `create-booking` and `handle-stripe-webhook` Edge Functions deleted 2026-08-10; Stripe secrets removed from Edge Function secrets (confirmed 2026-08-10). Only remaining manual step: delete the stale webhook endpoint in the Stripe dashboard — harmless while it exists, since the target function is gone.
 
 ---
 
@@ -261,7 +261,7 @@ Write-only from the frontend's perspective — inserts happen inside `submit-con
 
 | Bucket | Public | Operation | Caller | Details |
 |---|---|---|---|---|
-| `payment-proofs` | No | `upload(path, file, {upsert:true})` | `PaymentProofUpload.jsx:44` | Path: `<booking_id>/<booking_id>_<unix_ms>.<ext>` (e.g. `3f1c…/3f1c…_1754321012345.jpg`). `upsert:true` means a same-millisecond re-upload overwrites. |
+| `payment-proofs` | No | `upload(path, file, {upsert:false})` | `PaymentProofUpload.jsx` | Path: `<booking_id>/attempt-<n>.<ext>` (semantic attempt numbering, 2026-08-12 — `n` = count of existing `payment_proofs` rows for the booking + 1; DB rows are append-only so the file name mirrors the audit trail). `upsert:false` so a name collision fails instead of overwriting. Legacy files keep the old `<booking_id>/<booking_id>_<unix_ms>.<ext>` names — both patterns are valid. |
 | `payment-proofs` | No | `createSignedUrl(file_url, 86400)` | `PaymentVerificationPanel.jsx:94`, `PaymentProofPreview.jsx:14` | 24-hour signed URLs for admins/customers to view proofs |
 | `invoices` | Yes | *(service role)* upload/download | Edge Functions only | `Pending/YYYY/MM/DD/invoice_*.pdf`, `assets/logo.png`. Planned: `Paid/`, `Refused/` prefixes. |
 | `qr-codes` | Yes | *(service role)* download | `generate-invoice-pdf` | `QR_<amount>.pdf` — unchanged, OK as-is per owner |
@@ -311,7 +311,6 @@ Custom functions in the `public` schema (callable via `/rest/v1/rpc/<name>` when
 | **SendGrid** | `notify-payment-verification` | `POST https://api.sendgrid.com/v3/mail/send` | `SENDGRID_API_KEY` |
 | **Resend** | `notify-payment-verification` (fallback) | `POST https://api.resend.com/emails` | `RESEND_API_KEY` |
 | **Supabase GoTrue admin mailer** | `submit-contact-form` | `POST /auth/v1/admin/send` with service role key | Internal endpoint; relies on project SMTP config. Undocumented/unstable interface. |
-| **Hostinger Horizons** | dev-only Vite plugins | iframe error reporting, visual editing | Dev tooling only; excluded from production builds. |
 | **DeepL** | none yet | planned runtime i18n | Planned (see `architecture.md §7`). Not implemented. |
 
 ---
@@ -327,10 +326,10 @@ All TODOs from the initial capture have been resolved by the project owner:
 | 3 | Merge `invoices` + `payment-proofs` buckets? | **No — keep separate** (publicity is bucket-level; proofs must stay private, invoices public). `invoices` gains `Paid/` + `Refused/` prefixes next to `Pending/`; files move on finance verification (future feature). `receipts` bucket deletion ordered — pending manual dashboard deletion (SQL blocked by `storage.protect_delete()`). |
 | 4 | `upload-invoice-to-storage` writes `'completed'` | Annotated for future rework: it becomes the single invoice status-transition helper (initial upload / verify → `'paid'` / cancel), flag-driven. The `'completed'` value is wrong (outside the CHECK) and must become `'paid'` when implemented. No code change now. |
 | 5 | Log to `notifications_log`? Is the table useful? | **Yes, useful** — audit trail for payment disputes and finance reconciliation (who was notified, when, delivery status). **Implemented** in `notify-payment-verification` v2 (respects the CHECK constraints: `email`/`sms`, `client`/`admin`, `sent`/`failed`/`pending`). Keep the table. |
-| 6 | Stripe decommission | DB artifacts removed (migration `0004`): `bookings.stripe_session_id` column + 2 Stripe-named `profiles` policies. `TermsPage.jsx` legal copy updated. `create-booking` + `handle-stripe-webhook` functions **deleted 2026-08-10**. Remaining owner check: Stripe secrets in Edge Function secrets + any Stripe-dashboard webhook endpoint. |
+| 6 | Stripe decommission | **Complete.** DB artifacts removed (migration `0004`), `TermsPage.jsx` copy updated, `create-booking` + `handle-stripe-webhook` deleted 2026-08-10, secrets confirmed removed 2026-08-10. Remaining manual step: delete the webhook endpoint in the Stripe dashboard (harmless — target function is gone). |
 | 7 | RLS: none applied now; what breaks when adding policies? | **Correction:** RLS is already **enabled on every table** and a live policy set exists (verified 2026-08-07 — see below). The question is therefore about **hardening** existing permissive policies, and the production impact of doing so. See analysis below. |
 | 8 | `verify-booking-saved` | **Deleted 2026-08-10** (it validated the dropped Stripe field). |
-| 9 | Proof upload path pattern | Resolved during capture: `<booking_id>/<booking_id>_<unix_ms>.<ext>` (§3). |
+| 9 | Proof upload path pattern | Resolved during capture: `<booking_id>/<booking_id>_<unix_ms>.<ext>`; **superseded 2026-08-12** by semantic attempt numbering `<booking_id>/attempt-<n>.<ext>` (§3). |
 | 10 | Admin UI reading `invoices`? | Decision: a **unified admin finance view** (invoices + payment proofs together) will be spec'd after the brownfield definition is complete. |
 
 ### 7.1 RLS — live state and production-impact analysis (answer to #7)

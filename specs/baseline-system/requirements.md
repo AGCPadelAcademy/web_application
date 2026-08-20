@@ -35,7 +35,7 @@ This file describes **what the live system already does**: existing features, ac
 >
 > ⚠️ The header does **not** expose an Admin link. Admins reach the panel by URL (`/admin` redirects to `/admin/payment-verification`).
 >
-> TODO: Define the permission matrix for `coach` and `accounting` in a future feature spec (`specs/features/` or `specs/baseline-system/roles-and-permissions.md`). They are not actors of any live workflow.
+> **Decision 2026-08-19:** `coach` and `accounting` remain schema-only. Do **not** invent a permission matrix until `class-assignment` / `memberships-credits` are specified. Live actors are **student** and **admin** only. Accounting MUST NOT get `/admin/payment-verification` (or other admin writes) in the meantime. Future spec: `coach-accounting-matrix`.
 
 ---
 
@@ -46,7 +46,7 @@ This file describes **what the live system already does**: existing features, ac
 | **BC-01** Discover academy offerings | Public home, lessons, trips (marketing), tournaments (gallery), contact, terms | ✅ live |
 | **BC-02** Register and authenticate | Email/password signup, confirmation, sign-in, sign-out, password recovery | ✅ live |
 | **BC-03** Maintain a billing profile | Create/update name, phone, address; email is Auth-owned | ✅ live |
-| **BC-04** Book a lesson | Authenticated booking of an active catalogue lesson against a date/time slot | ✅ live |
+| **BC-04** Book a lesson | Authenticated booking of an active catalogue lesson against a date (time slot optional — **Decision 2026-08-19**) | ✅ live |
 | **BC-05** Issue an invoice | Server-generated branded PDF with Swiss QR page; unique sequential number | ✅ live |
 | **BC-06** Collect payment by bank transfer | Customer pays offline using invoice instructions; no card processor | ✅ live |
 | **BC-07** Submit payment evidence | Customer uploads PDF/JPG/PNG proof; admin reviews | ✅ live |
@@ -84,7 +84,7 @@ This file describes **what the live system already does**: existing features, ac
 
 > ⚠️ **FEAT-LES-003** states a 48-hour cancellation policy in copy. The application does **not** enforce cancellation or refunds. There is no customer-facing cancel action.
 >
-> ⚠️ A time slot is **not required** before “Book Now”. `start_time` / `end_time` may be null if the user never selected a slot. TODO: decide whether a slot is mandatory before booking (likely yes for `with_time` lessons).
+> **Decision 2026-08-19:** A time slot is **not** required before “Book Now”. `start_time` / `end_time` may be null. Do **not** add a mandatory-slot fix. Self-serve calendar occupancy is transitional: memberships will use tokens (weeks in the month, academy open or not) that the academy redeems into classes; students will be placed into existing groups by skill rank. Calendar / slot booking is scheduled for removal in those future specs.
 
 ### 4.3 Authentication
 
@@ -100,6 +100,10 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-AUTH-010**: On first session, the system MUST upsert a `profiles` row for the auth user (`id`, `email`, `full_name`, `phone` from metadata).
 - **FEAT-AUTH-011**: After login from a booking attempt, the system MUST honor `?return_to=` and send the user back to the intended lesson page.
 
+> **Live:** signup counts ≥ 9 digits; `ProfileCompletionModal` uses raw `phone.length < 10`.
+>
+> **Decision 2026-08-19 (intended, one rule everywhere — not live):** Phone UI is a **country calling-code selector** (default **+41**) plus a **national number** field that accepts **digits only** (no spaces, dashes, or `+`). The same control MUST be used on signup, `ProfileCompletionModal`, and `/profile`. Persist a single E.164 string in `profiles.phone` (`+` + country code + national digits). Completeness requires a selected prefix and a non-empty national number. Implement in a `005` follow-up (or a small profile-phone spec); do not leave two validators.
+>
 > ⏸️ **OAuth / Google sign-in** is wired in code (`signInWithOAuth`, `OAuthButtons`) but `OAUTH_PROVIDERS` is currently `[]`. Not a live capability.
 >
 > TODO: Capture OAuth enablement in `specs/features/oauth-signin.md` when the provider is configured.
@@ -126,7 +130,7 @@ This file describes **what the live system already does**: existing features, ac
 
 > ⚠️ There is **no** customer-facing cancel-booking action. Cancellation is an explicit future action (customer, admin, or coach) per domain-model D1/API-contracts TODO 1 — not live.
 >
-> ⚠️ Booking insert and invoice generation are sequential, not transactional. If invoice generation fails after insert, the booking row remains without `receipt_url`. **FEAT-PAY-004** covers recovery.
+> ⚠️ Booking insert and invoice generation are sequential, not transactional. If invoice generation fails after insert, the booking row remains without `receipt_url`. **FEAT-PAY-003** covers recovery.
 
 ### 4.6 Invoicing
 
@@ -137,9 +141,7 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-INV-005**: Only the booking owner or an admin MAY invoke invoice generation. The Edge Function MUST reject other callers (401/403).
 - **FEAT-INV-006**: The caller MUST be signed in; the session JWT MUST be sent with the invoke.
 
-> ⚠️ Moving invoices from `Pending/` to `Paid/` after finance verification is **not implemented**. Documented as future work in `api-contracts.md`.
->
-> ⚠️ `invoices.booking_id` is intended 1:1 but the UNIQUE constraint is not yet applied.
+> **Decision 2026-08-19 (`invoice-lifecycle`, not live):** On proof **approve**, set `invoices.status = paid`, set `paid_at`, and move the PDF from `Pending/` to `Paid/`. On proof **reject**, leave the invoice `pending` (student still owes); do not move to `Refused/` unless the invoice itself is cancelled. Add `UNIQUE (booking_id)`. A second “Get invoice” MUST UPDATE the existing row (or pass `invoice_id`), not INSERT a second invoice. Do not implement this inside unrelated features.
 
 ### 4.7 Customer payments (My Payments)
 
@@ -149,7 +151,7 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-PAY-004**: While `payment_status = pending` and the latest proof is missing or `rejected`, the student MUST be able to upload a new payment proof.
 - **FEAT-PAY-005**: After a rejection, the student MUST see the admin notes (or a default “upload a valid payment proof” message) and MAY upload again.
 - **FEAT-PAY-006**: While a non-rejected proof exists, the student MUST see a preview of that proof rather than the upload control.
-- **FEAT-PAY-007**: Payment proofs MUST be PDF, JPEG, or PNG, maximum 5 MB, stored in the private `payment-proofs` bucket under `{bookingId}/{bookingId}_{timestamp}.{ext}`.
+- **FEAT-PAY-007**: Payment proofs MUST be PDF, JPEG, or PNG, maximum 5 MB, stored in the private `payment-proofs` bucket under `{bookingId}/attempt-{n}.{ext}` (`n` = existing `payment_proofs` rows for that booking + 1). MIME and size are enforced in the client only; the bucket has no MIME/size limits. Legacy objects named `{bookingId}/{bookingId}_{timestamp}.{ext}` remain valid to read.
 - **FEAT-PAY-008**: Each upload MUST insert a new `payment_proofs` row (`verification_status = pending`) and set `bookings.proof_uploaded_at`. Previous proofs MUST be retained (append-only).
 - **FEAT-PAY-009**: The My Payments UI MAY show only the most recent proof per booking; history is still stored.
 
@@ -163,7 +165,7 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-ADM-006**: After approve or reject, the system MUST attempt to email the student via `notify-payment-verification` (admin-only; 401/403 otherwise) and record the attempt in `notifications_log`.
 - **FEAT-ADM-007**: If no email provider key is configured, verification MUST still succeed; the notification is logged as failed.
 
-> ⚠️ Invoice `status` is **not** flipped to `paid` on approval today. Domain invariant 2 in `domain-model.md` describes the intended rule; it is not yet implemented.
+> **Live:** Invoice `status` is **not** flipped to `paid` on approval; 004 updates bookings/proofs only. **Intended:** Decision 2026-08-19 in §4.6 / `invoice-lifecycle`.
 >
 > ⚠️ The admin UI shows proofs, not the paired invoice PDF. Combined invoice + proof review is deferred (api-contracts TODO 10).
 
@@ -316,15 +318,22 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 
 > **Assumption:** Bank transfer details live on the invoice PDF / QR page; the web UI does not duplicate IBAN copy on My Payments.
 >
-> **Assumption:** Occupying a slot while `payment_status = pending` is intentional (hold the court until paid or cancelled). There is no automatic expiry of unpaid holds.
+> **Assumption:** Occupying a slot while `payment_status = pending` is intentional **while the calendar exists** (hold the court until paid or cancelled). There is no automatic expiry of unpaid holds. The calendar itself is scheduled for removal (Decision 2026-08-19).
 >
-> TODO: Require a selected time slot before booking (`FEAT-LES` gap).
+> **Decision 2026-08-19:** Do not require a selected time slot before booking. Do not harden grid occupancy (`duration_minutes`). See §4.2.
+>
+> **Decision 2026-08-19:** `coach` / `accounting` stay schema-only; no admin-equivalent access until `coach-accounting-matrix` (after class-assignment / memberships-credits). Live actors: student, admin.
+>
+> **Decision 2026-08-19:** Invoice paid + folder move + `UNIQUE(booking_id)` + regenerate-as-UPDATE belong in `invoice-lifecycle` only. See §4.6. Current approve/reject MUST keep updating bookings/proofs only.
+>
+> **Decision 2026-08-19:** Phone = country-prefix picker (default +41) + digits-only national number, one control on signup / profile modal / `/profile`, stored as E.164 in `profiles.phone`. See §4.3. Live dual validators stay a gap until implemented.
+>
+> **Decision 2026-08-19:** Dual identity. **CAG Padel Academy GmbH** on legal copy, impressum, and invoice PDFs. **AGC Padel Academy** on product UI, domain, and repository. Do not rename one side.
+>
 > TODO: Enforce 48-hour cancellation (or replace the copy) in a cancellation feature spec.
-> TODO: Flip `invoices.status` to `paid` on admin approval (domain invariant vs. live code).
-> TODO: Add `UNIQUE (booking_id)` on `invoices`.
-> TODO: Coach / accounting permission matrix.
 > TODO: Trip and tournament product tables + booking extension.
-> TODO: Membership/credits draw-down model (domain-model §2.8–2.9).
+> TODO: Membership/credits — tokens from weeks-in-month and academy-open; academy redeems into classes (`memberships-credits`).
+> TODO: Replace self-serve calendar/slots with skill-rank placement into existing groups (`class-assignment`).
 > TODO: OAuth provider enablement.
 > TODO: i18n (DeepL) — `specs/features/i18n.md`.
 
@@ -338,6 +347,9 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 | `specs/project-context/domain-model.md` | Entities, cardinalities, invariants |
 | `specs/project-context/api-contracts.md` | Endpoints, payloads, auth of functions |
 | `specs/baseline-system/architecture.md` | Module map, sequence diagrams, deployment |
+| `specs/baseline-system/design.md` | As-is architecture, persistence, integrations, data flows |
+| `specs/baseline-system/implementation-inventory.md` | Modules, responsibilities, dependencies, test coverage |
 | `specs/baseline-system/supabase-backend.md` | Schema, RLS, functions, storage — technical snapshot |
 | **This file** | **Behavioral requirements of the live system** |
 | `specs/features/*` | Future deltas (must reference requirement IDs they change) |
+| `docs/sdd-brownfield/` | SDD folder map and condensed project context |

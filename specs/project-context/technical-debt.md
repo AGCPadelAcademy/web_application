@@ -3,6 +3,7 @@
 > Captured 2026-08-10 from repository analysis (after the 2026-08-10 convention cleanup). Every item cites observed evidence. Risk levels: **High** = can cause data loss, security exposure, or payment/booking breakage · **Medium** = slows development or hides bugs · **Low** = cosmetic or housekeeping.
 > Scope note: DB-level schema debt is inventoried in `baseline-system/supabase-backend.md §2` and summarized here only where it drives application debt. Security findings are in `baseline-system/supabase-backend.md §6` and `api-contracts.md §7.1`.
 > **Remediation pass executed 2026-08-10 (PM)** — statuses below. ✅ resolved · 🔶 partially resolved · ⏸️ intentionally deferred · 🧑 owner action required.
+> **Refreshed 2026-08-19:** Edge Function versions aligned to live `generate-invoice-pdf` v22 and `notify-payment-verification` v6.
 
 ## Summary
 
@@ -10,7 +11,7 @@
 |---|---|---|---|---|
 | 1 | Zero automated tests on payment/booking/auth flows | Missing tests | **High** | 🔶 Vitest + 23 unit tests on `lib/` (`profileValidation`, `bookings`); auth/RLS/E2E coverage still open |
 | 2 | `bookings` public-read RLS policy exposes PII; availability grid depends on it | Coupling | **High** | ✅ Migration `0006`: `booking_slots` non-PII view + owner/admin SELECT policies; grid switched to the view |
-| 3 | All Edge Functions run `verify_jwt: false` with service-role keys | Coupling | **High** | 🔶 `generate-invoice-pdf` v21 + `notify-payment-verification` v5: `verify_jwt: true` + in-function JWT/ownership/admin checks. 6 utility functions still `verify_jwt: false` |
+| 3 | All Edge Functions run `verify_jwt: false` with service-role keys | Coupling | **High** | 🔶 `generate-invoice-pdf` v22 + `notify-payment-verification` v6: `verify_jwt: true` + in-function JWT/ownership/admin checks. 6 utility functions still `verify_jwt: false` |
 | 4 | Business workflow orchestration inside `LessonsPage` | Coupling / Large module | Medium | ✅ Extracted to `src/lib/bookings.js` (`fetchDayBookings`, `buildBookingPayload`, `createBooking`, `requestInvoice`) — unit-tested |
 | 5 | UI coupled to DB schema via inline `select('*')` and join strings | Coupling | Medium | 🔶 `profiles` + booking write/read paths centralized (`profileService.js`, `bookings.js`); admin panel join string remains in `PaymentVerificationPanel` |
 | 6 | `use-toast` duplicated; `src/hooks/` entirely dead | Duplication | Medium | ✅ Dead copy deleted; `src/hooks/` now holds live `useProfile.js` |
@@ -40,8 +41,8 @@
 - `PaymentVerificationPanel.jsx` and `PaymentProofPreview.jsx` both use `getSignedProofUrl()` from `src/lib/storage.js` (bucket name + 24h TTL as named constants).
 
 ### 1.4 Company identity in two places (Low) — ⏸️ DEFERRED (documented pairing)
-- Legal name/address/email are hardcoded in `TermsPage.jsx` **and** in the `generate-invoice-pdf` Edge Function (`CO_NAME`, `CO_ADDR1`, …). A rebranding means editing two repos' worth of surfaces.
-- **Refactor:** acceptable as-is (different runtimes), but document the pairing, or move invoice identity into a DB settings table.
+- Legal name/address/email are hardcoded in `TermsPage.jsx` **and** in the `generate-invoice-pdf` Edge Function (`CO_NAME`, `CO_ADDR1`, …). Both MUST stay **CAG Padel Academy GmbH** (Decision 2026-08-19 dual identity). Product UI stays **AGC Padel Academy**. A legal-address change still means editing two runtimes.
+- **Refactor:** acceptable as-is; optional later: a DB settings table for the GmbH block only — do not collapse AGC and CAG into one string.
 
 ---
 
@@ -51,7 +52,7 @@
 - Exactly the planned safe path was executed: non-PII `booking_slots` view created and granted to `anon`/`authenticated`; `src/lib/bookings.js` (`fetchDayBookings`) switched to it; `bookings` public-read policy dropped in favor of `Users can view own bookings` + `Admins can view all bookings`. `isMine` slot styling was vestigial (never rendered) and removed with the `user_id` projection.
 
 ### 2.2 Edge Functions: no gateway auth, full service role (High) — 🔶 PARTIALLY RESOLVED 2026-08-10
-- `generate-invoice-pdf` **v21** and `notify-payment-verification` **v5** now run with `verify_jwt: true` at the gateway **and** verify the caller's JWT in-function: the invoice function requires booking ownership or `profiles.role = 'admin'`; the notification function is admin-only. Both return proper 401/403/404 responses.
+- `generate-invoice-pdf` **v22** and `notify-payment-verification` **v6** now run with `verify_jwt: true` at the gateway **and** verify the caller's JWT in-function: the invoice function requires booking ownership or `profiles.role = 'admin'`; the notification function is admin-only. Both return proper 401/403/404 responses. (v21/v5 used the implicit-header JWT check, which failed in this Deno `supabase-js` pin; v22/v6 pass the token explicitly — `api-contracts.md` §1.1.)
 - **Remaining:** the 6 utility functions (`submit-contact-form`, `enable-notifications`, `cleanup-pending-bookings`, `merge-invoice-qr`, `upload-invoice-to-storage`, `verify-invoice-generation`, `upload-logo-once`) still run `verify_jwt: false`. `submit-contact-form`/`enable-notifications` must stay anonymous (public forms); the dormant/admin utilities should be hardened when they get real callers.
 
 ### 2.3 UI coupled to schema via raw query strings (Medium) — 🔶 PARTIALLY RESOLVED 2026-08-10

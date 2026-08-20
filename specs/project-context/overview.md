@@ -4,6 +4,7 @@
 > Methodology: Spec-Driven Development (SDD) on a brownfield codebase.
 > Sources analyzed: `package.json`, `index.html`, `src/App.jsx`, `src/pages/*`, `src/components/*`, `src/contexts/*`.
 > Refreshed 2026-08-12: Hostinger Horizons dev tooling (`plugins/`, generator meta tag, Babel runtime deps) and all Stripe artifacts removed from the project; `sonner`, server-only PDF/QR packages, and dead dependencies also removed. Overview updated to the live state.
+> Refreshed 2026-08-19: users, booking path, and invoice modal aligned with reverse specs `001`–`006` (lessons-only booking; accounting is not admin).
 
 ---
 
@@ -23,7 +24,7 @@ In addition to the marketing surface, the app provides authenticated areas for *
 - **Legal entity:** **CAG Padel Academy GmbH** (Swiss GmbH). Source: `src/pages/TermsPage.jsx` (Impressum / Privacy sections).
 - **Primary country / market:** **Switzerland**.
 - **System of record:** The application is intended to be the **single source of truth for bookings** — no external CRM is in scope.
-- **Branding note (inconsistency to track):** the product is branded **"AGC Padel Academy"** in UI copy and the repository name, while the legal entity in the Terms & Conditions is **"CAG Padel Academy GmbH"**. Both spellings currently coexist in the codebase. Treat this as a known discrepancy; it will need a decision (rename one side) during a future spec.
+- **Branding (Decision 2026-08-19):** dual identity is accepted. **Legal / invoices / GTC / impressum:** **CAG Padel Academy GmbH**. **Product UI / domain / repo:** **AGC Padel Academy**. Do not force a single spelling.
 
 ---
 
@@ -34,14 +35,14 @@ Inferred from the routing structure (`src/App.jsx`) and the `ProtectedRoute` / `
 | User type | Description | Evidence |
 |---|---|---|
 | **Anonymous visitors** | Browse marketing pages, view services, read terms, contact the academy. | Public routes: `/`, `/lessons`, `/trips`, `/tournaments`, `/contact`, `/terms`, `/login` |
-| **Authenticated students / customers** | Manage their own profile and pay for lessons / tournaments / trips. | Protected routes: `/profile`, `/payments`; auth via `AuthProvider` (`src/contexts/SupabaseAuthContext.jsx`) |
-| **Administrators / academy staff** | Full access; verify customer payments, manage everything. | Admin-only route: `/admin/payment-verification` guarded by `requireAdmin={true}`; `src/components/admin/PaymentVerificationPanel.jsx` |
-| **Coaches** (planned) | Authenticated coach role; can see **only their own assigned lessons**. No admin capabilities. | Not yet implemented — to be added as a new feature spec. |
-| **Accounting** (planned) | Authenticated accounting role; **same broad read/write access as `admin`** for now (financial oversight). | Not yet implemented — to be added as a new feature spec. |
+| **Authenticated students / customers** | Manage their own profile, book lessons, and pay by bank transfer. Trips and tournaments are marketing only. | Protected routes: `/profile`, `/payments`; auth via `AuthProvider` (`src/contexts/SupabaseAuthContext.jsx`) |
+| **Administrators** | Verify customer payment proofs. No other live admin tools. | Admin-only route: `/admin/payment-verification` guarded by `requireAdmin={true}`; `src/components/admin/PaymentVerificationPanel.jsx` |
+| **Coaches** (planned) | Role value exists on `profiles.role`. No live UI or workflows. | Schema only — permission matrix is a future spec (`specs/features/006-roles-and-permissions/spec.md` documents this as a gap). |
+| **Accounting** (planned) | Role value exists on `profiles.role`. **Does not** share admin access today. | Schema only — `ProtectedRoute requireAdmin` allows `admin` only. |
 
 > **Registration flow:** Sign-up is **self-service** via `/login` (`LoginPage.jsx`). **OAuth sign-in is planned** but the provider strategy is **undecided** — candidates under consideration are (a) a Vercel integration, (b) Supabase Auth's built-in OAuth providers (preferred default, since Supabase already manages auth here), or (c) an external library. Decision to be captured in a dedicated `specs/features/oauth-signin.md` when scoped.
 >
-> **Open scope question — role permission matrix:** the exact per-role capabilities for `coach` and `accounting` (e.g., can accounting export financial reports? can a coach mark a lesson as completed?) must be defined before implementation. To be captured in `specs/baseline-system/roles-and-permissions.md`.
+> **Open scope question — role permission matrix:** the exact per-role capabilities for `coach` and `accounting` (e.g., can accounting export financial reports? can a coach mark a lesson as completed?) must be defined before implementation. Live student/admin behavior is reverse-specced in `specs/features/006-roles-and-permissions/spec.md`.
 
 ---
 
@@ -54,21 +55,21 @@ The workflows below are inferred from the page set, component names, and the exi
 
 ### 3.2 Authentication
 - `/login` (`LoginPage.jsx`) → Supabase Auth via `SupabaseAuthContext` → session-aware UI.
-- A `ProfileCompletionModal` (`src/components/modals/ProfileCompletionModal.jsx`) and `ProfileValidation.js` (`src/lib/`) suggest a **post-login profile completion / validation step** before users can transact.
+- A `ProfileCompletionModal` (`src/components/modals/ProfileCompletionModal.jsx`) and `src/lib/profileValidation.js` gate **booking**, not every post-login page.
 
 ### 3.3 Booking & payment (customer side)
-- User browses `/lessons`, `/trips`, or `/tournaments` and initiates a booking.
-- **Current payment model (manual / proof-of-payment):** Users pay by **bank transfer** and upload proof of payment via `PaymentProofUpload.jsx` / `PaymentProofPreview.jsx` (`src/components/payments/`). The uploaded proof is reviewed by an admin (or accounting) before the booking is confirmed.
+- Lesson booking is live on `/lessons` only. `/trips` and `/tournaments` are marketing pages (trip CTA → `/contact`; tournaments are gallery + date TBC).
+- **Current payment model (manual / proof-of-payment):** Users pay by **bank transfer** and upload proof of payment via `PaymentProofUpload.jsx` / `PaymentProofPreview.jsx` (`src/components/payments/`). The uploaded proof is reviewed by an **admin** before the booking is confirmed.
 - `/payments` page (`PaymentsPage.jsx`) lists the user's payment history and pending payments, and lets the user re-download the invoice PDF.
-- **Invoice PDFs:** An invoice PDF is generated server-side by the `generate-invoice-pdf` Supabase Edge Function (out of this repo) and rendered in the frontend via `InvoiceModal.jsx` (iframe by URL). No PDF/QR libraries live in this repo's dependencies.
+- **Invoice PDFs:** An invoice PDF is generated server-side by the `generate-invoice-pdf` Supabase Edge Function (out of this repo) and previewed in the frontend via `InvoicePreviewModal.jsx`. No PDF/QR libraries live in this repo's dependencies.
 - **Stripe is fully removed** (decommissioned 2026-08-07/10; project cleanup 2026-08-12). Payment is bank transfer only — no Stripe code, columns, policies, secrets, or webhook endpoints remain in the project.
 
 ### 3.4 Admin payment verification
 - Admin opens `/admin/payment-verification` → reviews uploaded payment proofs → approves or rejects via `PaymentVerificationPanel.jsx`.
-- Approval presumably unlocks the booking / marks the payment as settled.
+- Approval sets `bookings.status` and `payment_status` to `confirmed` (student sees “Paid”). It does **not** set `invoices.status = paid` or move storage folders.
 
 ### 3.5 Profile management
-- Authenticated user at `/profile` (`ProfileManagementPage.jsx`) can view/update profile data validated against `ProfileValidation.js` rules.
+- Authenticated user at `/profile` (`ProfileManagementPage.jsx`) can view/update profile data validated against `src/lib/profileValidation.js` rules.
 
 ```mermaid
 flowchart LR
@@ -77,15 +78,15 @@ flowchart LR
     Login --> Auth[(Supabase Auth)]
     Auth --> U[Authenticated User]
     U --> Profile[Profile Management]
-    U --> Book[Booking Flow on Lessons/Trips/Tournaments]
+    U --> Book[Booking Flow on /lessons]
     Book --> ManualPay[Upload Payment Proof / Bank Transfer]
     ManualPay --> AdminReview[Admin Payment Verification Panel]
-    AdminReview -->|approves| BookingConfirmed[Booking Confirmed -> Invoice PDF available]
+    AdminReview -->|approves| BookingConfirmed[Booking Confirmed]
     AdminReview -->|rejects| U
     U --> Payments[Payments History / Invoices]
 ```
 
-> **Deferred to `specs/baseline-system/`:** The exact booking → payment-proof → admin-review → confirmation state machine (status values, transitions, who can transition what, what triggers invoice generation) must be reverse-engineered from `src/pages/LessonsPage.jsx`, `TripsPage.jsx`, `TournamentsPage.jsx`, `PaymentsPage.jsx`, plus the Supabase Edge Functions and database schema. The diagram above is the **inferred happy path** only.
+> Booking → proof → admin-review → confirmation is specified as-is in `specs/baseline-system/requirements.md` and reverse specs `001`–`004`. `/trips` and `/tournaments` are not on this path.
 
 ---
 
@@ -156,11 +157,12 @@ web_application/
 │   ├── lib/                     # customSupabaseClient, profileValidation, profileService, bookings, storage, utils
 │   └── utils/                   # (empty directory)
 ├── tools/                       # generate-llms.js, find-dead-code.mjs
-├── public/                      # static assets (.htaccess is a legacy Apache leftover, unused by Vercel)
-├── specs/                       # SDD specifications (this document lives in specs/project-context/)
-│   ├── project-context/
-│   ├── baseline-system/
-│   └── features/
+├── public/                      # static assets
+├── docs/sdd-brownfield/         # SDD map + condensed project context (start here)
+├── specs/                       # SDD specifications
+│   ├── project-context/         # extracted context (overview, domain, APIs, standards, debt)
+│   ├── baseline-system/         # as-is system (requirements, design, inventory, snapshots)
+│   └── features/                # new work — one folder per feature spec
 ├── package.json
 ├── vite.config.js
 ├── tailwind.config.js
@@ -179,16 +181,12 @@ These are confirmed decisions whose **implementation** is deliberately out of sc
 
 1. ~~Remove Stripe~~ — **done** (code 2026-08-07/10, project cleanup 2026-08-12; secrets removed; the Stripe-dashboard webhook endpoint deletion is the only remaining manual step and is harmless while outstanding — the target function no longer exists).
 2. ~~Remove dead frontend dependencies~~ — **done** (`pdf-lib`, `pdfkit`, `qrcode`, `sonner`, `@babel/*`, and the unused UI/hook files).
-3. **Reconcile the AGC vs. CAG naming.** The product is branded "AGC Padel Academy" but the legal entity is "CAG Padel Academy GmbH". Decide which is canonical for product copy and align.
+3. ~~**Reconcile the AGC vs. CAG naming.**~~ — **resolved 2026-08-19**: dual identity. Legal/invoices/impressum = **CAG Padel Academy GmbH**; product UI/domain/repo = **AGC Padel Academy**. No rename spec.
 4. **Decide OAuth provider strategy** (Vercel integration vs. Supabase native OAuth vs. external library) → `specs/features/oauth-signin.md`.
-5. **Define `coach` and `accounting` role permission matrices** → `specs/baseline-system/roles-and-permissions.md`.
+5. **Define `coach` and `accounting` role permission matrices** → future feature spec (live student/admin matrix is `specs/features/006-roles-and-permissions/spec.md`).
 6. ~~Document the Supabase backend~~ — **done**: `specs/baseline-system/supabase-backend.md` (refreshed via Supabase MCP).
 7. **Specify the i18n strategy** (DeepL runtime translation, target languages, caching, fallback) → `specs/features/i18n.md`.
 
 ## 8. Next Steps for SDD
 
-These belong to subsequent specs, not this overview, but are listed for traceability:
-
-1. `specs/project-context/` — stakeholders, goals, constraints, non-functional requirements.
-2. `specs/baseline-system/` — detailed architecture (frontend module map, Supabase schema/functions, booking & payment-proof flow), data model, deployment topology.
-3. `specs/features/` — per-feature specs as new work is planned (starting with the cleanup backlog above).
+The brownfield baseline is complete. Start here: `docs/sdd-brownfield/README.md`. New work belongs under `specs/features/` (see that folder's README).

@@ -10,6 +10,7 @@ Objectives:
 
 Architecture process:
 Read:
+/docs/sdd-brownfield
 /specs
 /src
 

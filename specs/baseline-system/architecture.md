@@ -2,7 +2,7 @@
 
 > Snapshot captured: 2026-06-28.
 > Refreshed 2026-08-06: corrected stale findings (lessons catalogue is DB-driven, Supabase keys are in env vars, admin guard uses `role === 'admin'` with RLS enforcement).
-> Refreshed 2026-08-12: Hostinger Horizons dev tooling removed (plugins, meta tag, Babel deps); Stripe fully removed; deployment, build, and dependency sections updated to the live state (Vercel + CI + Vitest).
+> Refreshed 2026-08-19: ProtectedRoute tree line and invoice modal filename aligned with live code; payment-proofs service-role-on-public policy is **not** dropped (Advisor WARN remains).
 > Sources analyzed: all files under `src/`, `vite.config.js`, `package.json`, Supabase MCP (project `jokjxpogvwxbwdaroqkc`).
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
 
@@ -59,14 +59,13 @@ src/
 │   │   ├── Header.jsx     Top navigation bar (auth-aware)
 │   │   └── Footer.jsx     Site footer
 │   ├── auth/
-│   │   └── ProtectedRoute.jsx  Route guard (checks auth state; admin check present but disabled — see §5)
+│   │   └── ProtectedRoute.jsx  Route guard (auth + `requireAdmin`; UX only — see §3.3)
 │   ├── admin/
 │   │   └── PaymentVerificationPanel.jsx  Admin table: review/approve/reject payment proofs
 │   ├── payments/
 │   │   ├── PaymentProofUpload.jsx    Upload bank-transfer proof to storage
 │   │   └── PaymentProofPreview.jsx   Show uploaded proof status to customer
 │   ├── modals/
-│   │   ├── InvoiceModal.jsx          Renders generated PDF in iframe (with download button)
 │   │   ├── InvoicePreviewModal.jsx   Inline PDF preview + redirect to /payments on close
 │   │   └── ProfileCompletionModal.jsx  Gate: forces profile completion before booking
 │   ├── ui/                shadcn/Radix UI component library (button, dialog, calendar, tabs, …)
@@ -185,7 +184,7 @@ The legacy `src/contexts/AuthContext.jsx` (localStorage-based) and `BookingConte
 **Important:** `ProtectedRoute` is a UX guard, not a security boundary. Server-side authorization is enforced by **Supabase RLS** (migrations `0006`/`0007`, 2026-08-10):
 - `bookings` SELECT: owner or admin (`is_admin()`); public availability flows through the non-PII `booking_slots` view.
 - `payment_proofs` UPDATE: only `public.is_admin()` (admins).
-- The permissive "Service Role Full Access Payment Proofs" policy on the `public` role is dropped (it previously bypassed RLS for everyone — Supabase advisor warning 0024).
+- The permissive "Service Role Full Access Payment Proofs" policy targeting the `public` role is **still present** (Supabase advisor warning 0024) — it is not dropped. See `supabase-backend.md` §6 and `specs/features/003-payment-proof-upload/spec.md`.
 
 Additionally, the two user-invoked Edge Functions (`generate-invoice-pdf` v22, `notify-payment-verification` v6) run with `verify_jwt: true` and perform in-function JWT + authorization checks (booking ownership / admin role); the client passes the session token explicitly in the `Authorization` header.
 

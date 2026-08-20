@@ -19,6 +19,7 @@ You are working on an existing brownfield codebase.
 
 Before making changes, read the relevant documentation under:
 
+- `/docs/sdd-brownfield/`
 - `/specs/project-context/`
 - `/specs/baseline-system/`
 

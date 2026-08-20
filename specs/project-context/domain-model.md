@@ -1,6 +1,6 @@
 # Domain Model — AGC Padel Academy
 
-> Derived from the technical baseline in `specs/baseline-system/supabase-backend.md` (snapshot 2026-06-28, Supabase MCP), **refreshed 2026-08-06** via Supabase MCP for the `profiles.role` column, the `LessonsPage.jsx` catalogue finding, the `users` table deletion, NOT NULL constraint tightening (migration `0002`), and the `bookings.lesson_code` FK migration (migration `0003`).
+> Derived from the technical baseline in `specs/baseline-system/supabase-backend.md` (snapshot 2026-06-28, Supabase MCP), **refreshed 2026-08-06** via Supabase MCP for the `profiles.role` column, the `LessonsPage.jsx` catalogue finding, the `users` table deletion, NOT NULL constraint tightening (migration `0002`), and the `bookings.lesson_code` FK migration (migration `0003`). **Refreshed 2026-08-19:** invariant 3 matches live `next_invoice_number`; invariant 2 splits live booking confirmation from intended invoice `paid`.
 > This document presents the **business/domain view** of the data model: entities, attributes, relationships, and cardinalities. For technical details (RLS policies, row counts, indexes, security findings) refer to the baseline document — **nothing was moved out of it**; the two documents are complementary by design.
 > Convention: ✅ confirmed from schema/code · ⚠️ inferred, marked with TODO.
 
@@ -47,9 +47,9 @@
 
 > **Role source of truth:** `profiles.role` is the canonical role field (CHECK constraint: `student`, `coach`, `accounting`, `admin`; default `student`). The legacy `users` table has been **deleted** (2026-08-06). `profiles` is linked 1:1 to Supabase Auth via `auth.users.id`. The admin panel's commented-out email guard (`ProtectedRoute.jsx`) must be replaced with a check against `profiles.role = 'admin'` — this is the critical security gap tracked in `architecture.md §5`. Note: the `availability.trainer_id` column name uses "trainer", but the corresponding role value is `coach`.
 >
-> **Profile completion:** `email`, `phone`, and address fields remain nullable because 20–27 existing profiles are incomplete (users who never finished profile completion). The domain invariant "profile must be complete before booking" is enforced only in the UI layer (`ProfileCompletionModal` + `ProfileValidation.js`), not in the DB.
+> **Profile completion:** `email`, `phone`, and address fields remain nullable because 20–27 existing profiles are incomplete (users who never finished profile completion). The domain invariant "profile must be complete before booking" is enforced only in the UI layer (`ProfileCompletionModal` + `src/lib/profileValidation.js`), not in the DB.
 >
-> TODO: Business rules should define which fields are **mandatory before booking** (the frontend enforces this via `ProfileCompletionModal` + `ProfileValidation.js`, but the DB allows nulls everywhere except `id` and `role` — domain invariants live only in the UI layer today).
+> TODO: Business rules should define which fields are **mandatory before booking** (the frontend enforces this via `ProfileCompletionModal` + `src/lib/profileValidation.js`, but the DB allows nulls everywhere except `id` and `role` — domain invariants live only in the UI layer today).
 
 ### 2.2 Lesson — the product
 
@@ -352,11 +352,11 @@ erDiagram
 
 These rules are implied by the frontend flows and schema constraints. They should be made explicit in feature specs:
 
-1. **A Booking requires a complete Profile** — enforced today only in the UI (`ProfileCompletionModal`), not in the DB.
-2. **A Booking in `pending_payment` is unconfirmed** until an admin approves its Payment Proof; on approval both `bookings.status` and `payment_status` become `confirmed`, and `invoices.status` should become `paid`.
-3. **Invoice numbers must be unique** (`UNIQUE` constraint) — currently generated client-side as `INV-<timestamp>` (⚠️ collision risk, flagged in `architecture.md §5`).
+1. **A Booking requires a complete Profile** — enforced today only in the UI (`ProfileCompletionModal` + `src/lib/profileValidation.js`), not in the DB.
+2. **A Booking in `pending_payment` is unconfirmed** until an admin approves its Payment Proof. **Live:** on approval both `bookings.status` and `payment_status` become `confirmed` (student sees “Paid”). **Intended (`invoice-lifecycle`, Decision 2026-08-19):** on approve set `invoices.status = paid`, `paid_at`, move PDF `Pending/` → `Paid/`; on proof reject leave invoice `pending`.
+3. **Invoice numbers must be unique** — allocated atomically by `next_invoice_number` as `INV-YYYY/MM/DD-XX` (migration `0005`; `FEAT-INV-002`). The `invoices.invoice_number` column is UNIQUE. **Intended (`invoice-lifecycle`, Decision 2026-08-19):** add `UNIQUE (booking_id)`; a second generate UPDATEs the existing invoice (or passes `invoice_id`), it MUST NOT INSERT a second row.
 4. **An Invoice references a PDF** in the public `invoices` Storage bucket; a Payment Proof references a file in the **private** `payment-proofs` bucket.
-5. **A rejected Payment Proof returns the Booking to `pending_payment`** — re-upload path exists (see `architecture.md §4` state machine).
+5. **A rejected Payment Proof returns the Booking to `pending_payment`** — `payment_status` stays `pending`; re-upload path exists (see `architecture.md §4` state machine).
 
 ---
 

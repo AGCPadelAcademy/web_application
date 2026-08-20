@@ -34,7 +34,7 @@ Schema changes are tracked as numbered migrations applied via Supabase MCP (migr
 
 ### VI. Documentation Discipline
 - Diagrams in **Mermaid**, prose in **Markdown**.
-- Specs live under `specs/`; the `.specify/` folder is tooling only and must not be edited manually except for this constitution and config files.
+- Specs live under `specs/`; `docs/sdd-brownfield/` is the navigation layer (folder map + condensed context). The `.specify/` folder is tooling only and must not be edited manually except for this constitution and config files.
 - Every spec states what is confirmed from source vs. what is inferred. Assumptions are marked `> **Assumption:**` and open questions are marked `> TODO:`.
 - Cross-references between specs use relative paths and section anchors (e.g. `specs/baseline-system/architecture.md §5`).
 
@@ -99,8 +99,9 @@ No PR may add a hardcoded credential. Reviews must reject any commit that introd
 |---|---|---|---|
 | 2026-07-01 | 1.0.0 | Initial constitution drafted from brownfield rules + baseline-system findings. | SDD session |
 | 2026-08-12 | 1.1.0 | Deployment moved to Vercel (long-term production host, replacing Apache); Hostinger Horizons and Stripe removed from constraints; testing (Vitest + CI), secrets, role-system, and RLS/Edge Function auth open decisions resolved to their implemented state. | SDD session |
+| 2026-08-19 | 1.1.1 | Documented `docs/sdd-brownfield/` as the SDD navigation layer; `specs/baseline-system/tasks.md` renamed to `implementation-inventory.md` to avoid collision with Spec-Kit feature `tasks.md`. | SDD session |
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-08-12
+**Version**: 1.1.1 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-08-19
 
 ---
 

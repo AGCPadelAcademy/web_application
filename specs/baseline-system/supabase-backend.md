@@ -5,6 +5,7 @@
 > Refreshed 2026-08-07: Stripe artifacts removed (migration `0004`: `bookings.stripe_session_id` column dropped, Stripe-named `profiles` policies dropped); atomic invoice numbering added (migration `0005`: `invoice_counters` table + `next_invoice_number()` RPC); `generate-invoice-pdf` v18 and `notify-payment-verification` v2 deployed; §3/§4/§5 reconciled with the live project (13 Edge Functions, 3 pending manual deletion; `receipts` bucket pending deletion; live RLS policies; `bookings_old` no longer present in the live schema). Live row counts updated.
 > Refreshed 2026-08-10: five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the `receipts` bucket deleted by the owner. 8 functions remain.
 > Refreshed 2026-08-10 (PM): RLS hardening (migration `0006`) — `booking_slots` non-PII view created; `bookings` public-read policy replaced by owner/admin SELECT policies. Edge Function auth hardened — `generate-invoice-pdf` v21 and `notify-payment-verification` v5 run with `verify_jwt: true` + in-function JWT/authorization checks.
+> Refreshed 2026-08-19: live Edge Function versions are `generate-invoice-pdf` **v22** and `notify-payment-verification` **v6** (explicit JWT); payment-proof storage path is `{booking_id}/attempt-{n}.{ext}`.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -58,7 +59,7 @@ Primary user profile. Linked 1:1 to `auth.users`. Holds the canonical `role` fie
 
 Referenced by: `bookings`, `availability`, `memberships`, `credits`.
 
-> **Profile completion:** contact/address fields remain nullable because 20–27 existing profiles are incomplete (users who never finished profile completion). The "profile must be complete before booking" invariant is enforced only in the UI layer (`ProfileCompletionModal` + `ProfileValidation.js`), not in the DB.
+> **Profile completion:** contact/address fields remain nullable because 20–27 existing profiles are incomplete (users who never finished profile completion). The "profile must be complete before booking" invariant is enforced only in the UI layer (`ProfileCompletionModal` + `src/lib/profileValidation.js`), not in the DB.
 
 ---
 
@@ -361,9 +362,9 @@ Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `
 
 | Function | Version | Purpose | Status |
 |---|---|---|---|
-| `generate-invoice-pdf` | v21 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — main invoice generator** (called via `src/lib/bookings.js` from `LessonsPage.jsx`). Auth: caller JWT + booking ownership (or admin). |
+| `generate-invoice-pdf` | v22 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — main invoice generator** (called via `src/lib/bookings.js` from `LessonsPage.jsx` and `PaymentsPage.jsx`). Auth: caller JWT + booking ownership (or admin). |
 | `submit-contact-form` | v13+ | Persist contact message + trainer/customer emails | **Active** (called by `ContactPage.jsx`) |
-| `notify-payment-verification` | v5 | Email customer on proof approval/rejection; audits to `notifications_log` | **Active** (called by `PaymentVerificationPanel.jsx`). Auth: caller JWT + admin role. |
+| `notify-payment-verification` | v6 | Email customer on proof approval/rejection; audits to `notifications_log` | **Active** (called by `PaymentVerificationPanel.jsx`). Auth: caller JWT + admin role. |
 | `cleanup-pending-bookings` | v15+ | Time-based auto-cancel of pending bookings | **Dormant — do NOT schedule.** Rejected approach; to be replaced by an explicit cancel-reservation flow (decision 2026-08-07). |
 | `upload-invoice-to-storage` | v2+ | Verify invoice PDF in storage, set status | Active, no frontend caller. To become the flag-driven invoice status-transition helper (future spec). |
 | `merge-invoice-qr` | v1+ | Merge QR page into a base64 invoice PDF | Active, no frontend caller (QR merge now inline in `generate-invoice-pdf`) |
@@ -382,7 +383,7 @@ Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `
 |---|---|---|---|---|
 | `invoices` | Yes | Generated invoice PDFs (`Pending/YYYY/MM/DD/` prefix; planned: `Paid/`, `Refused/` on finance verification) + `assets/logo.png` | None | None |
 | `qr-codes` | Yes | Swiss QR payment slips embedded in invoices (`QR_<amount>.pdf`) | None | None |
-| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/<booking_id>_<ts>.<ext>`), accessed via 24h signed URLs | None | None |
+| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/attempt-<n>.<ext>`; legacy `<booking_id>/<booking_id>_<ts>.<ext>` files remain valid), accessed via 24h signed URLs | None | None |
 
 > ~~`receipts`~~ bucket **deleted 2026-08-10** (legacy Stripe-era invoice PDFs; verified unreferenced before deletion).
 >

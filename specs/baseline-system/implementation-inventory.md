@@ -1,4 +1,4 @@
-# Baseline Tasks — AGC Padel Academy (implementation inventory)
+# Baseline Implementation Inventory — AGC Padel Academy
 
 > Scope: **as-is implementation inventory** — what modules exist, what each one is responsible for, what it depends on, how it is tested, and where maintenance attention is needed. This document describes the **current implementation only**; it is not a backlog and contains no future work.
 > Captured 2026-08-12 from `src/`, `package.json`, `vite.config.js`, `.github/workflows/ci.yml`, and the live Supabase project (via MCP). Cross-references: `requirements.md` (what it does), `design.md` (how it is wired), `api-contracts.md` (integration contracts), `technical-debt.md` (risk-ranked debt).
@@ -21,7 +21,7 @@
 
 | Module | Lines | Responsibility | Depends on | Tests |
 |---|---|---|---|---|
-| `pages/HomePage.jsx` | 101 | Marketing landing; hero image, services overview | `framer-motion`, `react-router-dom` | ❌ |
+| `pages/HomePage.jsx` | ~90 | Marketing landing (centered hero copy, no image); services overview | `framer-motion`, `react-router-dom` | ❌ |
 | `pages/LessonsPage.jsx` | 362 | Lesson catalogue (from `lessons` table), availability grid (08:00–20:30, 30-min steps, 14:00 blocked), booking dialog, T&C acceptance, booking insert + invoice request, profile-completion gate | `lib/bookings.js`, `lib/profileService.js`, `lib/profileValidation.js`, `ui/calendar`, modals | ❌ (logic delegated to tested `lib/bookings.js`) |
 | `pages/TripsPage.jsx` | 93 | Static trips marketing (Ebro Delta campus); CTA → `/contact` | `framer-motion` | ❌ |
 | `pages/TournamentsPage.jsx` | 73 | Static tournaments marketing + photo gallery | `framer-motion` | ❌ |
@@ -174,6 +174,6 @@ Areas of the **current implementation** that need attention when touched (not a 
 |---|---|
 | `requirements.md` | What the system does (features, actors, workflows) |
 | `design.md` | How it is wired (architecture, data flows, integrations) |
-| `tasks.md` (this file) | What exists to maintain (modules, responsibilities, dependencies, coverage) |
+| `implementation-inventory.md` (this file) | What exists to maintain (modules, responsibilities, dependencies, coverage) |
 | `technical-debt.md` | Risk-ranked problems in the above, with remediation status |
 | `api-contracts.md` | Exact request/response contracts for every integration point |

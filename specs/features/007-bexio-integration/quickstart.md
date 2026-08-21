@@ -9,7 +9,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 
 ## 0. Prerequisites (one-time setup)
 
-1. **Bexio developer app**: register at developer.bexio.com → note `client_id`/`client_secret` → register redirect URL `https://<test-project-ref>.supabase.co/functions/v1/bexio-oauth?action=callback` (plus localhost variant for dev).
+1. **Bexio developer app**: register at developer.bexio.com → note `client_id`/`client_secret` → register redirect URL `https://<project-ref>.supabase.co/functions/v1/bexio-oauth/callback` (path-based; the IdP matches redirect URIs exactly).
 2. **Bexio company setup** (FR-018 checklist): QR-capable bank account configured; invoice template with QR payment part enabled; automatic invoice numbering on; active sales tax present.
 3. **Supabase secrets** (Edge Function env): `BEXIO_CLIENT_ID`, `BEXIO_CLIENT_SECRET`, `BEXIO_OAUTH_STATE_SECRET`.
 4. **Migration applied**: tables, RLS, view, extensions (`pg_cron`, `pg_net`), cron job — see data-model.md §Migration plan.
@@ -20,7 +20,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 
 | Step | Action | Expected |
 |---|---|---|
-| 1.1 | Admin opens `/admin/integrations` → "Connect Bexio" | Redirect to `idp.bexio.com` consent screen with the 5 scopes |
+| 1.1 | Admin opens `/admin/integrations` → "Connect Bexio" | Redirect to `auth.bexio.com` consent screen with the 5 scopes |
 | 1.2 | Approve | Redirect back with `?bexio=connected`; card shows `connected`, scopes, timestamp |
 | 1.3 | Run "Initialize configuration" | Discovered IDs shown; any `missing` items flagged; `config_complete` true after entry |
 | 1.4 | In DB: `SELECT refresh_token_secret FROM billing_integrations` | Contains a Vault **name**, never a token value |

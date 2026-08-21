@@ -12,7 +12,7 @@ Integrate Bexio as the external financial/accounting system so AGC never builds 
 
 **Language/Version**: TypeScript (Deno, Supabase Edge Functions); React 18 + Vite frontend; PL/pgSQL for migrations.
 
-**Primary Dependencies**: Supabase platform only — Edge Functions, Postgres + RLS, Vault (`supabase_vault`, already installed), `pg_cron` + `pg_net` (newly enabled for scheduling, research R-09). **Zero new runtime npm dependencies**: Bexio calls use Deno's built-in `fetch`; OAuth/PKCE/HMAC use Deno std + Web Crypto. Bexio API v2.0/3.0 + `idp.bexio.com` OAuth 2.0.
+**Primary Dependencies**: Supabase platform only — Edge Functions, Postgres + RLS, Vault (`supabase_vault`, already installed), `pg_cron` + `pg_net` (newly enabled for scheduling, research R-09). **Zero new runtime npm dependencies**: Bexio calls use Deno's built-in `fetch`; OAuth/PKCE/HMAC use Deno std + Web Crypto. Bexio API v2.0/3.0 + `auth.bexio.com/realms/bexio` OAuth 2.0 (new IdP; `idp.bexio.com` decommissioned 2025-03-31).
 
 **Storage**: PostgreSQL — new tables `billing_integrations`, `billing_contacts`, `billing_documents`, `billing_operations`, `billing_events`; additive columns `bookings.payment_confirmation_source`, `bookings.payment_confirmed_at`; view `billing_public_config`; secrets in Vault (`bexio_refresh_token`, `bexio_access_token_cache`, `bexio_scheduler_secret`). No new Storage buckets; PDFs are streamed from Bexio on demand (research R-11).
 

@@ -66,7 +66,7 @@ export interface ExternalInvoice {
 
 | Operation | Bexio call | Verified |
 |---|---|---|
-| token exchange/refresh | `POST https://idp.bexio.com/token` | docs + knowledge base |
+| token exchange/refresh | `POST https://auth.bexio.com/realms/bexio/protocol/openid-connect/token` | docs + live OIDC discovery (2026-08-21) |
 | current user (setup) | `GET /3.0/users/me` | docs |
 | find contact | `POST /2.0/contact/search` field `mail` | docs |
 | create/update contact | `POST /2.0/contact`, `POST /2.0/contact/{id}` (`contact_type_id: 2`, `name_1` last, `name_2` first) | docs |

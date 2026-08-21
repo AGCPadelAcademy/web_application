@@ -71,6 +71,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="admin/integrations"
+              element={
+                <ProtectedRoute requireAdmin={true}>
+                  <AdminDashboard defaultTab="integrations" />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={<Navigate to="/" replace />} />
 

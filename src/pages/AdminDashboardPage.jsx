@@ -1,10 +1,10 @@
 
-import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentVerificationPanel from '@/components/admin/PaymentVerificationPanel';
+import IntegrationsPanel from '@/components/admin/IntegrationsPanel';
 
-const AdminDashboard = () => {
+const AdminDashboard = ({ defaultTab = 'payments' }) => {
   return (
     <>
       <Helmet>
@@ -16,16 +16,21 @@ const AdminDashboard = () => {
           <p className="text-gray-400">Manage bookings, payments, and system configurations.</p>
         </div>
 
-        <Tabs defaultValue="payments" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="bg-gray-900 border border-gray-800 mb-8 p-1 rounded-xl">
             <TabsTrigger value="payments" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
               Payment Verification
             </TabsTrigger>
-            {/* Future admin tabs can go here */}
+            <TabsTrigger value="integrations" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
+              Integrations
+            </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="payments" className="mt-0">
             <PaymentVerificationPanel />
+          </TabsContent>
+          <TabsContent value="integrations" className="mt-0">
+            <IntegrationsPanel />
           </TabsContent>
         </Tabs>
       </div>

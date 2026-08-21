@@ -13,11 +13,11 @@ New source locations (in-repo, research R-13): `supabase/functions/bexio-oauth/i
 **Auth**: caller JWT required for `start`, `status`, `disconnect`; caller must be admin (`is_admin` pattern from existing functions). `callback` is invoked by the browser redirect from Bexio and authenticates via the signed `state` parameter instead of a JWT.
 
 ### `POST /bexio-oauth` `{ "action": "start" }`
-→ `200 { "authorize_url": "https://idp.bexio.com/authorize?..." }`
+→ `200 { "authorize_url": "https://auth.bexio.com/realms/bexio/protocol/openid-connect/auth?..." }`
 Builds the authorize URL with scopes `contact_show contact_edit kb_invoice_show kb_invoice_edit offline_access` and a signed, single-use `state` nonce (HMAC with server secret, 10-min TTL). No session? → `401`. Not admin? → `403`.
 
-### `GET /bexio-oauth?action=callback&code=…&state=…` (browser redirect target, registered at developer.bexio.com)
-Validates `state`, exchanges `code` at `https://idp.bexio.com/token`, stores refresh token + access-token cache in Vault, upserts `billing_integrations` (`status='connected'`, scopes, `connected_at/by`), writes `integration.connected` audit event, then `302` redirects to the admin integrations page (`/admin/integrations?bexio=connected` or `?bexio=error=<code>`). Never renders tokens.
+### `GET /bexio-oauth/callback?code=…&state=…` (browser redirect target, registered at developer.bexio.com — path-based, no query string in the registered URL)
+Validates `state`, exchanges `code` at `https://auth.bexio.com/realms/bexio/protocol/openid-connect/token`, stores refresh token + access-token cache in Vault, upserts `billing_integrations` (`status='connected'`, scopes, `connected_at/by`), writes `integration.connected` audit event, then `302` redirects to the admin integrations page (`/admin/integrations?bexio=connected` or `?bexio=error=<code>`). Never renders tokens.
 
 ### `POST /bexio-oauth` `{ "action": "status" }`
 → `200 { "status": "not_connected|connected|degraded|requires_reauth", "connected_at": "…", "scopes": [...], "last_successful_call_at": "…", "last_error": "…", "config_complete": true|false }` — powers the admin integration card (FR-006).

@@ -16,7 +16,7 @@
 ### Session 2026-08-20
 
 - Q: Invoice delivery channel post-cutover — in-app only, Bexio send-by-email, or both? → A: In-app only (view/download inside AGC); Bexio send-by-email is not used in V1.
-- Q: Swiss VAT treatment of lesson prices (registered incl./excl./exempt)? → A: Unknown — deferred to the academy's accountant; VAT handling stays fully config-driven with no hardcoded default, and go-live remains blocked until the accountant confirms the Bexio tax configuration (FR-018).
+- Q: Swiss VAT treatment of lesson prices (registered incl./excl./exempt)? → A: Confirmed 2026-08-21 by the academy: **standard rate 8.1% applies** (demo Bexio company tax id 14; the production id is re-discovered during production `initialize`). Prices are **gross** — the advertised lesson price already includes VAT (`mwst_is_net = false`, matching research R-14 and the legacy invoice behavior). VAT handling stays config-driven; changing the rate or mode later is a `configure` action, not a code change.
 - Q: Does V1 re-issue pre-integration bookings into Bexio (none / admin-triggered / bulk)? → A: No backfill in V1 — pre-integration bookings permanently keep their legacy documents; any future re-issuance requires its own explicitly specified feature.
 - Q: Grace period for the FR-038 "proof approved but no Bexio payment" discrepancy flag? → A: 30 days from admin proof approval, configurable via `manual_paid_grace_days`.
 
@@ -319,7 +319,7 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 
 - Exact `kb_item_status_id` ↔ AGC sync-state mapping; whether to derive "paid" from status or from received/remaining totals (lean: totals, per FR-023).
 - ~~Whether Bexio's `send`-by-email should be used for invoice delivery, or AGC keeps surfacing documents in-app only~~ — resolved 2026-08-20: **in-app only in V1**; Bexio send-by-email is not invoked (may be enabled later without code changes).
-- ~~VAT treatment of lesson prices (VAT-registered status, inclusive/exclusive pricing)~~ — clarified 2026-08-20: **unresolved business fact, owned by the accountant**; implementation MUST keep VAT/tax fully configuration-driven (no hardcoded rate or inclusivity), and it is a hard go-live prerequisite (FR-018) — no live invoice may be issued before accountant confirmation.
+- ~~VAT treatment of lesson prices (VAT-registered status, inclusive/exclusive pricing)~~ — clarified 2026-08-20 as accountant-owned, then **confirmed 2026-08-21: standard rate 8.1%, advertised prices are gross (VAT-included, `mwst_is_net = false`)**. Implementation keeps VAT/tax fully configuration-driven; FR-018 go-live prerequisite is satisfied once the same rate is confirmed in the production Bexio company.
 - Whether the unverified April-2026 third-party claim of a Bexio webhook-registration UI reflects a real, supported product feature (re-check official sources at planning; polling remains the designed mechanism regardless).
 - ~~Whether the legacy static per-amount QR files in the `qr-codes` bucket remain needed post-cutover~~ — resolved by Q1-A: not needed for new transactions (they are inputs to the legacy generator only); the bucket is retained for historical continuity.
 - ~~Grace period and detection rule for the "proof approved but no matching Bexio payment" discrepancy flag (FR-038)~~ — resolved 2026-08-20: 30 days from admin proof approval, configurable (`manual_paid_grace_days`); detection runs in the scheduled reconciliation worker.

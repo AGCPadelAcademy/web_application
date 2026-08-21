@@ -25,3 +25,6 @@ Thumbs.db
 # IDE (keep rules and shared config; ignore local secrets)
 .idea/
 .vscode/
+
+# Deno lockfile from local Edge Function tests (this repo is Node/Vite; Deno is Edge-only)
+deno.lock

@@ -216,13 +216,17 @@ const LessonsPage = () => {
         setIsConfirmOpen(false);
         toast({
             title: 'Booking Successful',
-            description: 'Your invoice has been generated.',
+            description: invoiceUrl
+                ? 'Your invoice has been generated.'
+                : 'Your invoice has been issued. You will receive it by email and can pay via QR-bill.',
             variant: 'default',
         });
 
         setSelectedBookingId(insertedBooking.id);
-        setSelectedInvoiceUrl(invoiceUrl);
-        setIsInvoiceModalOpen(true);
+        if (invoiceUrl) {
+            setSelectedInvoiceUrl(invoiceUrl);
+            setIsInvoiceModalOpen(true);
+        }
 
     } catch (error) {
         console.error('Booking error:', error);

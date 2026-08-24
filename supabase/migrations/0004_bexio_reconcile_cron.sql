@@ -13,23 +13,43 @@
 --   - ENVIRONMENT: the function URL below targets the production project
 --     (jokjxpogvwxbwdaroqkc). Adjust the project ref if applying to a
 --     branch/staging project.
---   - Idempotent: an existing job with the same name is replaced.
+--   - Idempotent: an existing job with the same name is unscheduled first.
+--   - Hosted Supabase: the migrator role cannot SELECT/UPDATE cron.job
+--     (permission denied for table job). Use cron.unschedule / cron.schedule
+--     only — those are SECURITY DEFINER. The job is created active because
+--     bexio-reconcile is deployed with this story (T038).
+--   - pg_net's default HTTP collector timeout is 5s; a full run against
+--     several Bexio invoices takes longer. timeout_milliseconds := 60000
+--     records the HTTP result. Closing the collector does not abort the
+--     Edge Function (verified: reconciliation.run still persisted).
 -- ============================================================================
 
+-- Cron (and this migration) must be able to read the Vault-backed secret.
+GRANT EXECUTE ON FUNCTION public.billing_get_secret(text) TO postgres;
+
 -- 1. Scheduler shared secret (Vault only) ------------------------------------
-
-SELECT public.billing_put_secret(
-  'bexio_scheduler_secret',
-  gen_random_uuid()::text || gen_random_uuid()::text
-);
-
--- 2. (Re)register the cron job ------------------------------------------------
+-- Do not rotate an existing secret on re-apply.
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'bexio-reconcile') THEN
-    PERFORM cron.unschedule('bexio-reconcile');
+  IF public.billing_get_secret('bexio_scheduler_secret') IS NULL THEN
+    PERFORM public.billing_put_secret(
+      'bexio_scheduler_secret',
+      gen_random_uuid()::text || gen_random_uuid()::text
+    );
   END IF;
+END;
+$$;
+
+-- 2. (Re)register the cron job ------------------------------------------------
+-- cron.unschedule(name) raises if the job is absent; ignore that case.
+
+DO $$
+BEGIN
+  PERFORM cron.unschedule('bexio-reconcile');
+EXCEPTION
+  WHEN OTHERS THEN
+    NULL;
 END;
 $$;
 
@@ -43,17 +63,14 @@ SELECT cron.schedule(
         'Content-Type', 'application/json',
         'x-scheduler-secret', public.billing_get_secret('bexio_scheduler_secret')
       ),
-      body := '{}'::jsonb
+      body := '{}'::jsonb,
+      timeout_milliseconds := 60000
     );
   $cmd$
 );
 
--- The bexio-reconcile Edge Function is deployed in Phase 5 (T034). Until then
--- the job stays inactive so it does not log 404 failures every 15 minutes.
--- Activate with: UPDATE cron.job SET active = true WHERE jobname = 'bexio-reconcile';
-UPDATE cron.job SET active = false WHERE jobname = 'bexio-reconcile';
-
--- Verify afterwards with:
+-- Verify afterwards (may require the dashboard SQL editor if cron.job is
+-- not selectable by the current role):
 --   SELECT jobname, schedule, active FROM cron.job WHERE jobname = 'bexio-reconcile';
 --   SELECT status, return_message, start_time FROM cron.job_run_details
 --     ORDER BY start_time DESC LIMIT 5;

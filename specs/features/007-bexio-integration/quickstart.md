@@ -48,30 +48,21 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 
 | Step | Action | Expected |
 |---|---|---|
-| 4.1 | In Bexio, register a payment covering the invoice (demo company) | — |
-| 4.2 | Wait ≤ 15 min (or press "Run reconciliation now" as admin) | Booking mirrors admin-approval end state: `status = 'confirmed'`, `payment_status = 'confirmed'`, `verification_status = 'approved'`, `payment_confirmation_source = 'bexio_reconciliation'`; document status `paid`; `payment.reconciled` audit event — **no admin verification clicked** |
+| 4.1 | In Bexio, register a payment covering the invoice (demo company: open the invoice → record payment. A live bank feed is **not** required.) | Bexio invoice shows received = total |
+| 4.2 | Wait ≤ 15 min (or press "Run reconciliation now" as admin) | Booking `status = 'confirmed'`, `payment_status = 'confirmed'`, `payment_confirmation_source = 'bexio_reconciliation'`; document status `paid`; `payment.reconciled` audit event |
 | 4.3 | Re-run reconciliation | No state change, no duplicate events (idempotent) |
 | 4.4 | Partial payment case | Document shows `partially_paid`; booking remains `pending`; visible to admin |
 
-## 5. Manual verification interplay (Q2-A guards)
+## 5. Failure drills (spec Edge Cases, FR-030–FR-032)
 
 | Step | Action | Expected |
 |---|---|---|
-| 5.1 | New booking → student uploads proof → admin verifies **before** any Bexio payment | Booking `payment_status = 'confirmed'`, source `manual_proof` |
-| 5.2 | Later, Bexio reconciles that invoice | No downgrade/duplicate; source stays recorded; reconciliation event notes already-paid |
-| 5.3 | Reconciled-paid booking → student uploads proof | Proof stored but flagged `superseded`; admin sees it flagged, not pending (FR-038) |
-| 5.4 | Admin tries to verify an already-reconciled booking | Guard rejects; state unchanged (FR-037) |
+| 5.1 | Block network to `api.bexio.com` (or revoke scopes in demo app), then book | Booking **succeeds**; invoice step returns `provider_unavailable`; row in `billing_operations` with `next_retry_at`; admin sees failure |
+| 5.2 | Restore access, run worker | Operation retried, invoice created+issued, operation `succeeded` |
+| 5.3 | Invalidate refresh token, run worker | Integration flips `requires_reauth`; admin sees reconnect banner; no crash loop |
+| 5.4 | Check logs (Edge Function logs + `billing_events`) | No tokens, no auth headers, no full payloads |
 
-## 6. Failure drills (spec Edge Cases, FR-030–FR-032)
-
-| Step | Action | Expected |
-|---|---|---|
-| 6.1 | Block network to `api.bexio.com` (or revoke scopes in demo app), then book | Booking **succeeds**; invoice step returns `provider_unavailable`; row in `billing_operations` with `next_retry_at`; admin sees failure |
-| 6.2 | Restore access, run worker | Operation retried, invoice created+issued, operation `succeeded` |
-| 6.3 | Invalidate refresh token, run worker | Integration flips `requires_reauth`; admin sees reconnect banner; no crash loop |
-| 6.4 | Check logs (Edge Function logs + `billing_events`) | No tokens, no auth headers, no full payloads |
-
-## 7. Legacy coexistence & cutover
+## 6. Legacy coexistence & cutover
 
 | Step | Action | Expected |
 |---|---|---|
@@ -79,7 +70,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 | 7.2 | Reconnect | New bookings use Bexio again; old legacy invoices still downloadable |
 | 7.3 | Invoice numbering | AGC internal sequence unaffected; Bexio numbers are stored display-only |
 
-## 8. Cancellation & refunds (US5)
+## 7. Cancellation & refunds (US5)
 
 | Step | Action | Expected |
 |---|---|---|
@@ -88,7 +79,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 | 8.3 | Reconciled-paid booking → cancel with refund agreed | No automatic money movement; refund expectation recorded; admin sees an explicit "financial correction required in Bexio" indicator |
 | 8.4 | Cancel an invoice Bexio refuses (e.g. already paid) | Conflict surfaced to admin; no forced state change in AGC |
 
-## 9. Admin financial overview (US6)
+## 8. Admin financial overview (US6)
 
 | Step | Action | Expected |
 |---|---|---|

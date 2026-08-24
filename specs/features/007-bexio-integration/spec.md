@@ -2,10 +2,10 @@
 
 **Feature Branch**: `007-bexio-integration`
 **Created**: 2026-08-20
-**Status**: Draft — clarifications resolved 2026-08-20 (Q1-A, Q2-A); ready for planning
+**Status**: Draft — clarifications resolved 2026-08-20 (Q1-A, Q2-A); proof-of-payment removed 2026-08-24
 **Input**: User description: "Integrate Bexio as the external financial and accounting system of the AGC Padel Academy web application. AGC remains the operational system of record (users, bookings, memberships, schedules, pricing, application-level payment state); Bexio becomes the financial/accounting system (accounting contacts, invoices, invoice PDFs, receivables, payment reconciliation, VAT/accounting workflows, financial reporting). No card payments. Preserve existing brownfield behavior."
 
-> **Forward spec.** This document deltas against the brownfield baseline (`specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, `specs/baseline-system/supabase-backend.md`) and the live reverse specs `001`–`006`. It does not restate baseline behavior. External-system claims are grounded in the official Bexio API reference (docs.bexio.com, retrieved 2026-08-20) — see §"Verified External Capabilities".
+> **Forward spec.** This document deltas against the brownfield baseline (`specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, `specs/baseline-system/supabase-backend.md`) and the live reverse specs `001`–`006` under `specs/baseline-system/features/`. It does not restate baseline behavior. External-system claims are grounded in the official Bexio API reference (docs.bexio.com, retrieved 2026-08-20) — see §"Verified External Capabilities".
 >
 > **Core architectural principle (binding):** AGC is the operational system; Bexio is the financial/accounting system. Bexio MUST NOT become the source of truth for any operational AGC domain data (users, players, memberships, bookings, coaches, schedules, courts, pricing, discounts, lifecycles, application-level payment state). AGC MUST NOT re-implement Bexio's accounting functionality (general ledger, VAT workflows, bank reconciliation UI, financial statements, expense accounting).
 
@@ -15,10 +15,14 @@
 
 ### Session 2026-08-20
 
-- Q: Invoice delivery channel post-cutover — in-app only, Bexio send-by-email, or both? → A: In-app only (view/download inside AGC); Bexio send-by-email is not used in V1.
+- Q: Invoice delivery channel post-cutover — in-app only, Bexio send-by-email, or both? → A: **In-app preview plus automatic email.** After issuance, AGC fetches the Bexio PDF and emails it via Resend (`RESEND_API_KEY`) from `no-reply@agcpadelacademy.com`. Bexio's send-by-email API is not used. Email failure MUST NOT fail the booking or invoice (FR-030).
 - Q: Swiss VAT treatment of lesson prices (registered incl./excl./exempt)? → A: Confirmed 2026-08-21 by the academy: **standard rate 8.1% applies** (demo Bexio company tax id 14; the production id is re-discovered during production `initialize`). Prices are **gross** — the advertised lesson price already includes VAT (`mwst_is_net = false`, matching research R-14 and the legacy invoice behavior). VAT handling stays config-driven; changing the rate or mode later is a `configure` action, not a code change.
 - Q: Does V1 re-issue pre-integration bookings into Bexio (none / admin-triggered / bulk)? → A: No backfill in V1 — pre-integration bookings permanently keep their legacy documents; any future re-issuance requires its own explicitly specified feature.
-- Q: Grace period for the FR-038 "proof approved but no Bexio payment" discrepancy flag? → A: 30 days from admin proof approval, configurable via `manual_paid_grace_days`.
+- Q: Grace period for the FR-038 "proof approved but no Bexio payment" discrepancy flag? → A: **Superseded 2026-08-24.** Proof-of-payment is removed; this grace period no longer applies.
+
+### Session 2026-08-24 (proof-of-payment removed)
+
+- Q: Does AGC still need student proof upload and admin proof verification now that Bexio reconciliation confirms payments? → A: **No.** Proof-of-payment is removed from the product. Bank transfer against the Bexio QR invoice is the only confirmation path. AGC MUST NOT offer upload or admin approve/reject of payment proofs. Historical `payment_proofs` rows and the storage bucket MAY remain in the database unused.
 
 ---
 
@@ -43,7 +47,7 @@ An admin connects the AGC application to the academy's Bexio account once, via B
 
 ### User Story 2 - A lesson purchase produces exactly one Bexio invoice (Priority: P1)
 
-When a student completes the existing lesson-booking flow (reverse specs `001`/`002`), AGC ensures the corresponding financial document exists in Bexio: the customer's accounting contact is located or created once, and exactly one Bexio invoice is created for that booking — even if the operation is retried, times out, or is requested twice.
+When a student completes the existing lesson-booking flow (reverse specs `001`/`002`), AGC ensures the corresponding financial document exists in Bexio: the customer's accounting contact is located or created once from the AGC profile (any country), and exactly one Bexio invoice is created for that booking — even if the operation is retried, times out, or is requested twice.
 
 **Why this priority**: This is the core business value — every franc billed by the academy becomes visible in the accounting system without manual re-entry, while the booking UX stays exactly as it is today.
 
@@ -77,11 +81,11 @@ A student (and an admin) can open or download the official invoice document for 
 
 ### User Story 4 - Bank payments become visible in AGC via reconciliation (Priority: P2)
 
-When a customer pays a Bexio invoice by Swiss bank transfer (QR invoice), and that payment is recorded in Bexio (via the academy's bank reconciliation in Bexio or a manual entry there), AGC learns about it and reflects the resulting payment state on the affected booking/invoice — without an admin typing anything into AGC (Decision 2026-08-20, Q2-A: Bexio-recorded payment is the authoritative paid signal; the existing proof-upload flow remains as the dispute/manual path).
+When a customer pays a Bexio invoice by Swiss bank transfer (QR invoice), and that payment is recorded in Bexio (via the academy's bank reconciliation in Bexio or a manual payment entry there), AGC learns about it and confirms the booking — without an admin typing anything into AGC (Decision 2026-08-24: proof-of-payment is removed; Bexio-recorded payment is the only paid signal).
 
 **Why this priority**: This closes the loop `AGC transaction → Bexio invoice → Swiss QR / bank transfer → bank payment → Bexio reconciliation → AGC payment state`. It removes today's purely manual "did they pay?" check, but it depends on the academy's bank-feed habits inside Bexio, so it ships after invoicing works.
 
-**Independent Test**: With a synced invoice outstanding, record the payment in a Bexio test account; after at most one synchronization interval, the AGC view of that transaction shows the payment (amount, date), and repeated syncs never double-apply it.
+**Independent Test**: With a synced invoice outstanding, record the payment in a Bexio test account (manual payment on the invoice is enough; a live bank feed is not required); after at most one synchronization interval, the AGC booking is confirmed, and repeated syncs never double-apply it.
 
 **Acceptance Scenarios**:
 
@@ -89,8 +93,6 @@ When a customer pays a Bexio invoice by Swiss bank transfer (QR invoice), and th
 2. **Given** a partial payment recorded in Bexio, **When** synchronization runs, **Then** AGC reflects a partially-paid state with the outstanding amount, and the booking is NOT treated as fully paid.
 3. **Given** a payment that was already synchronized once, **When** subsequent synchronization runs execute, **Then** the payment is not applied twice and the state does not flap.
 4. **Given** a synchronization run that fails or is delayed, **When** the next successful run executes, **Then** all intermediate payment changes are picked up — synchronization is idempotent and order-safe (a stale run never overrides newer state).
-5. **Given** a booking whose payment proof is still awaiting admin review, **When** reconciliation records full payment for its invoice, **Then** the booking is confirmed and the pending proof is flagged as superseded (no admin action required); the proof record itself is retained.
-6. **Given** an admin-approved proof whose payment never appears in Bexio within the defined grace period, **When** synchronization runs, **Then** the transaction is flagged for admin review as a reconciliation discrepancy (FR-038).
 
 ---
 
@@ -135,7 +137,6 @@ An admin sees operationally useful financial information inside the existing adm
 - **Duplicate request / double-click / page reload**: same external reference → same invoice; AGC never stores two invoice references for one financial event.
 - **Reconciliation delayed or bank payment arrives late**: payment state converges on the next sync; the student-facing state remains consistent with the last confirmed state; no partial flapping.
 - **Payment applied to the wrong invoice in Bexio**: AGC must key reconciliation strictly on the invoice↔booking mapping, never on amount/name heuristics.
-- **Proof uploaded for an already-reconciled paid transaction**: the proof is retained and flagged as superseded; it MUST NOT regress the paid state.
 - **Customer data sync failure (contact create/update fails)**: invoice creation for that transaction is postponed/retried; the failure is visible to admins; the booking itself is unaffected.
 - **Partial system outage (AGC DB ok, Bexio ok, sync worker dead)**: operational flows keep working; sync backlog drains when the worker recovers.
 - **Rate limiting (Bexio 429)**: sync and retries respect the provider's rate-limit signals and back off instead of hammering.
@@ -157,18 +158,18 @@ An admin sees operationally useful financial information inside the existing adm
 - **FR-005**: Only an admin (`profiles.role = 'admin'`, per ACT-003) MUST be able to connect, disconnect, or view the connection status of the Bexio integration.
 - **FR-006**: Every outbound Bexio call MUST have a bounded timeout and a retry policy that (a) retries transient failures (5xx, network, timeouts) with exponential backoff, (b) honors Bexio rate-limit responses (HTTP 429 and `RateLimit-*` headers), and (c) never retries non-retryable client errors (4xx other than 429).
 - **FR-007**: All integration operations MUST be observable: every external call outcome (success, failure class, retry count, duration) MUST be recorded server-side in a form an admin can inspect, without logging credentials, tokens, or unnecessary personal financial data (constitution §IV; safe-logging rule).
-- **FR-008**: A Bexio outage or failure MUST NOT corrupt, block, or roll back AGC operational data (bookings, profiles, proofs). Financial operations that cannot complete MUST be persisted as pending and remain recoverable/retryable (manually by an admin and/or automatically).
+- **FR-008**: A Bexio outage or failure MUST NOT corrupt, block, or roll back AGC operational data (bookings, profiles). Financial operations that cannot complete MUST be persisted as pending and remain recoverable/retryable (manually by an admin and/or automatically).
 
 #### B. Customer ↔ Bexio contact synchronization
 
 - **FR-009**: AGC MUST persist a provider-keyed mapping between the AGC customer (profile) and the external accounting contact identifier, so that every financial operation can locate the mapped contact deterministically. The mapping MUST be provider-neutral in shape (provider + external id), not a Bexio-named column scattered across domain tables.
 - **FR-010**: On the first financial operation for a customer, the system MUST locate the mapped Bexio contact, or — absent a mapping — search Bexio for an existing contact for that customer before creating one, to prevent accidental duplicates. AGC (the profile) remains the primary customer database; Bexio is never the source of truth for customer data.
-- **FR-011**: Contact creation in Bexio MUST carry the customer's billing-relevant data (name, billing address, email) as captured in the complete AGC profile (FEAT-PRF-003). Billing-relevant profile changes MUST be propagated to the mapped contact on the next financial operation (update-in-place), never by creating a second contact.
+- **FR-011**: Contact creation in Bexio MUST carry the customer's billing-relevant data as captured in the complete AGC profile: first name, last name, email, phone, street, postal code, city, and country (ISO 3166-1 alpha-2, mapped to Bexio `country_id` — any country, not Switzerland-only). The profile form MUST collect every field Bexio needs so contacts are not completed by hand in Bexio. Billing-relevant profile changes MUST be propagated to the mapped contact on the next financial operation (update-in-place), never by creating a second contact.
 - **FR-012**: Contact synchronization failures MUST NOT block or alter the booking; they postpone the dependent financial operation and are surfaced per FR-007/FR-008.
 
 #### C. Invoice creation
 
-- **FR-013**: Eligible AGC financial transactions MUST be able to generate a Bexio invoice. V1 eligibility = the currently live purchase flow only: lesson bookings (reverse specs `001`/`002`). Memberships, packages, events/camps, trips, and tournaments are out of V1 (they are not live purchase flows — baseline §7) but the design MUST accommodate them as future sources without rework of the integration core.
+- **FR-013**: Eligible AGC financial transactions MUST be able to generate a Bexio invoice. V1 eligibility = the currently live purchase flow only: lesson bookings (reverse specs `001`/`002`). Memberships, packages, events/camps, trips, tournaments, and token redemption are out of V1 (they are not live purchase flows — baseline §7) but the design MUST accommodate them as future sources without rework of the integration core.
 - **FR-014**: The domain layer MUST express financial intentions (e.g., "issue invoice for booking X", "record payment", "cancel invoice") without depending on Bexio-specific endpoints or payload shapes. All provider-specific logic MUST be isolated behind a provider abstraction so the provider can theoretically be replaced. (Constitution §VII applies: one provider in V1 — no speculative provider-selection UI or multi-provider config.)
 - **FR-015**: Bexio invoices MUST carry: the customer's billing information, line item(s) reflecting the AGC charge (designation, quantity, unit price), currency (CHF, per XR-001), applicable taxes/VAT per the academy's Bexio configuration, and a reference back to the originating AGC transaction.
 - **FR-016**: The AGC↔Bexio correlation MUST be two-sided and durable: (a) AGC persists the external invoice identifier against the AGC financial record, and (b) the Bexio invoice carries the AGC-side reference in Bexio's API-managed reference field (`api_reference`), which is searchable — enabling duplicate checks and recovery after lost responses.
@@ -191,6 +192,7 @@ An admin sees operationally useful financial information inside the existing adm
 - **FR-027**: Students MUST be able to view/download the invoice document for their own transactions from the existing payments area; admins for any transaction. Authorization MUST be enforced server-side, mirroring FEAT-INV-005 (owner or admin).
 - **FR-028**: For pre-integration bookings with only a legacy AGC PDF, the existing document MUST remain accessible unchanged (backward compatibility, constitution §III).
 - **FR-029**: Invoice documents served from AGC MUST come from Bexio's generated PDF (post-cutover per Q1); AGC MUST NOT maintain a parallel invoice renderer for Bexio-managed transactions.
+- **FR-029a**: After a Bexio invoice is issued, AGC MUST email the official Bexio PDF to the customer via Resend from `no-reply@agcpadelacademy.com`. Delivery is idempotent (one successful send per booking, audited in `notifications_log`). Mail failure MUST be audited and MUST NOT fail invoice issuance or the booking.
 
 #### F. Cancellation, refunds, corrections
 
@@ -200,15 +202,15 @@ An admin sees operationally useful financial information inside the existing adm
 
 #### G. Admin financial visibility (bounded)
 
-- **FR-033**: AGC MUST expose only operationally useful financial information: payment status, invoice status, outstanding indicators, recent transactions, external invoice reference, sync/failure state, and a navigation path to the corresponding Bexio record. The confirmation source (Bexio-reconciled vs. manual admin) MUST be distinguishable per transaction.
+- **FR-033**: AGC MUST expose only operationally useful financial information: payment status, invoice status, outstanding indicators, recent transactions, external invoice reference, sync/failure state, and a navigation path to the corresponding Bexio record. The confirmation source MUST be distinguishable per transaction.
 - **FR-034**: Full accounting capabilities MUST remain exclusively in Bexio: financial statements, general ledger, detailed VAT workflows, bank reconciliation interface, professional accounting reports, expense accounting, fiduciary operations. AGC MUST NOT rebuild any of these.
 
-#### H. Reconciliation authority & dispute handling (Decision 2026-08-20, Q2-A)
+#### H. Reconciliation authority (Decision 2026-08-24: proof path removed)
 
-- **FR-035**: A Bexio-recorded full payment MUST automatically transition the affected transaction to the same end state an admin proof approval produces today (booking confirmed, payment confirmed, invoice paid per the `invoice-lifecycle` decision) — without admin action.
-- **FR-036**: The payment-proof upload and admin approve/reject capability (specs `003`/`004`) MUST remain available as the dispute and manual path (e.g., reconciliation lag, provider outage, non-standard payments). An admin approval remains a valid manual confirmation.
-- **FR-037**: A payment proof still awaiting review for a transaction that becomes reconciled-paid MUST be flagged as superseded (no admin action required); the proof record is retained (append-only, per domain model R6).
-- **FR-038**: Reconciliation discrepancies MUST be surfaced for admin review: (a) proof approved but no matching Bexio payment after the defined grace period of **30 days from admin approval** (Clarification 2026-08-20; configurable via `manual_paid_grace_days`); (b) payment recorded against a cancelled invoice; (c) overpayment beyond the invoice total.
+- **FR-035**: A Bexio-recorded full payment MUST automatically confirm the affected booking (`status` and `payment_status` confirmed, document `paid`) without admin action.
+- **FR-036**: AGC MUST NOT offer payment-proof upload or admin proof approve/reject. Confirmation is exclusively Bexio reconciliation (or an admin-triggered run of the same worker). Reverse specs `003`/`004` are retired.
+- **FR-037**: (Retired 2026-08-24 — superseded-proof rules no longer apply.)
+- **FR-038**: Reconciliation discrepancies MUST be surfaced for admin review: (a) payment recorded against a cancelled invoice; (b) overpayment beyond the invoice total.
 
 ---
 
@@ -218,7 +220,7 @@ An admin sees operationally useful financial information inside the existing adm
 - **External Contact Mapping** (new): AGC profile ↔ provider contact id, provider-keyed, with sync timestamps. Owned by AGC; Bexio contact is a projection.
 - **External Invoice Reference** (extends the existing **Invoice** concept rather than a parallel structure where possible): AGC financial record ↔ provider invoice id + provider document number, synchronization state, last-synced-at, and the external payment position (received/remaining). Smallest durable model per constitution §V; exact placement (extend `invoices` vs. companion table) is a planning decision.
 - **Payment Synchronization record** (conceptual; may be fields on the invoice reference rather than a table): per-transaction financial sync state (FR-025), reconciliation timestamp (FR-026), and failure/retry bookkeeping (FR-008).
-- Existing entities reused unchanged in meaning: **Profile** (customer master), **Booking** (operational transaction, lifecycle owner), **Payment Proof** (existing verification evidence), **Invoice** (AGC financial record).
+- Existing entities reused unchanged in meaning: **Profile** (customer master), **Booking** (operational transaction, lifecycle owner), **Invoice** (AGC financial record). Historical **Payment Proof** rows may exist unused.
 
 ---
 
@@ -269,14 +271,14 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 |---|---|
 | Booking flow (`src/pages/LessonsPage.jsx`, `src/lib/bookings.js`) | **Additive**: after the existing booking insert, trigger the financial operation (invoice issuance) via the new provider-abstracted path. The current sequential non-transactional insert→invoice pattern (known gap in reverse spec `002`) is preserved as the fallback-safe baseline; the integration adds persisted pending-state recovery. |
 | Invoice generation (Edge Function `generate-invoice-pdf` v22) | **Cutover decided (Q1-A)**: not invoked for new integrated bookings after go-live; historical PDFs remain accessible (FR-028); the function stays deployed during the transition for legacy recovery paths (FEAT-PAY-003 on pre-integration bookings). |
-| My Payments (`src/pages/PaymentsPage.jsx`) | **Additive**: invoice-document access routes to Bexio-backed documents for integrated transactions; legacy PDFs unchanged. Financial sync state may be surfaced on the student's own transactions (read-only). |
-| Admin (`PaymentVerificationPanel.jsx` / admin area) | **Additive**: financial overview (FR-033), sync-failure surfacing and re-run (FR-008/FR-007), connection management (FR-005). The live proof-verification flow (spec `004`) is retained as the dispute/manual path (Decision Q2-A, FR-036–FR-038). |
+| My Payments (`src/pages/PaymentsPage.jsx`) | Invoice-document access for integrated transactions; pending copy tells the student to pay the QR invoice. Proof upload/preview removed. |
+| Admin (`AdminDashboardPage.jsx` / Integrations) | Connection management (FR-005), run reconciliation now, worker health (FR-007/FR-008). Proof-verification panel removed (FR-036). |
 | Data model | **New, minimal, provider-neutral**: accounting-connection state, contact mapping, invoice external-reference + sync state (per Key Entities). Migrations will be numbered per constitution §V and defined in the plan. No changes to existing column semantics; no schema-debt cleanup piggybacked (constitution §V debt rule). |
 | RLS / security | New tables get least-privilege RLS (owner/admin reads where user-facing; service-role-only writes), matching the migration `0006`/`0007` pattern. |
 | Edge Functions | New server-side function(s) for OAuth callback/token handling, financial operations, and scheduled reconciliation. All run `verify_jwt` + in-function checks where user-invoked, per constitution §IV. The scheduled reconciler is service-side only. |
 | Specs to update after implementation | `specs/baseline-system/requirements.md` (BC-05/06/08/09 deltas), `specs/project-context/api-contracts.md` (new functions/endpoints), `specs/project-context/domain-model.md` (new entities/relationships), `specs/baseline-system/supabase-backend.md` (schema snapshot), reverse specs `002`/`003`/`004` where behavior changes per Q1/Q2. |
 
-**Backward-compatibility risks identified**: (1) invoice-document cutover changing the customer-visible PDF/numbering (cutover decided Q1-A; mitigated by FR-028 and the go-live prerequisite verification in FR-018); (2) payment-state authority change colliding with the live admin proof flow (resolved Q2-A; mitigated by the ordering rules FR-024/FR-025 and the retained manual path FR-036); (3) polling load vs. Bexio rate limits (mitigated by FR-006/FR-022 cadence sizing); (4) duplicate contacts/invoices in Bexio from retries (mitigated by FR-010/FR-016/FR-017).
+**Backward-compatibility risks identified**: (1) invoice-document cutover changing the customer-visible PDF/numbering (cutover decided Q1-A; mitigated by FR-028 and the go-live prerequisite verification in FR-018); (2) removal of the proof-upload/admin-verify path (Decision 2026-08-24) — bookings stay pending until Bexio records payment; (3) polling load vs. Bexio rate limits (mitigated by FR-006/FR-022 cadence sizing); (4) duplicate contacts/invoices in Bexio from retries (mitigated by FR-010/FR-016/FR-017).
 
 ---
 
@@ -287,14 +289,15 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 - Secure server-side Bexio connection (OAuth 2.0 auth-code flow, token storage/refresh/rotation, least-privilege scopes, admin-managed connect/disconnect/status).
 - Contact find-or-create mapping with duplicate prevention and billing-data propagation.
 - Invoice creation for the live lesson-booking purchase flow — idempotent, correlated, recoverable.
-- Invoice document retrieval (Bexio PDF) for owner/admin, with legacy-document compatibility; delivery is in-app only — Bexio send-by-email is not used in V1 (Clarification 2026-08-20).
+- Invoice document retrieval (Bexio PDF) for owner/admin, with legacy-document compatibility; AGC also emails the Bexio PDF via Resend after issuance.
 - Scheduled payment reconciliation (polling) reflecting Bexio payment position into AGC per Q2's resolution.
 - Programmatic cancellation of unpaid Bexio invoices; manual/hybrid refund workflow with AGC-side tracking.
 - Failure handling, retry queue, observability, and the bounded admin financial overview.
 
 ### Future scope (design-compatible, NOT implemented)
 
-- Invoicing for memberships/packages/events/trips/tournaments as those purchase flows ship (see `memberships-credits`, `trips-tournaments` in `specs/features/README.md`).
+- Invoicing for memberships/packages/events/trips/tournaments as those purchase flows ship (see `memberships-credits`, `trips-tournaments` in `specs/features/README.md`). When `memberships-credits` is specified: the billable event is expected to be the membership purchase, not later token redemption when a student attends a class. This spec does not implement memberships, tokens, or that billing split.
+- Automatic bank-transaction-driven reconciliation depth (if/when Bexio exposes incoming-payment APIs); adoption of any officially documented Bexio webhook mechanism.
 - Automatic bank-transaction-driven reconciliation depth (if/when Bexio exposes incoming-payment APIs); adoption of any officially documented Bexio webhook mechanism.
 - Credit-note automation when Bexio ships a credit-note API.
 - Expenses/supplier workflows, VAT/account mappings, accountant/fiduciary workflows, advanced financial reporting — all stay in Bexio.
@@ -308,7 +311,7 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 - Re-implementing any Bexio accounting capability inside AGC (ledger, VAT, statements, reconciliation UI, expenses, fiduciary tooling).
 - Making Bexio the source of truth for any operational AGC data.
 - Card payments, Stripe, or any card-payment-specific infrastructure (XR-005).
-- Changing the live booking lifecycle, the proof-upload flow, or admin verification semantics (specs `001`/`003`/`004`) beyond what Q1/Q2 resolutions explicitly decide.
+- Changing the live lesson-booking flow (spec `001`) beyond invoice issuance and payment confirmation via Bexio.
 - Retroactive migration or re-issuance of pre-integration invoices — **none in V1** (Clarification 2026-08-20): legacy bookings keep legacy documents permanently; no backfill UI or job is built; any future re-issuance is its own feature spec.
 - Event-driven infrastructure (message bus, domain-event store): not justified by current complexity — synchronous invocation with persisted sync state and retry is sufficient (constitution §VII). The conceptual events listed in the brief (InvoiceRequested, PaymentReconciled, …) are realized as state transitions on the payment-synchronization record, not as a bus.
 - `plan.md` / `tasks.md` / production code — this is a specification only.
@@ -318,11 +321,11 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 ## Open questions (non-blocking for spec approval; resolved at planning)
 
 - Exact `kb_item_status_id` ↔ AGC sync-state mapping; whether to derive "paid" from status or from received/remaining totals (lean: totals, per FR-023).
-- ~~Whether Bexio's `send`-by-email should be used for invoice delivery, or AGC keeps surfacing documents in-app only~~ — resolved 2026-08-20: **in-app only in V1**; Bexio send-by-email is not invoked (may be enabled later without code changes).
+- ~~Whether Bexio's `send`-by-email should be used for invoice delivery, or AGC keeps surfacing documents in-app only~~ — resolved 2026-08-20 as in-app only; **revised 2026-08-24 (morning)**: in-app preview and AGC/Resend email; **revised 2026-08-24 (evening)**: Bexio send-by-email; **revised 2026-08-24 (night)**: in-app preview and AGC/Resend email from `no-reply@agcpadelacademy.com` (Bexio send abandoned: no academy mailbox for sender confirmation).
 - ~~VAT treatment of lesson prices (VAT-registered status, inclusive/exclusive pricing)~~ — clarified 2026-08-20 as accountant-owned, then **confirmed 2026-08-21: standard rate 8.1%, advertised prices are gross (VAT-included, `mwst_is_net = false`)**. Implementation keeps VAT/tax fully configuration-driven; FR-018 go-live prerequisite is satisfied once the same rate is confirmed in the production Bexio company.
 - Whether the unverified April-2026 third-party claim of a Bexio webhook-registration UI reflects a real, supported product feature (re-check official sources at planning; polling remains the designed mechanism regardless).
 - ~~Whether the legacy static per-amount QR files in the `qr-codes` bucket remain needed post-cutover~~ — resolved by Q1-A: not needed for new transactions (they are inputs to the legacy generator only); the bucket is retained for historical continuity.
-- ~~Grace period and detection rule for the "proof approved but no matching Bexio payment" discrepancy flag (FR-038)~~ — resolved 2026-08-20: 30 days from admin proof approval, configurable (`manual_paid_grace_days`); detection runs in the scheduled reconciliation worker.
+- ~~Grace period and detection rule for the "proof approved but no matching Bexio payment" discrepancy flag (FR-038)~~ — **superseded 2026-08-24**: proof-of-payment removed; FR-038 now covers cancelled-invoice payments and overpayments only.
 - Contact number assignment strategy in Bexio (auto `nr` vs. academy convention).
 
 ---
@@ -332,7 +335,7 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 - The academy operates (or will operate) a Bexio account for CAG Padel Academy GmbH with Swiss QR-invoice capability configured (QR-IBAN bank account, invoice template with QR payment part). This is a business prerequisite, not an AGC feature.
 - An admin of the AGC application has the authority to complete Bexio OAuth consent for the academy.
 - The only live, chargeable purchase flow today is lesson booking (baseline §3/§7); V1 integrates exactly that flow.
-- The payment method remains Swiss QR invoice + bank transfer only. The proof-upload/admin-verification flow remains available as the dispute and manual path, while Bexio reconciliation is the authoritative paid signal for integrated transactions (Decision 2026-08-20, Q2-A).
+- The payment method remains Swiss QR invoice + bank transfer only. Bookings are confirmed only when Bexio records the payment (Decision 2026-08-24). There is no AGC proof-upload or admin proof-verification path.
 - Supabase Edge Functions (Deno) are the server-side execution environment; no custom API server exists or is introduced (architecture §0 of api-contracts.md; constitution Technology Stack).
 - Pre-integration bookings/invoices are left untouched; coexistence is permanent for historical records.
 - Single academy, single Bexio company (single-tenant per XR-002); multi-company Bexio setups are out of scope.
@@ -345,11 +348,11 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 | Spec | Relationship |
 |---|---|
 | `specs/baseline-system/requirements.md` | Baseline this feature deltas against (BC-04/05/06/07/08/09, FEAT-BKG-*, FEAT-INV-*, FEAT-PAY-*, WF-005/007/008, XR-001/003/005) |
-| `specs/features/001-lesson-booking/spec.md` | Trigger point of the financial operation |
-| `specs/features/002-invoice-generation/spec.md` | Legacy invoice generator — cutover for new bookings per Decision Q1-A; historical documents unaffected |
-| `specs/features/003-payment-proof-upload/spec.md` | Proof upload retained as dispute/manual path per Decision Q2-A |
-| `specs/features/004-admin-payment-verification/spec.md` | Admin verification becomes the manual/dispute path per Decision Q2-A |
-| `specs/features/006-roles-and-permissions/spec.md` | Admin-only integration management reuses the live role model |
+| `specs/baseline-system/features/001-lesson-booking/spec.md` | Trigger point of the financial operation |
+| `specs/baseline-system/features/002-invoice-generation/spec.md` | Legacy invoice generator — cutover for new bookings per Decision Q1-A; historical documents unaffected |
+| `specs/baseline-system/features/003-payment-proof-upload/spec.md` | **Retired** 2026-08-24 — proof upload removed from the product |
+| `specs/baseline-system/features/004-admin-payment-verification/spec.md` | **Retired** 2026-08-24 — admin proof verification removed |
+| `specs/baseline-system/features/006-roles-and-permissions/spec.md` | Admin-only integration management reuses the live role model |
 | `specs/project-context/domain-model.md` | New entities (connection, contact mapping, invoice reference) extend it after implementation |
 | `specs/project-context/api-contracts.md` | New Edge Functions/contracts added there after implementation |
 | Future: `cancel-reservation`, `invoice-lifecycle`, `memberships-credits` | Downstream consumers of this integration; cancellation UX owns its booking-side rules, this spec owns the financial side effects |

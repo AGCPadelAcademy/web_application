@@ -308,8 +308,27 @@ async function handleInitialize(): Promise<Response> {
     rows.find((r) => /hour|stunde|std/i.test(r.name))?.id ?? rows[0]?.id ?? null);
   await discover('language_id', '/2.0/language', (rows: { id: number; name: string }[]) =>
     rows.find((r) => /deutsch|german/i.test(r.name))?.id ?? rows[0]?.id ?? null);
-  await discover('country_id_ch', '/2.0/country', (rows: { id: number; name: string }[]) =>
-    rows.find((r) => /switzerland|schweiz/i.test(r.name))?.id ?? null);
+  try {
+    const countryRows = await client.request<{
+      id: number;
+      name: string;
+      name_short?: string;
+      iso3166_alpha2?: string;
+    }[]>('GET', '/2.0/country');
+    config.countries = countryRows.map((row) => ({
+      id: row.id,
+      iso: (row.iso3166_alpha2 || row.name_short || '').toUpperCase(),
+      name: row.name,
+    }));
+    config.country_id_ch =
+      countryRows.find((r) => (r.iso3166_alpha2 || r.name_short) === 'CH')?.id
+      ?? countryRows.find((r) => /switzerland|schweiz/i.test(r.name))?.id
+      ?? null;
+    if (config.country_id_ch === null) missing.push('country_id_ch');
+  } catch (err) {
+    log({ event: 'discovery_failed', key: 'countries', error: (err as Error).name });
+    missing.push('country_id_ch');
+  }
   // Sales revenue account for invoice positions: Swiss SME chart of accounts —
   // class 3 = operating revenue. May fail if the granted scopes exclude the
   // accounts endpoint; then the admin enters it via `configure`.

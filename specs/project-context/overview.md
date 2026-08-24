@@ -18,7 +18,7 @@ Based on the landing page copy (`src/pages/HomePage.jsx`) and the route map (`sr
 2. **Tournaments** — the "AGC Tournament" competitive circuit run throughout the year.
 3. **Padel trips / camps** — travel packages (flights, hotel, transfers, training) to padel camps, primarily in Spain.
 
-In addition to the marketing surface, the app provides authenticated areas for **profile management, payments, and administrative payment verification**, indicating the platform also serves as an operational tool for the academy staff.
+In addition to the marketing surface, the app provides authenticated areas for **profile management, payments, and administrative Bexio integration**, indicating the platform also serves as an operational tool for the academy staff.
 
 ### Business identity & scope
 - **Legal entity:** **CAG Padel Academy GmbH** (Swiss GmbH). Source: `src/pages/TermsPage.jsx` (Impressum / Privacy sections).
@@ -36,7 +36,7 @@ Inferred from the routing structure (`src/App.jsx`) and the `ProtectedRoute` / `
 |---|---|---|
 | **Anonymous visitors** | Browse marketing pages, view services, read terms, contact the academy. | Public routes: `/`, `/lessons`, `/trips`, `/tournaments`, `/contact`, `/terms`, `/login` |
 | **Authenticated students / customers** | Manage their own profile, book lessons, and pay by bank transfer. Trips and tournaments are marketing only. | Protected routes: `/profile`, `/payments`; auth via `AuthProvider` (`src/contexts/SupabaseAuthContext.jsx`) |
-| **Administrators** | Verify customer payment proofs. No other live admin tools. | Admin-only route: `/admin/payment-verification` guarded by `requireAdmin={true}`; `src/components/admin/PaymentVerificationPanel.jsx` |
+| **Administrators** | Manage the Bexio integration and trigger reconciliation. | Admin-only route: `/admin/integrations` guarded by `requireAdmin={true}`; `src/components/admin/IntegrationsPanel.jsx`. `/admin/payment-verification` redirects here. |
 | **Coaches** (planned) | Role value exists on `profiles.role`. No live UI or workflows. | Schema only — permission matrix is a future spec (`specs/features/006-roles-and-permissions/spec.md` documents this as a gap). |
 | **Accounting** (planned) | Role value exists on `profiles.role`. **Does not** share admin access today. | Schema only — `ProtectedRoute requireAdmin` allows `admin` only. |
 
@@ -59,14 +59,14 @@ The workflows below are inferred from the page set, component names, and the exi
 
 ### 3.3 Booking & payment (customer side)
 - Lesson booking is live on `/lessons` only. `/trips` and `/tournaments` are marketing pages (trip CTA → `/contact`; tournaments are gallery + date TBC).
-- **Current payment model (manual / proof-of-payment):** Users pay by **bank transfer** and upload proof of payment via `PaymentProofUpload.jsx` / `PaymentProofPreview.jsx` (`src/components/payments/`). The uploaded proof is reviewed by an **admin** before the booking is confirmed.
+- **Current payment model:** Users pay by **bank transfer** against the Bexio QR invoice. The booking is confirmed when Bexio records the payment (scheduled reconciliation or admin "Run reconciliation now"). There is no proof-of-payment upload.
 - `/payments` page (`PaymentsPage.jsx`) lists the user's payment history and pending payments, and lets the user re-download the invoice PDF.
 - **Invoice PDFs:** An invoice PDF is generated server-side by the `generate-invoice-pdf` Supabase Edge Function (out of this repo) and previewed in the frontend via `InvoicePreviewModal.jsx`. No PDF/QR libraries live in this repo's dependencies.
 - **Stripe is fully removed** (decommissioned 2026-08-07/10; project cleanup 2026-08-12). Payment is bank transfer only — no Stripe code, columns, policies, secrets, or webhook endpoints remain in the project.
 
-### 3.4 Admin payment verification
-- Admin opens `/admin/payment-verification` → reviews uploaded payment proofs → approves or rejects via `PaymentVerificationPanel.jsx`.
-- Approval sets `bookings.status` and `payment_status` to `confirmed` (student sees “Paid”). It does **not** set `invoices.status = paid` or move storage folders.
+### 3.4 Admin integrations
+- Admin opens `/admin/integrations` → connects Bexio, discovers configuration, runs reconciliation, sees worker health.
+- `/admin/payment-verification` redirects to integrations (proof verification retired 2026-08-24).
 
 ### 3.5 Profile management
 - Authenticated user at `/profile` (`ProfileManagementPage.jsx`) can view/update profile data validated against `src/lib/profileValidation.js` rules.

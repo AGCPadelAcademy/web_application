@@ -113,6 +113,7 @@ function makeProvider(overrides: Partial<MockProvider> = {}): MockProvider {
     },
     getInvoice: () => maybeFail(provider, makeInvoice()),
     getInvoicePdf: () => Promise.resolve({ bytes: new Uint8Array(), fileName: 'x.pdf' }),
+    sendInvoiceEmail: () => Promise.resolve(),
     cancelInvoice: () => Promise.resolve(),
     ...overrides,
   };
@@ -272,6 +273,7 @@ Deno.test('returning customer reuses the stored contact mapping (no duplicate co
 
   assert(!provider.calls.includes('findContactByEmail'));
   assert(!provider.calls.includes('createContact'));
+  assert(provider.calls.includes('updateContact'));
   assert(!repo.events.some((e) => e.event_type === 'contact.linked'));
 });
 

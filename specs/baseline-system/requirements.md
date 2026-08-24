@@ -18,8 +18,8 @@ This file describes **what the live system already does**: existing features, ac
 | Actor | Identity | Access today |
 |---|---|---|
 | **Visitor** | Unauthenticated browser | Public marketing pages, lesson catalogue, availability grid, contact form, login/signup, terms |
-| **Student** | Authenticated user whose `profiles.role` is `student` (default) | Own profile, own bookings/payments, lesson booking, invoice download, payment-proof upload |
-| **Admin** | Authenticated user whose `profiles.role` is `admin` | Everything a student can do, plus `/admin/payment-verification` (approve/reject proofs, view all proofs) |
+| **Student** | Authenticated user whose `profiles.role` is `student` (default) | Own profile, own bookings/payments, lesson booking, invoice download |
+| **Admin** | Authenticated user whose `profiles.role` is `admin` | Everything a student can do, plus `/admin/integrations` (Bexio connection and reconciliation) |
 | **Coach** | Role value allowed by `profiles.role` CHECK | ⏸️ No dedicated UI, no dedicated workflows. Schema only (`availability.trainer_id`). |
 | **Accounting** | Role value allowed by `profiles.role` CHECK | ⏸️ No dedicated UI. `ProtectedRoute` accepts `allowedRoles` but no route uses it. |
 
@@ -49,7 +49,7 @@ This file describes **what the live system already does**: existing features, ac
 | **BC-04** Book a lesson | Authenticated booking of an active catalogue lesson against a date (time slot optional — **Decision 2026-08-19**) | ✅ live |
 | **BC-05** Issue an invoice | Server-generated branded PDF with Swiss QR page; unique sequential number | ✅ live |
 | **BC-06** Collect payment by bank transfer | Customer pays offline using invoice instructions; no card processor | ✅ live |
-| **BC-07** Submit payment evidence | Customer uploads PDF/JPG/PNG proof; admin reviews | ✅ live |
+| **BC-07** Submit payment evidence | Retired 2026-08-24 — proof-of-payment removed; Bexio reconciliation confirms payment | ❌ retired |
 | **BC-08** Confirm or reject payment | Admin approves/rejects; booking status updates; customer is notified | ✅ live |
 | **BC-09** Re-access an invoice | Customer re-opens or regenerates the PDF from My Payments | ✅ live |
 | **BC-10** Enquire without an account | Public contact form stored as `contact_messages` | ✅ live |
@@ -148,26 +148,13 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-PAY-001**: An authenticated student MUST see only their own bookings on `/payments`, newest first, with lesson name, date, price, and payment status (`pending` → “Pending”, `confirmed` → “Paid”).
 - **FEAT-PAY-002**: For a booking that already has `receipt_url`, the student MUST be able to re-open the invoice PDF (“Invoice (PDF)”).
 - **FEAT-PAY-003**: For a pending booking with no `receipt_url`, the student MUST be able to generate the invoice on demand (“Get invoice”), subject to **FEAT-INV-005**.
-- **FEAT-PAY-004**: While `payment_status = pending` and the latest proof is missing or `rejected`, the student MUST be able to upload a new payment proof.
-- **FEAT-PAY-005**: After a rejection, the student MUST see the admin notes (or a default “upload a valid payment proof” message) and MAY upload again.
-- **FEAT-PAY-006**: While a non-rejected proof exists, the student MUST see a preview of that proof rather than the upload control.
-- **FEAT-PAY-007**: Payment proofs MUST be PDF, JPEG, or PNG, maximum 5 MB, stored in the private `payment-proofs` bucket under `{bookingId}/attempt-{n}.{ext}` (`n` = existing `payment_proofs` rows for that booking + 1). MIME and size are enforced in the client only; the bucket has no MIME/size limits. Legacy objects named `{bookingId}/{bookingId}_{timestamp}.{ext}` remain valid to read.
-- **FEAT-PAY-008**: Each upload MUST insert a new `payment_proofs` row (`verification_status = pending`) and set `bookings.proof_uploaded_at`. Previous proofs MUST be retained (append-only).
-- **FEAT-PAY-009**: The My Payments UI MAY show only the most recent proof per booking; history is still stored.
+- **FEAT-PAY-004** through **FEAT-PAY-009**: **Retired 2026-08-24.** Payment-proof upload, preview, and re-upload after rejection are removed. Students pay the QR invoice; confirmation is Bexio reconciliation.
 
-### 4.8 Admin payment verification
+- **FEAT-ADM-001** through **FEAT-ADM-007**: **Retired 2026-08-24.** The admin proof-verification panel is removed. Admin tools live at `/admin/integrations`.
 
-- **FEAT-ADM-001**: An admin MUST access a payment-verification panel at `/admin/payment-verification`.
-- **FEAT-ADM-002**: The panel MUST list payment proofs in three tabs: pending, approved, rejected, showing student name/email, lesson, price, date, upload time, and a signed-URL “View” of the file.
-- **FEAT-ADM-003**: For a pending proof, the admin MUST be able to approve or reject, optionally with notes.
-- **FEAT-ADM-004**: On **approve**, the system MUST set `payment_proofs.verification_status = approved`, `bookings.verification_status = approved`, `bookings.payment_status = confirmed`, and `bookings.status = confirmed`.
-- **FEAT-ADM-005**: On **reject**, the system MUST set `payment_proofs.verification_status = rejected`, `bookings.verification_status = rejected`, and keep `bookings.payment_status = pending` so the student can re-upload.
-- **FEAT-ADM-006**: After approve or reject, the system MUST attempt to email the student via `notify-payment-verification` (admin-only; 401/403 otherwise) and record the attempt in `notifications_log`.
-- **FEAT-ADM-007**: If no email provider key is configured, verification MUST still succeed; the notification is logged as failed.
+### 4.8 Admin (Bexio integration)
 
-> **Live:** Invoice `status` is **not** flipped to `paid` on approval; 004 updates bookings/proofs only. **Intended:** Decision 2026-08-19 in §4.6 / `invoice-lifecycle`.
->
-> ⚠️ The admin UI shows proofs, not the paired invoice PDF. Combined invoice + proof review is deferred (api-contracts TODO 10).
+- **FEAT-ADM-001** through **FEAT-ADM-007**: **Retired 2026-08-24.** The payment-verification panel is removed. Admins use `/admin/integrations` for Bexio connection and reconciliation. `/admin/payment-verification` redirects there.
 
 ### 4.9 Contact
 
@@ -259,13 +246,13 @@ flowchart TD
 ```
 
 - **WF-007**: Payment MUST be offline (bank transfer using the invoice / QR). The application MUST NOT charge a card.
-- **WF-008**: A booking MUST stay `pending` until an admin approves a proof. Occupied slots remain reserved while `payment_status` is `pending` or `confirmed`.
-- **WF-009**: Rejection MUST not delete the booking or the rejected proof. The student MUST be able to upload a new proof.
+- **WF-008**: A booking MUST stay `pending` until Bexio records full payment and reconciliation confirms it. Occupied slots remain reserved while `payment_status` is `pending` or `confirmed`.
+- **WF-009**: **Retired 2026-08-24.** Proof rejection/re-upload no longer exists.
 - **WF-010**: Approval MUST mark the booking paid/confirmed from the student’s point of view (“Paid” badge).
 
 ### 5.5 Admin verification
 
-- **WF-011**: An admin MUST be able to filter proofs by pending / approved / rejected, open the file via signed URL, add notes, and approve or reject in one action.
+- **WF-011**: **Retired 2026-08-24.** Admin proof filtering/approve/reject is removed.
 - **WF-012**: Notification failure MUST NOT roll back the verification decision.
 
 ### 5.6 Booking lifecycle (as implemented)
@@ -274,7 +261,7 @@ flowchart TD
 stateDiagram-v2
   [*] --> pending_payment: booking insert
   pending_payment --> pending_payment: proof rejected / re-upload
-  pending_payment --> confirmed: admin approves proof
+  pending_payment --> confirmed: Bexio reconciliation
   pending_payment --> cancelled: not exposed in UI
   confirmed --> [*]
 ```

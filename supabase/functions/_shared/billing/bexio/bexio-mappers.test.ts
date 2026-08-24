@@ -9,6 +9,7 @@ import {
   contactToBexioPayload,
   invoiceToBexioPayload,
   profileToContactInput,
+  resolveBexioCountryId,
   splitFullName,
 } from './bexio-mappers.ts';
 import type { ExternalContactRef } from '../accounting-provider.ts';
@@ -23,6 +24,10 @@ const CONFIG = {
   unit_id: 5,
   language_id: 1,
   country_id_ch: 7,
+  countries: [
+    { id: 7, iso: 'CH', name: 'Switzerland' },
+    { id: 2, iso: 'ES', name: 'Spain' },
+  ],
   mwst_type: 0,
   mwst_is_net: false,
   payment_term_days: 30,
@@ -32,11 +37,15 @@ const CONFIG = {
 const PROFILE = {
   id: 'user-1',
   full_name: 'Josep Barbera',
+  first_name: 'Josep',
+  last_name: 'Barbera',
   email: 'josep@example.com',
+  phone: '696588327',
   address: 'Bahnhofstrasse 1',
   postal_code: '8001',
   city: 'Zürich',
   country: 'Switzerland',
+  country_code: 'CH',
 };
 
 const BOOKING = {
@@ -62,9 +71,11 @@ Deno.test('profileToContactInput maps profile fields', () => {
     firstName: 'Josep',
     lastName: 'Barbera',
     email: 'josep@example.com',
+    phone: '696588327',
     address: 'Bahnhofstrasse 1',
     postcode: '8001',
     city: 'Zürich',
+    countryCode: 'CH',
   });
 });
 
@@ -74,10 +85,20 @@ Deno.test('contactToBexioPayload: person type, name_1 last / name_2 first (R-04)
   assertEquals(payload.name_1, 'Barbera');
   assertEquals(payload.name_2, 'Josep');
   assertEquals(payload.mail, 'josep@example.com');
-  assertEquals(payload.address, 'Bahnhofstrasse 1');
+  assertEquals(payload.user_id, 1);
+  assertEquals(payload.owner_id, 1);
+  assertEquals(payload.phone_mobile, '696588327');
+  assertEquals(payload.street_name, 'Bahnhofstrasse 1');
   assertEquals(payload.postcode, '8001');
   assertEquals(payload.city, 'Zürich');
   assertEquals(payload.country_id, 7);
+  assertEquals(payload.language_id, 1);
+});
+
+Deno.test('resolveBexioCountryId maps any ISO country, not only Switzerland', () => {
+  assertEquals(resolveBexioCountryId('ES', CONFIG.countries), 2);
+  assertEquals(resolveBexioCountryId('ch', CONFIG.countries), 7);
+  assertEquals(resolveBexioCountryId('US', CONFIG.countries), undefined);
 });
 
 Deno.test('bookingToInvoiceInput: api_reference format, gross CHF line, payment term (FR-016)', () => {

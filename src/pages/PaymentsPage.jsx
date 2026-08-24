@@ -6,18 +6,19 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import PaymentProofUpload from '@/components/payments/PaymentProofUpload';
-import PaymentProofPreview from '@/components/payments/PaymentProofPreview';
 import { requestInvoice } from '@/lib/bookings';
 import { fetchProfile } from '@/lib/profileService';
+import InvoicePreviewModal from '@/components/modals/InvoicePreviewModal.jsx';
 
 const PaymentsPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [bookings, setBookings] = useState([]);
-  const [proofs, setProofs] = useState({});
   const [loading, setLoading] = useState(true);
   const [invoiceLoadingId, setInvoiceLoadingId] = useState(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [selectedInvoiceUrl, setSelectedInvoiceUrl] = useState(null);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -30,24 +31,7 @@ const PaymentsPage = () => {
         .order('created_at', { ascending: false });
 
       if (bookingsError) throw bookingsError;
-
-      const { data: proofsData, error: proofsError } = await supabase
-        .from('payment_proofs')
-        .select('*')
-        .in('booking_id', bookingsData.map(b => b.id));
-
-      if (proofsError) throw proofsError;
-
-      const proofsMap = proofsData.reduce((acc, proof) => {
-        // Only keep the most recent proof if there are multiple
-        if (!acc[proof.booking_id] || new Date(proof.upload_date) > new Date(acc[proof.booking_id].upload_date)) {
-          acc[proof.booking_id] = proof;
-        }
-        return acc;
-      }, {});
-
       setBookings(bookingsData || []);
-      setProofs(proofsMap);
     } catch (error) {
       console.error('Fetch error:', error);
       toast({ title: 'Error', description: 'Failed to load payments data.', variant: 'destructive' });
@@ -60,11 +44,13 @@ const PaymentsPage = () => {
     fetchData();
   }, [user]);
 
-  // Re-opens the invoice PDF, regenerating it first if the booking has none
-  // yet (e.g. bookings created while invoice generation was broken).
+  // Opens the invoice PDF preview. Legacy bookings use receipt_url; Bexio
+  // bookings issue/reuse the document then stream the PDF in the same modal.
   const handleGetInvoice = async (booking) => {
     if (booking.receipt_url) {
-      window.open(booking.receipt_url, '_blank');
+      setSelectedBookingId(booking.id);
+      setSelectedInvoiceUrl(booking.receipt_url);
+      setInvoiceModalOpen(true);
       return;
     }
     setInvoiceLoadingId(booking.id);
@@ -77,7 +63,9 @@ const PaymentsPage = () => {
         profile,
         userId: user.id,
       });
-      if (data?.url) window.open(data.url, '_blank');
+      setSelectedBookingId(booking.id);
+      setSelectedInvoiceUrl(data?.url || null);
+      setInvoiceModalOpen(true);
       fetchData();
     } catch (error) {
       console.error('Invoice error:', error);
@@ -117,62 +105,57 @@ const PaymentsPage = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {bookings.map(booking => {
-              const proof = proofs[booking.id];
-              return (
-                <div key={booking.id} className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 shadow-lg">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-4">
-                    <div>
-                      <h3 className="font-bold text-xl text-white mb-1">{booking.lesson_name}</h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-400">
-                        <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {booking.booking_date ? format(new Date(booking.booking_date), 'dd MMM yyyy') : 'N/A'}</span>
-                        <span className="font-medium text-green-400">{booking.price}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {(booking.receipt_url || booking.payment_status === 'pending') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGetInvoice(booking)}
-                          disabled={invoiceLoadingId === booking.id}
-                          className="border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
-                        >
-                          {invoiceLoadingId === booking.id ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <FileDown className="w-4 h-4 mr-2" />
-                          )}
-                          {booking.receipt_url ? 'Invoice (PDF)' : 'Get invoice'}
-                        </Button>
-                      )}
-                      <PaymentBadge status={booking.payment_status} />
+            {bookings.map((booking) => (
+              <div key={booking.id} className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 shadow-lg">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-4">
+                  <div>
+                    <h3 className="font-bold text-xl text-white mb-1">{booking.lesson_name}</h3>
+                    <div className="flex items-center gap-4 text-sm text-gray-400">
+                      <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {booking.booking_date ? format(new Date(booking.booking_date), 'dd MMM yyyy') : 'N/A'}</span>
+                      <span className="font-medium text-green-400">{booking.price}</span>
                     </div>
                   </div>
-
-                  {booking.payment_status === 'pending' && (!proof || proof.verification_status === 'rejected') && (
-                    <div className="mt-4">
-                      {proof?.verification_status === 'rejected' && (
-                        <div className="mb-4 p-4 border border-red-500/20 bg-red-500/10 rounded-xl text-sm">
-                          <p className="text-red-400 font-bold mb-1">Previous Upload Rejected</p>
-                          <p className="text-red-200">{proof.admin_notes || 'Please upload a valid payment proof.'}</p>
-                        </div>
-                      )}
-                      <PaymentProofUpload bookingId={booking.id} onUploadSuccess={fetchData} />
-                    </div>
-                  )}
-
-                  {proof && proof.verification_status !== 'rejected' && (
-                    <div className="mt-4">
-                      <PaymentProofPreview proof={proof} />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {(booking.receipt_url || booking.payment_status === 'pending') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleGetInvoice(booking)}
+                        disabled={invoiceLoadingId === booking.id}
+                        className="border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                      >
+                        {invoiceLoadingId === booking.id ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileDown className="w-4 h-4 mr-2" />
+                        )}
+                        {booking.receipt_url ? 'Invoice (PDF)' : 'Get invoice'}
+                      </Button>
+                    )}
+                    <PaymentBadge status={booking.payment_status} />
+                  </div>
                 </div>
-              );
-            })}
+
+                {booking.payment_status === 'pending' && (
+                  <p className="text-sm text-gray-400">
+                    Pay with the QR slip on the invoice. This booking is confirmed automatically after the bank transfer is recorded in Bexio.
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      <InvoicePreviewModal
+        isOpen={invoiceModalOpen}
+        onClose={() => {
+          setInvoiceModalOpen(false);
+          setSelectedInvoiceUrl(null);
+        }}
+        bookingId={selectedBookingId}
+        invoiceUrl={selectedInvoiceUrl}
+      />
     </>
   );
 };

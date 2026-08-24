@@ -17,8 +17,8 @@ Three lines: **lessons** (live booking + payment), **tournaments** (marketing on
 | User | Role today |
 |---|---|
 | Visitor | Browse, contact, sign up / sign in |
-| Student (`profiles.role = student`) | Profile, book a lesson, pay by bank transfer, upload proof, re-download invoice |
-| Admin (`profiles.role = admin`) | Verify payment proofs; `is_admin()` enforces this server-side |
+| Student (`profiles.role = student`) | Profile, book a lesson, pay by bank transfer (QR invoice), re-download invoice |
+| Admin (`profiles.role = admin`) | Manage Bexio integration and reconciliation; `is_admin()` enforces this server-side |
 | Coach / accounting | Role values exist; no live UI or workflows |
 
 ---
@@ -29,9 +29,8 @@ Three lines: **lessons** (live booking + payment), **tournaments** (marketing on
 2. **Register & sign in** — email + password; confirmation; password recovery lands on `/reset-password` (must not silently log in).
 3. **Complete profile** — billing fields required before a booking is created.
 4. **Book a lesson** — pick active catalogue item + date/slot → insert booking → generate branded invoice PDF (Swiss QR) → My Payments.
-5. **Pay** — bank transfer using the invoice; upload PDF/JPG/PNG proof (`<booking_id>/attempt-<n>.<ext>`).
-6. **Admin verifies** — approve or reject; booking status updates; customer email; proofs are append-only.
-7. **Re-get invoice** — open existing PDF or regenerate from My Payments if `receipt_url` is missing.
+5. **Pay** — bank transfer using the QR invoice. The booking is confirmed when Bexio records the payment (reconciliation worker, every 15 minutes or admin "Run now").
+6. **Re-get invoice** — open existing PDF or issue/reuse from My Payments if needed.
 
 Trips and tournaments are **not** bookable. There is **no** live cancel-booking action.
 

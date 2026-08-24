@@ -14,8 +14,10 @@
 
 import {
   ProviderAuthError,
+  ProviderClientError,
   ProviderConfigError,
   ProviderUnavailableError,
+  type AccountingProvider,
 } from '../_shared/billing/accounting-provider.ts';
 import { BexioClient } from '../_shared/billing/bexio/bexio-client.ts';
 import { BexioAdapter } from '../_shared/billing/bexio/bexio-adapter.ts';
@@ -25,7 +27,13 @@ import {
   BookingNotBillableError,
   createPostgrestRepo,
   issueInvoiceForBooking,
+  type BillingDocumentRow,
 } from '../_shared/billing/financial-service.ts';
+import {
+  invoiceEmailHtml,
+  invoiceEmailSubject,
+  sendTransactionalEmail,
+} from '../_shared/billing/mailer.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -69,6 +77,109 @@ async function resolveCaller(req: Request): Promise<{ userId: string; isAdmin: b
   if (!user.id) return null;
   const rows = await dbSelect('profiles', `id=eq.${user.id}&select=role`);
   return { userId: user.id, isAdmin: rows[0]?.role === 'admin' };
+}
+
+async function insertNotification(row: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications_log`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) log({ event: 'notification_log_failed', status: res.status });
+}
+
+/** FR-029a: email the Bexio PDF via Resend. Never throws (FR-030). */
+async function maybeEmailInvoicePdf(opts: {
+  provider: AccountingProvider;
+  bookingId: string;
+  userId: string;
+  document: BillingDocumentRow;
+}): Promise<void> {
+  const subject = invoiceEmailSubject(opts.document.document_nr);
+  try {
+    const already = await dbSelect(
+      'notifications_log',
+      `booking_id=eq.${opts.bookingId}&status=eq.sent&message_subject=like.${encodeURIComponent('Your AGC invoice')}*&select=id`,
+    );
+    if (already.length > 0) {
+      log({ event: 'invoice_email_skipped', bookingId: opts.bookingId, reason: 'already_sent' });
+      return;
+    }
+
+    const profiles = await dbSelect('profiles', `id=eq.${opts.userId}&select=email,full_name,first_name`);
+    const profile = profiles[0];
+    const to = typeof profile?.email === 'string' ? profile.email : '';
+    if (!to) {
+      log({ event: 'invoice_email_skipped', bookingId: opts.bookingId, reason: 'no_email' });
+      return;
+    }
+
+    const pdf = await opts.provider.getInvoicePdf({ externalId: opts.document.external_id });
+    const resendKey = (Deno.env.get('RESEND_API_KEY') ?? '').trim() || null;
+    const result = await sendTransactionalEmail(
+      {
+        to,
+        subject,
+        html: invoiceEmailHtml({
+          name: (profile.first_name as string) || (profile.full_name as string) || null,
+          documentNr: opts.document.document_nr,
+          total: Number(opts.document.total),
+          currency: opts.document.currency,
+        }),
+        attachments: [{
+          filename: pdf.fileName || `${opts.document.document_nr ?? 'invoice'}.pdf`,
+          bytes: pdf.bytes,
+        }],
+      },
+      { sendgridKey: null, resendKey },
+    );
+
+    await insertNotification({
+      booking_id: opts.bookingId,
+      notification_type: 'email',
+      recipient_type: 'client',
+      recipient_email: to,
+      message_subject: subject,
+      status: result.sent ? 'sent' : 'failed',
+      error_message: result.error ?? null,
+      sent_at: result.sent ? new Date().toISOString() : null,
+    });
+    log({
+      event: result.sent ? 'invoice_email_sent' : 'invoice_email_failed',
+      bookingId: opts.bookingId,
+      via: 'resend',
+      skipped: result.skipped ?? false,
+      message: result.error ?? undefined,
+    });
+  } catch (err) {
+    const message = (err as Error).message;
+    log({
+      event: 'invoice_email_failed',
+      bookingId: opts.bookingId,
+      error: (err as Error).name,
+      message,
+    });
+    try {
+      const profiles = await dbSelect('profiles', `id=eq.${opts.userId}&select=email`);
+      const to = typeof profiles[0]?.email === 'string' ? profiles[0].email : null;
+      await insertNotification({
+        booking_id: opts.bookingId,
+        notification_type: 'email',
+        recipient_type: 'client',
+        recipient_email: to,
+        message_subject: subject,
+        status: 'failed',
+        error_message: message,
+        sent_at: null,
+      });
+    } catch {
+      /* audit best-effort */
+    }
+  }
 }
 
 async function loadConfig(): Promise<BexioConfig> {
@@ -134,6 +245,12 @@ Deno.serve(async (req: Request) => {
     const repo = createPostgrestRepo(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const result = await issueInvoiceForBooking({ provider, repo, config }, body.booking_id);
+    await maybeEmailInvoicePdf({
+      provider,
+      bookingId: body.booking_id,
+      userId: String(booking.user_id),
+      document: result.document,
+    });
     return json({
       document: {
         id: result.document.id ?? null,
@@ -154,6 +271,9 @@ Deno.serve(async (req: Request) => {
     if (err instanceof ProviderAuthError || err instanceof ProviderUnavailableError) {
       // Operation already enqueued by the financial service (FR-030).
       return json({ error: 'provider_unavailable', message: 'invoice issuing queued for retry' }, 502);
+    }
+    if (err instanceof ProviderClientError) {
+      return json({ error: 'provider_rejected', message: 'Bexio rejected the request' }, 502);
     }
     log({ event: 'unhandled_error', error: (err as Error).name });
     return json({ error: 'internal_error' }, 500);

@@ -36,7 +36,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-04. Contact synchronization strategy
 
-- **Decision**: Per-student (person) contacts. On first billable transaction for a user: search Bexio contacts by email (`POST /2.0/contact/search`, field `mail`); if exactly one match → adopt it; if zero → create (`contact_type_id = 2` person, `name_1` = last name, `name_2` = first name, `mail`, address fields when known); if multiple → do not guess, create a new contact and log an observability warning for manual merge in Bexio. Persist the Bexio `contact_id` in `billing_contacts`. Subsequent transactions reuse the stored ID; contact field updates are pushed best-effort when the AGC profile changes (V1: on next invoice creation only, no background propagation).
+- **Decision**: Per-student (person) contacts. On first billable transaction for a user: search Bexio contacts by email (`POST /2.0/contact/search`, field `mail`); if exactly one match → adopt it; if zero → create (`contact_type_id = 2` person, `name_1` = last name, `name_2` = first name, `mail`, `phone_mobile`, `street_name`/`postcode`/`city`, `country_id` resolved from the profile ISO country code via `GET /2.0/country` `iso3166_alpha2`, plus required `user_id`/`owner_id`); if multiple → do not guess, create a new contact and log an observability warning for manual merge in Bexio. Persist the Bexio `contact_id` in `billing_contacts`. Subsequent transactions reuse the stored ID and **update** the mapped contact from the current profile (FR-011). Country is never forced to Switzerland.
 - **Rationale**: Verified that `mail` is a supported contact search field and `contact_type_id` semantics (1 = company, 2 = person; `name_1` doubles as last name for persons) from the official schema. Email-first matching is the only reliable heuristic available; persisting the mapping (FR-011) makes the heuristic a one-time risk.
 - **Alternatives considered**:
   - *Company-type contacts per membership* — rejected: AGC bills individuals; company billing is out of scope (spec Scope/V1).
@@ -70,9 +70,9 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-08. Payment confirmation authority (Q2-A implementation mechanics)
 
-- **Decision**: Reconciliation writes are performed exclusively by the `bexio-reconcile` function (service role) in a guarded transaction that **mirrors the live admin-approval writes exactly** (verified against `src/components/admin/PaymentVerificationPanel.jsx` and the DB CHECK constraint in `specs/baseline-system/supabase-backend.md`): `UPDATE bookings SET status = 'confirmed', payment_status = 'confirmed', verification_status = 'approved', payment_confirmation_source = 'bexio_reconciliation', payment_confirmed_at = now() WHERE id = ? AND payment_status <> 'confirmed'`. (`bookings.payment_status` is `pending | confirmed | cancelled` — there is no `paid` value; document-level `paid` lives on `billing_documents.status`.) In the same transaction, unresolved payment proofs for that booking are marked superseded (FR-036). The manual path is the existing **client-side PostgREST update** in `PaymentVerificationPanel.jsx` (no `verify-payment-proof` Edge Function exists) — it is extended to set `payment_confirmation_source = 'manual_proof'` + `payment_confirmed_at` and to skip the booking update when already `confirmed` (FR-037); proofs on already-reconciled transactions are flagged `superseded` for audit (FR-038).
-- **Rationale**: Guarded updates (optimistic state check) prevent race conditions between manual verification and the polling worker without locks; source attribution satisfies FR-033.
-- **Alternatives considered**: *Blocking manual verification once integration is live* — rejected: admins still need it as a break-glass path when reconciliation stalls (FR-028 degraded mode).
+- **Decision**: Reconciliation writes are performed exclusively by the `bexio-reconcile` function (service role) with a guarded booking update: `UPDATE bookings SET status = 'confirmed', payment_status = 'confirmed', verification_status = 'approved', payment_confirmation_source = 'bexio_reconciliation', payment_confirmed_at = now() WHERE id = ? AND payment_status <> 'confirmed'`. (`bookings.payment_status` is `pending | confirmed | cancelled` — there is no `paid` value; document-level `paid` lives on `billing_documents.status`.) There is no AGC proof-upload or admin proof-verify path (Decision 2026-08-24).
+- **Rationale**: Guarded updates prevent double-confirm; source attribution satisfies FR-033.
+- **Alternatives considered**: *Keeping manual proof verification as break-glass* — rejected 2026-08-24: payments are confirmed only through Bexio.
 
 ## R-09. Scheduling mechanism for the polling worker
 
@@ -89,9 +89,15 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-11. Invoice PDF access pattern
 
-- **Decision**: On-demand retrieval. `billing-invoice-document` Edge Function: validates caller (owner of the booking or admin, via existing JWT + profiles pattern), resolves the `billing_documents` row, calls `GET /2.0/kb_invoice/{id}/pdf` (base64 payload with `name` field), decodes and streams bytes with `Content-Type: application/pdf` and `Content-Disposition: inline; filename="<document_nr>.pdf"`. No PDF bytes are persisted in AGC Storage.
+- **Decision**: On-demand retrieval. `billing-invoice-document` Edge Function: validates caller (owner of the booking or admin, via existing JWT + profiles pattern), resolves the `billing_documents` row, calls `GET /2.0/kb_invoice/{id}/pdf` (JSON `{ name, size, mime, content }` — `content` is base64), decodes and streams bytes with `Content-Type: application/pdf` and `Content-Disposition: inline; filename="<document_nr>.pdf"`. No PDF bytes are persisted in AGC Storage.
 - **Rationale**: Bexio is the document of record (Q1-A); storing copies adds storage-policy surface (known debt TD-016) and drift risk for zero UX benefit. The endpoint requires an issued invoice, which R-05 guarantees before any user sees a download affordance.
 - **Alternatives considered**: *Mirroring PDFs into `invoices` bucket* — rejected (above). *Direct user-to-Bexio links* — impossible: no public customer-facing URLs exist.
+
+## R-16. Invoice email delivery (revised 2026-08-24 night)
+
+- **Decision**: After issuance, AGC fetches `GET /2.0/kb_invoice/{id}/pdf` and emails the PDF via Resend HTTP API (`RESEND_API_KEY`) from `no-reply@agcpadelacademy.com`. In-app preview is unchanged. Idempotent via `notifications_log` (`status=sent` + subject `Your AGC invoice {document_nr}`). Mail failure is audited and does not fail the booking (FR-030 / FR-029a). Invoice sends always use Resend (not SendGrid), matching the verified academy domain. Auth mail stays on Supabase Custom SMTP.
+- **Rationale**: The domain is already verified in Resend, so From branding needs no mailbox or Bexio SPF. Bexio send-by-email requires confirming `no-reply@…`, which has no inbox.
+- **Alternatives considered**: *Bexio `POST .../send`* — tried 2026-08-24 evening, abandoned the same night: no academy mailbox for sender confirmation, and Gmail cannot be the From address. *Plug Resend SMTP into Bexio* — not supported.
 
 ## R-12. Cutover and legacy coexistence (Q1-A implementation mechanics)
 

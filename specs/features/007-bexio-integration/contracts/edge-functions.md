@@ -43,7 +43,8 @@ Deletes Vault secrets, sets `status='disconnected'`, keeps config for audit. Exi
 1. Verify caller owns the booking (or is admin) and booking is in a billable state.
 2. Idempotency: return existing result if `billing_operations.idempotency_key` already `succeeded`, or `billing_documents.booking_id` exists.
 3. Ensure contact (research R-04) → create draft invoice (research R-05 payload, `api_reference` set) → issue → upsert `billing_documents` → write `invoice.issued` audit event.
-4. Booking payment state is untouched at issuance (`payment_status='pending'`); confirmation arrives only via reconciliation or the manual proof path (Q2-A).
+4. Email the official Bexio PDF via Resend from `no-reply@agcpadelacademy.com` (research R-16 / FR-029a). Mail failure is audited in `notifications_log` and MUST NOT fail issuance (FR-030). Idempotent: skip when a `status=sent` row already exists for subject `Your AGC invoice {document_nr}`.
+5. Booking payment state is untouched at issuance (`payment_status='pending'`); confirmation arrives only via Bexio reconciliation.
 
 ### Responses
 - `200 { "document": { "id", "document_nr", "status": "issued", "total", "currency" }, "reused": false }`
@@ -54,7 +55,7 @@ Deletes Vault secrets, sets `status='disconnected'`, keeps config for audit. Exi
 
 ## 3. `billing-invoice-document` — PDF access (US5, FR-026)
 
-**Auth**: caller JWT; booking owner **or** admin (same dual-check pattern as existing proof access).
+**Auth**: caller JWT; booking owner **or** admin.
 
 ### `GET /billing-invoice-document?booking_id=<uuid>` (or `POST { "booking_id" }`)
 Resolves `billing_documents` for the booking → `404 { "error": "no_document" }` if none (legacy bookings use the existing `invoices` path instead) → fetches `GET /2.0/kb_invoice/{id}/pdf` → streams decoded bytes:
@@ -70,7 +71,7 @@ Errors: `401/403`, `502 provider_unavailable`. Nothing is written to Storage (re
 ### `POST /bexio-reconcile` `{ }`
 1. Token refresh if cache expired (single-flight; on `invalid_grant` → `status='requires_reauth'`, event `integration.token_refresh_failed`, stop).
 2. For each `billing_documents` in (`issued`,`partially_paid`): fetch invoice, apply numeric-totals rule (research R-07):
-   - fully paid → guarded booking update mirroring the live admin-approval writes: `status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`, `payment_confirmation_source='bexio_reconciliation'`, `payment_confirmed_at=now()`, guarded by `WHERE payment_status <> 'confirmed'` (research R-08; no `paid` value exists on `bookings`) → supersede unresolved proofs (FR-036), events `payment.reconciled` (+ `proof.superseded`);
+   - fully paid → guarded booking update: `status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`, `payment_confirmation_source='bexio_reconciliation'`, `payment_confirmed_at=now()`, guarded by `WHERE payment_status <> 'confirmed'` (research R-08; no `paid` value exists on `bookings`) → event `payment.reconciled`;
    - partial → document status `partially_paid` (admin-visible);
    - cancelled in Bexio → document `cancelled` + discrepancy event for admin follow-up (spec Edge Cases).
 3. Process due `billing_operations` retries (backoff, `max_attempts`, then `failed` + `operation.retry_exhausted` event → admin alert per FR-031).

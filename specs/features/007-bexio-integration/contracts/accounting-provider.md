@@ -36,14 +36,15 @@ export interface AccountingProvider {
   issueInvoice(ref: ExternalInvoiceRef): Promise<ExternalInvoice>;   // draft → issued
   getInvoice(ref: ExternalInvoiceRef): Promise<ExternalInvoice>;     // status + totals
   getInvoicePdf(ref: ExternalInvoiceRef): Promise<ProviderPdf>;      // { bytes, fileName }
+  sendInvoiceEmail(ref: ExternalInvoiceRef, input: InvoiceEmailInput): Promise<void>;
   cancelInvoice(ref: ExternalInvoiceRef): Promise<void>;             // issued → cancelled
 }
 
 export interface InvoiceInput {
   apiReference: string;            // 'agc:booking:{uuid}' — FR-016
   contact: ExternalContactRef;
-  title: string;                   // e.g. 'Padel lesson — {lesson type} {date}'
-  lines: Array<{ text: string; amount: number; unitPrice: number; }>; // gross CHF from lesson_types.price
+  title: string;                   // e.g. '{lesson name} — {date}'
+  lines: Array<{ text: string; amount: number; unitPrice: number; }>; // gross CHF from lessons.price_amount
   currency: 'CHF';
   isValidFrom: string;             // ISO date
   isValidTo: string;               // payment term from config
@@ -74,7 +75,8 @@ export interface ExternalInvoice {
 | create invoice | `POST /2.0/kb_invoice` (positions `type: "KbPositionCustom"`, config IDs) | docs |
 | issue invoice | `POST /2.0/kb_invoice/{id}/issue` (requires draft) | docs |
 | get invoice | `GET /2.0/kb_invoice/{id}` (totals, `kb_item_status_id`, `qr_invoice_id`) | docs |
-| invoice PDF | `GET /2.0/kb_invoice/{id}/pdf` (base64 `{ data, name }`) | docs |
+| invoice PDF | `GET /2.0/kb_invoice/{id}/pdf` (JSON `{ name, size, mime, content }` — `content` is base64) | docs |
+| send invoice email | `POST /2.0/kb_invoice/{id}/send` (`recipient_email`, `subject`, `message` with `[Network Link]`, `attach_pdf: true`) | docs |
 | cancel invoice | `POST /2.0/kb_invoice/{id}/cancel` (issued only) | docs |
 | discovery (setup) | `/2.0/payment_type`, `/2.0/country`, `/2.0/language`, `/3.0/banking/accounts`, `/3.0/taxes?types=sales_tax&scope=active`, `/3.0/currencies`, document templates | docs |
 

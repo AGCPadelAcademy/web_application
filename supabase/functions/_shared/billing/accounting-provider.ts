@@ -14,9 +14,11 @@ export interface ContactInput {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
   address?: string;
   postcode?: string;
   city?: string;
+  countryCode?: string;
   countryId?: number;
 }
 
@@ -74,6 +76,12 @@ export interface ProviderPdf {
   fileName: string;
 }
 
+export interface InvoiceEmailInput {
+  recipientEmail: string;
+  subject: string;
+  message: string;
+}
+
 /** Authentication failed irrecoverably — integration must be re-authorized (FR-005). */
 export class ProviderAuthError extends Error {
   override readonly name = 'ProviderAuthError';
@@ -121,5 +129,6 @@ export interface AccountingProvider {
   issueInvoice(ref: ExternalInvoiceRef): Promise<ExternalInvoice>;
   getInvoice(ref: ExternalInvoiceRef): Promise<ExternalInvoice>;
   getInvoicePdf(ref: ExternalInvoiceRef): Promise<ProviderPdf>;
+  sendInvoiceEmail(ref: ExternalInvoiceRef, input: InvoiceEmailInput): Promise<void>;
   cancelInvoice(ref: ExternalInvoiceRef): Promise<void>;
 }

@@ -37,7 +37,7 @@
 - [X] T007 [P] Define the `AccountingProvider` interface and all shared types (`InvoiceInput`, `ExternalInvoice`, `ExternalContactRef`, `ProviderHealth`, error classes `ProviderAuthError`/`ProviderUnavailableError`) in `supabase/functions/_shared/billing/accounting-provider.ts` per contracts/accounting-provider.md
 - [X] T008 Implement the Bexio HTTP client in `supabase/functions/_shared/billing/bexio/bexio-client.ts`: base URL `https://api.bexio.com`, bearer header from Vault-cached token, single-flight token refresh on 401 (rotate `bexio_refresh_token` and `bexio_access_token_cache` in Vault, FR-004), `invalid_grant` → `ProviderAuthError`, 429/5xx exponential backoff honoring `RateLimit-*`/`Retry-After` (FR-008), sanitized structured logging (method, status, correlation key only — FR-032/FR-034). Depends on T006, T007
 - [X] T009 [P] Write Deno unit tests for the client in `supabase/functions/_shared/billing/bexio/bexio-client.test.ts` with mocked `fetch`: 401→refresh→single retry, refresh rotation persists new refresh token, `invalid_grant` surfacing, 429 backoff budget, log sanitization (no token strings in captured logs)
-- [ ] T010 Register the reconciliation schedule: store a generated `bexio_scheduler_secret` in Vault and create the `pg_cron` job (every 15 min) invoking `bexio-reconcile` via `pg_net.http_post` with the `x-scheduler-secret` header — as a follow-up migration `supabase/migrations/0004_bexio_reconcile_cron.sql`. Depends on T004. **DEFERRED**: migration file written (job registered inactive by design); applying it is folded into T034 — the job has no effect until the `bexio-reconcile` function ships in Phase 5
+- [X] T010 Register the reconciliation schedule: store a generated `bexio_scheduler_secret` in Vault and create the `pg_cron` job (every 15 min) invoking `bexio-reconcile` via `pg_net.http_post` with the `x-scheduler-secret` header — as a follow-up migration `supabase/migrations/0004_bexio_reconcile_cron.sql`. Depends on T004. Applied with T038 once `bexio-reconcile` is live.
 
 **Checkpoint**: Schema live on test branch; provider client can make an authenticated call once a token exists — user story implementation can now begin
 
@@ -98,10 +98,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Add `getInvoicePdf` to `supabase/functions/_shared/billing/bexio/bexio-adapter.ts`: `GET /2.0/kb_invoice/{id}/pdf`, decode base64 `{ data, name }` to bytes (research R-11; PDF exists only for issued invoices — guaranteed by T022)
-- [ ] T027 [US3] Implement `supabase/functions/billing-invoice-document/index.ts` per contracts/edge-functions.md §3: caller JWT, owner-or-admin authorization mirroring the existing proof-access pattern, resolve `billing_documents` by `booking_id` (`404 no_document` for legacy bookings), stream `application/pdf` with `Content-Disposition: inline; filename="<document_nr>.pdf"`, `502 provider_unavailable` mapping; nothing written to Storage
-- [ ] T028 [US3] Add the "View invoice" affordance for Bexio-billed bookings in the student payments view `src/pages/MyPaymentsPage.jsx` and the admin booking/verification views via `src/lib/billing.js`, leaving the existing legacy invoice links untouched (both paths coexist per quickstart.md §7)
-- [ ] T029 [US3] Deploy `billing-invoice-document` and verify quickstart.md §3.1–§3.4 on the test branch
+- [X] T026 [US3] Add `getInvoicePdf` to `supabase/functions/_shared/billing/bexio/bexio-adapter.ts`: `GET /2.0/kb_invoice/{id}/pdf`, decode base64 `{ content, name }` to bytes (research R-11; PDF exists only for issued invoices — guaranteed by T022)
+- [X] T027 [US3] Implement `supabase/functions/billing-invoice-document/index.ts` per contracts/edge-functions.md §3: caller JWT, owner-or-admin authorization mirroring the existing proof-access pattern, resolve `billing_documents` by `booking_id` (`404 no_document` for legacy bookings), stream `application/pdf` with `Content-Disposition: inline; filename="<document_nr>.pdf"`, `502 provider_unavailable` mapping; nothing written to Storage
+- [X] T028 [US3] Add the "View invoice" affordance for Bexio-billed bookings in the student payments view `src/pages/PaymentsPage.jsx` and reuse the existing `InvoicePreviewModal` after booking, via `src/lib/billing.js`, leaving the existing legacy invoice links untouched (both paths coexist per quickstart.md §7)
+- [X] T029 [US3] Deploy `billing-invoice-document` and verify quickstart.md §3.1–§3.4 on the test branch
 
 **Checkpoint**: Document self-service preserved end-to-end across the cutover boundary (Q1-A)
 
@@ -109,24 +109,24 @@
 
 ## Phase 6: User Story 4 - Bank payments become visible in AGC via reconciliation (Priority: P2)
 
-**Goal**: The scheduled worker converges AGC payment state with Bexio-recorded payments — authoritative for `paid` (Q2-A), idempotent, partial-payment aware, proof-superseding
+**Goal**: The scheduled worker converges AGC payment state with Bexio-recorded payments — authoritative for `paid`, idempotent, partial-payment aware. Proof-of-payment is not part of this path.
 
-**Independent Test**: quickstart.md §4–§5 — full payment auto-confirms without admin action; partial payment does not; repeated runs never double-apply; pending proofs are superseded; manual-proof path still works and is never overwritten
+**Independent Test**: quickstart.md §4 — full payment auto-confirms without admin action; partial payment does not; repeated runs never double-apply
 
 ### Tests for User Story 4
 
-- [ ] T030 [P] [US4] Write Deno unit tests in `supabase/functions/_shared/billing/bexio/bexio-adapter.status.test.ts`: numeric-totals status derivation (research R-07: `received>0 && remaining<=0` → paid; partial; `status_map` only for cancelled/draft)
-- [ ] T031 [P] [US4] Write Deno unit tests in `supabase/functions/bexio-reconcile/index.test.ts` (mocked provider + in-memory repo): guarded confirm transition never overwrites an already-`confirmed` booking (FR-037), proof supersede only on unresolved proofs (FR-036), no duplicate `payment.reconciled` events on re-run, stale/failed run leaves state convergent (order-safety)
+- [X] T030 [P] [US4] Write Deno unit tests in `supabase/functions/_shared/billing/bexio/bexio-adapter.status.test.ts`: numeric-totals status derivation (research R-07: `received>0 && remaining<=0` → paid; partial; `status_map` only for cancelled/draft)
+- [X] T031 [P] [US4] Write Deno unit tests in `supabase/functions/bexio-reconcile/index.test.ts` (mocked provider + in-memory repo): guarded confirm never overwrites an already-`confirmed` booking, no duplicate `payment.reconciled` events on re-run, stale/failed run leaves state convergent
 
 ### Implementation for User Story 4
 
-- [ ] T032 [US4] Add `getInvoice` + normalized status derivation to `supabase/functions/_shared/billing/bexio/bexio-adapter.ts` (`total_received_payments`/`total_remaining_payments` authority, `hasQrPaymentPart` health signal, `cancelled` via configured `status_map`)
-- [ ] T033 [US4] Implement the reconciliation core in `supabase/functions/bexio-reconcile/index.ts` per contracts/edge-functions.md §4: scheduler-secret or admin-JWT auth; iterate `billing_documents` in `issued`/`partially_paid`; on full payment apply the guarded booking update mirroring the live admin-approval field set (`status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`, `payment_confirmation_source='bexio_reconciliation'`, `payment_confirmed_at`, `WHERE payment_status <> 'confirmed'` per research R-08); document-level `billing_documents.status` transitions to `paid`/`partially_paid`/`cancelled`; supersede unresolved proofs; write `billing_events`
-- [ ] T034 [US4] Implement the retry-queue processor in `supabase/functions/bexio-reconcile/index.ts`: due `billing_operations` (`status='pending' AND next_retry_at<=now()`), execute by kind via `financial-service`, exponential backoff to `max_attempts`, then `failed` + `operation.retry_exhausted` event for admin alerting (FR-031)
-- [ ] T035 [US4] Implement the FR-038 discrepancy check in `supabase/functions/bexio-reconcile/index.ts`: bookings confirmed via `manual_proof` whose Bexio invoice remains unpaid beyond the grace period (config key `manual_paid_grace_days`, default 30 days from admin approval — Clarification 2026-08-20) get a `reconciliation.discrepancy` event and admin-visible flag; proofs on reconciled-confirmed transactions are flagged `superseded`, never state-regressing
-- [ ] T036 [US4] Add the manual "Run reconciliation now" action and the worker health summary (last run, counts, failed operations) to `src/pages/AdminIntegrationsPage.jsx` via `src/lib/billing.js`
-- [ ] T037 [US4] Extend the existing admin proof-verification write path in `src/components/admin/PaymentVerificationPanel.jsx` (client-side PostgREST — no Edge Function exists there): on approval also set `payment_confirmation_source='manual_proof'` + `payment_confirmed_at`, and skip the booking update when the booking is already `payment_status='confirmed'` (FR-033/FR-037); keep the rejection behavior and the notification invoke unchanged
-- [ ] T038 [US4] Deploy `bexio-reconcile`, confirm the `pg_cron` job from T010 invokes it (check `cron.job_run_details`), and verify quickstart.md §4.1–§4.4 and §5.1–§5.4 on the test branch
+- [X] T032 [US4] Add `getInvoice` + normalized status derivation to `supabase/functions/_shared/billing/bexio/bexio-adapter.ts` (`total_received_payments`/`total_remaining_payments` authority, `hasQrPaymentPart` health signal, `cancelled` via configured `status_map`)
+- [X] T033 [US4] Implement the reconciliation core in `supabase/functions/bexio-reconcile/index.ts` per contracts/edge-functions.md §4: scheduler-secret or admin-JWT auth; iterate `billing_documents` in `issued`/`partially_paid`; on full payment apply the guarded booking update (`status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`, `payment_confirmation_source='bexio_reconciliation'`, `payment_confirmed_at`, `WHERE payment_status <> 'confirmed'` per research R-08); document-level `billing_documents.status` transitions to `paid`/`partially_paid`/`cancelled`; write `billing_events`
+- [X] T034 [US4] Implement the retry-queue processor in `supabase/functions/bexio-reconcile/index.ts`: due `billing_operations` (`status='pending' AND next_retry_at<=now()`), execute by kind via `financial-service`, exponential backoff to `max_attempts`, then `failed` + `operation.retry_exhausted` event for admin alerting (FR-031)
+- [X] T035 [US4] Implement the FR-038 discrepancy check: payment recorded against a cancelled invoice; overpayment beyond the invoice total. (The former `manual_unpaid` / proof-grace check was removed 2026-08-24.)
+- [X] T036 [US4] Add the manual "Run reconciliation now" action and the worker health summary (last run, counts, failed operations) to `src/pages/AdminIntegrationsPage.jsx` via `src/lib/billing.js`
+- [X] T037 [US4] Remove the payment-proof product path (Decision 2026-08-24): delete `PaymentProofUpload`, `PaymentProofPreview`, `PaymentVerificationPanel`, and `storage.js`; My Payments shows QR-pay copy only; `/admin` and `/admin/payment-verification` redirect to `/admin/integrations`
+- [X] T038 [US4] Deploy `bexio-reconcile`, confirm the `pg_cron` job from T010 invokes it, and verify quickstart.md §4 on the test branch. Remaining live check: register a demo-company payment (quickstart §4.1–§4.2) then click **Run reconciliation now**.
 
 **Checkpoint**: Payment loop closed — bank payment in Bexio becomes `paid` in AGC within one interval, safely interleaved with the legacy manual flow
 
@@ -260,4 +260,4 @@ Each increment is behind the `billing_public_config` flag or additive-only UI, s
 - The adapter file `bexio-adapter.ts` and `AdminIntegrationsPage.jsx` are intentionally extended by multiple stories — work stories sequentially to avoid conflicts
 - Tests are written before implementation within each story (plan.md testing strategy)
 - Existing Edge Functions are never modified except the minimal, contract-preserving guard in T037
-- Rollback at any point: disable the integration flag — legacy invoice/proof behavior is fully preserved
+- Rollback at any point: disable the integration flag — new bookings fall back to the legacy invoice generator. There is no proof-upload rollback path.

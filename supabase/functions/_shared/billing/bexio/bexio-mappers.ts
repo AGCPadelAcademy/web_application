@@ -22,20 +22,26 @@ export interface BexioConfig {
   unit_id: number;
   language_id?: number;
   country_id_ch?: number;
+  countries?: BexioCountryRef[];
   mwst_type: number;
   mwst_is_net: boolean;
   payment_term_days: number;
   template_slug?: string | null;
+  status_map?: Record<string, number>;
 }
 
 export interface AgcProfileRow {
   id: string;
   full_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email: string | null;
+  phone?: string | null;
   address?: string | null;
   postal_code?: string | null;
   city?: string | null;
   country?: string | null;
+  country_code?: string | null;
 }
 
 export interface AgcBookingRow {
@@ -53,15 +59,25 @@ export interface AgcLessonRow {
   price_amount: number;
 }
 
+export interface BexioCountryRef {
+  id: number;
+  iso: string;
+  name: string;
+}
+
 export interface BexioContactPayload {
   contact_type_id: 2;
   name_1: string;
   name_2: string;
   mail: string;
-  address?: string;
+  user_id: number;
+  owner_id: number;
+  street_name?: string;
   postcode?: string;
   city?: string;
   country_id?: number;
+  language_id?: number;
+  phone_mobile?: string;
 }
 
 export interface BexioPositionCustom {
@@ -100,29 +116,54 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
 }
 
 export function profileToContactInput(profile: AgcProfileRow): ContactInput {
-  const { firstName, lastName } = splitFullName(profile.full_name ?? '');
+  const split = splitFullName(profile.full_name ?? '');
   return {
-    firstName,
-    lastName,
+    firstName: (profile.first_name ?? '').trim() || split.firstName,
+    lastName: (profile.last_name ?? '').trim() || split.lastName,
     email: profile.email ?? '',
+    ...(profile.phone ? { phone: profile.phone } : {}),
     ...(profile.address ? { address: profile.address } : {}),
     ...(profile.postal_code ? { postcode: profile.postal_code } : {}),
     ...(profile.city ? { city: profile.city } : {}),
+    ...(profile.country_code ? { countryCode: profile.country_code.toUpperCase() } : {}),
   };
 }
 
+export function normalizeBexioCountries(
+  rows: { id: number; name: string; name_short?: string; iso3166_alpha2?: string }[],
+): BexioCountryRef[] {
+  return rows.map((row) => ({
+    id: row.id,
+    iso: (row.iso3166_alpha2 || row.name_short || '').toUpperCase(),
+    name: row.name,
+  }));
+}
+
+export function resolveBexioCountryId(
+  countryCode: string | null | undefined,
+  countries: BexioCountryRef[] | undefined,
+): number | undefined {
+  if (!countryCode || !countries?.length) return undefined;
+  const code = countryCode.trim().toUpperCase();
+  return countries.find((c) => c.iso === code)?.id;
+}
+
 export function contactToBexioPayload(input: ContactInput, config: BexioConfig): BexioContactPayload {
+  const countryId = input.countryId ?? resolveBexioCountryId(input.countryCode, config.countries);
   return {
     contact_type_id: 2, // person (R-04)
     name_1: input.lastName,
     name_2: input.firstName,
     mail: input.email,
-    ...(input.address ? { address: input.address } : {}),
+    // Bexio marks both as required on POST /2.0/contact (422 without them).
+    user_id: config.bexio_user_id,
+    owner_id: config.bexio_user_id,
+    ...(input.phone ? { phone_mobile: input.phone } : {}),
+    ...(input.address ? { street_name: input.address } : {}),
     ...(input.postcode ? { postcode: input.postcode } : {}),
     ...(input.city ? { city: input.city } : {}),
-    ...(input.countryId ?? config.country_id_ch
-      ? { country_id: input.countryId ?? config.country_id_ch! }
-      : {}),
+    ...(countryId ? { country_id: countryId } : {}),
+    ...(config.language_id ? { language_id: config.language_id } : {}),
   };
 }
 
@@ -138,13 +179,13 @@ export function bookingToInvoiceInput(
   validTo.setUTCDate(validTo.getUTCDate() + config.payment_term_days);
 
   const datePart = booking.booking_date ?? 'unscheduled';
-  const title = `Padel lesson — ${lesson.name} ${datePart}`;
+  const title = `${lesson.name} — ${datePart}`;
 
   return {
     apiReference: `agc:booking:${booking.id}`,
     contact,
     title,
-    lines: [{ text: `${lesson.name} — ${datePart}`, amount: 1, unitPrice: lesson.price_amount }],
+    lines: [{ text: title, amount: 1, unitPrice: lesson.price_amount }],
     currency: 'CHF',
     isValidFrom,
     isValidTo: validTo.toISOString().slice(0, 10),

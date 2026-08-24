@@ -188,7 +188,23 @@ export class BexioClient {
       }
 
       if (!res.ok) {
-        // Non-retryable client error — surface status only, body stays out of logs (FR-032).
+        // Non-retryable client error. Log field names only — never the body (FR-032).
+        const text = await res.text().catch(() => '');
+        let fields: string[] = [];
+        try {
+          const parsed = JSON.parse(text) as { errors?: Record<string, unknown> };
+          if (parsed?.errors && typeof parsed.errors === 'object') {
+            fields = Object.keys(parsed.errors);
+          }
+        } catch { /* not JSON */ }
+        log({
+          event: 'client_error',
+          method,
+          path,
+          status: res.status,
+          fields,
+          correlationId: options.correlationId,
+        });
         throw new ProviderClientError(`bexio request failed with status ${res.status}`, res.status);
       }
 

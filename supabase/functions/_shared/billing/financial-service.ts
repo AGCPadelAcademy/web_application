@@ -13,11 +13,13 @@ import {
   ProviderAuthError,
   ProviderUnavailableError,
   type AccountingProvider,
+  type ContactInput,
   type ExternalContactRef,
 } from './accounting-provider.ts';
 import {
   bookingToInvoiceInput,
   profileToContactInput,
+  resolveBexioCountryId,
   type AgcBookingRow,
   type AgcLessonRow,
   type AgcProfileRow,
@@ -47,6 +49,7 @@ export interface BillingOperationRow {
   billing_document_id?: string | null;
   status: string;
   attempts: number;
+  max_attempts?: number;
   next_retry_at?: string | null;
   last_error?: string | null;
 }
@@ -92,6 +95,13 @@ function log(event: Record<string, unknown>): void {
   console.log(JSON.stringify({ component: 'financial-service', ...event }));
 }
 
+function billingContactInput(profile: AgcProfileRow, config: BexioConfig): ContactInput {
+  const input = profileToContactInput(profile);
+  const countryId = resolveBexioCountryId(profile.country_code ?? input.countryCode, config.countries);
+  if (countryId) input.countryId = countryId;
+  return input;
+}
+
 /** Exponential backoff for the retry queue: 2^n minutes, capped at 4h. */
 export function nextRetryAt(attempts: number, now: Date): string {
   const minutes = Math.min(2 ** attempts, 240);
@@ -132,12 +142,18 @@ export async function issueInvoiceForBooking(
     // Ensure contact: stored mapping → email search/adopt → create (R-04).
     let contactRef: ExternalContactRef | null = null;
     const storedContact = await repo.findContactByUser(booking.user_id);
+    const contactInput = billingContactInput(profile, config);
     if (storedContact) {
       contactRef = { externalId: storedContact.external_id };
+      try {
+        await provider.updateContact(contactRef, contactInput);
+      } catch (err) {
+        log({ event: 'contact_update_failed', error: (err as Error).name });
+      }
     } else {
       contactRef = await provider.findContactByEmail(profile.email);
       if (!contactRef) {
-        contactRef = await provider.createContact(profileToContactInput(profile));
+        contactRef = await provider.createContact(contactInput);
       }
       await repo.upsertContact({
         user_id: booking.user_id,
@@ -243,7 +259,7 @@ export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string)
     getProfile: (userId) =>
       selectOne(
         'profiles',
-        `id=eq.${userId}&select=id,full_name,email,address,postal_code,city,country`,
+        `id=eq.${userId}&select=id,full_name,first_name,last_name,email,phone,address,postal_code,city,country,country_code`,
       ),
     getLesson: (lessonCode) =>
       selectOne('lessons', `lesson_code=eq.${lessonCode}&select=lesson_code,name,price_amount`),

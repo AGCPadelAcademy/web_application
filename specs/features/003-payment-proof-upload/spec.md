@@ -1,5 +1,9 @@
 # Feature Specification: Payment Proof Upload
 
+> **Retired 2026-08-24** by `007-bexio-integration`. Proof-of-payment is no longer a product capability. This document is a historical as-is reverse spec of the former upload flow. Do not implement from it.
+
+**Feature Branch**: `003-payment-proof-upload`
+
 **Feature Branch**: `003-payment-proof-upload`  
 **Created**: 2026-08-19  
 **Status**: Draft (reverse-engineered, as-is)  

@@ -1,5 +1,9 @@
 # Feature Specification: Admin Payment Verification
 
+> **Retired 2026-08-24** by `007-bexio-integration`. Admin proof approve/reject is no longer a product capability. This document is a historical as-is reverse spec of the former admin panel. Do not implement from it.
+
+**Feature Branch**: `004-admin-payment-verification`
+
 **Feature Branch**: `004-admin-payment-verification`  
 **Created**: 2026-08-19  
 **Status**: Draft (reverse-engineered, as-is)  

@@ -49,6 +49,42 @@ export const issueBexioInvoice = (bookingId) =>
     idempotency_key: `booking:${bookingId}:invoice:v1`,
   });
 
+export const runBexioReconciliation = () =>
+  invokeBillingFunction('bexio-reconcile', {});
+
+// Fetch the Bexio PDF as a blob URL for in-app preview (US3).
+// functions.invoke JSON-parses the body, so this uses a raw fetch instead.
+export async function fetchInvoicePdfBlob(bookingId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('You must be signed in.');
+  }
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const res = await fetch(`${supabaseUrl}/functions/v1/billing-invoice-document`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: supabaseAnonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ booking_id: bookingId }),
+  });
+
+  if (!res.ok) {
+    let detail = `Invoice document request failed (${res.status})`;
+    try {
+      const parsed = await res.json();
+      detail = parsed?.message || parsed?.error || detail;
+    } catch { /* body is not JSON */ }
+    throw new Error(detail);
+  }
+
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 // Public cutover flag (FR-017): true when the Bexio integration is connected.
 // Fail-safe: on any read error we return false so the legacy invoice path
 // keeps working (spec Edge Cases — integration must not break bookings).

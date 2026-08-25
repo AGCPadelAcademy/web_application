@@ -2,6 +2,9 @@ import { supabase } from '@/lib/customSupabaseClient';
 
 export const PAYMENT_PROOFS_BUCKET = 'payment-proofs';
 
+// Object keys are `{bookingId}/…` so storage RLS can match the first path
+// segment to `bookings.id` (current `attempt-n.ext` and legacy `{id}_{ts}.ext`).
+
 // 24h — bucket is private; every view goes through a short-lived signed URL.
 const SIGNED_URL_TTL_SECONDS = 86400;
 

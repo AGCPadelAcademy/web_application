@@ -27,3 +27,14 @@ Documentation rules:
 - diagrams in Mermaid
 - use markdown
 - document uncertainty explicitly
+
+## Cursor Cloud specific instructions
+
+This is a **Vite + React 18 SPA (JavaScript/JSX, no TypeScript)** whose entire backend is a **hosted Supabase Cloud project** (Postgres + RLS, Auth, Storage, Deno Edge Functions). There is **no local Supabase stack** in this repo (no `supabase/config.toml`), and Docker is **not** available on the Cloud Agent VM, so `supabase start` is not an option here. Package manager is **npm** (`package-lock.json`); Node **22** (`.nvmrc`).
+
+Standard commands live in `package.json` `scripts`: `npm run dev` (Vite on port 3000), `npm run lint` (eslint), `npm test` (vitest), `npm run build`.
+
+Non-obvious caveats:
+- **Client requires Supabase env vars or it throws at import.** `src/lib/customSupabaseClient.js` throws if `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are missing, and `vite.config.js` throws the same for a **production `npm run build`**. Provide them as env vars (Cloud Agent secrets) or a git-ignored `.env.local` (see `.env.example`). `vite.config.js` reads `process.env` first, then `.env*`, so injected secrets override any placeholder `.env.local`. Without a **real** project URL + anon key, the SPA renders (marketing pages, login form) but any auth/data action fails with a network error (`Failed to fetch`) — a genuine sign-up/login/booking demo needs real credentials.
+- **Tests:** frontend unit tests are Vitest (`src/**/*.test.{js,jsx}`). Integration suites auto-skip unless `SUPABASE_TEST_URL` / `SUPABASE_TEST_SERVICE_ROLE_KEY` are set (`npm test` passes with them unset). Edge Functions under `supabase/functions/` are **Deno/TypeScript** and tested with `deno test` (see `supabase/functions/deno.json`); **Deno is not installed by default** and is a separate toolchain from the npm/Vite frontend.
+- Edge Functions (`billing-*`, `bexio-*`) run only against a deployed Supabase project and need server-side secrets (`SUPABASE_SERVICE_ROLE_KEY`, `BEXIO_*`, optional `RESEND_API_KEY`/`SENDGRID_API_KEY`); they are not exercisable purely locally here.

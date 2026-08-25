@@ -17,7 +17,7 @@ import {
   type ProviderHealth,
   type ProviderPdf,
   type InvoiceEmailInput,
-} from '../accounting-provider.ts';
+} from './accounting-provider.ts';
 import type { BexioClient } from './bexio-client.ts';
 import {
   contactToBexioPayload,

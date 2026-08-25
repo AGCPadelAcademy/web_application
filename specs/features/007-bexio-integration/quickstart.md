@@ -70,23 +70,18 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 | 7.2 | Reconnect | New bookings use Bexio again; old legacy invoices still downloadable |
 | 7.3 | Invoice numbering | AGC internal sequence unaffected; Bexio numbers are stored display-only |
 
-## 7. Cancellation & refunds (US5)
+## 7. Cancellation (US5 — client unpaid lesson)
 
 | Step | Action | Expected |
 |---|---|---|
-| 8.1 | New booking → invoice issued → cancel booking **before** payment | Bexio invoice shows cancelled via API; `billing_documents.status = 'cancelled'` |
-| 8.2 | Cancel while Bexio unreachable | AGC operational cancellation completes; `invoice_cancel` operation queued and retried by the worker; systems do not silently diverge |
-| 8.3 | Reconciled-paid booking → cancel with refund agreed | No automatic money movement; refund expectation recorded; admin sees an explicit "financial correction required in Bexio" indicator |
-| 8.4 | Cancel an invoice Bexio refuses (e.g. already paid) | Conflict surfaced to admin; no forced state change in AGC |
+| 8.1 | Student: unpaid invoiced lesson → **Cancel booking** on My Payments | Bexio invoice cancelled; My Payments shows Cancelled |
+| 8.2 | Cancel while Bexio unreachable | Booking still cancelled in AGC; `invoice_cancel` queued for the worker |
+| 8.3 | Paid lesson on My Payments | Shows **Paid**; no cancel action |
+| 8.4 | Admin Integrations page | No cancel-invoice or record-refund controls |
 
-## 8. Admin financial overview (US6)
+## 8. Admin financial overview (US6) — deferred
 
-| Step | Action | Expected |
-|---|---|---|
-| 9.1 | Admin opens the financial overview | Per-transaction payment/invoice status, outstanding indicator, Bexio document reference |
-| 9.2 | A transaction with a failed/exhausted operation | Failure state visible with a working re-run action |
-| 9.3 | Follow the Bexio reference link on a row | Lands on the matching invoice inside the Bexio web app |
-| 9.4 | Look for ledger/VAT/financial-report features in AGC | Absent by design — those remain exclusively in Bexio |
+Not in 007 (Decision 2026-08-25). Outstanding invoices are followed up in Bexio. AGC admin shows connection + worker health only.
 
 ## Acceptance mapping
 

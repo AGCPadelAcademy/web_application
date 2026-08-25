@@ -25,7 +25,7 @@ import {
   type AgcLessonRow,
   type AgcProfileRow,
   type BexioConfig,
-} from './bexio/bexio-mappers.ts';
+} from './bexio-mappers.ts';
 
 export class BookingNotBillableError extends Error {
   override readonly name = 'BookingNotBillableError';

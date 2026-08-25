@@ -24,7 +24,7 @@ Integrate Bexio as the external financial/accounting system so AGC never builds 
 
 **Performance Goals**: Invoice issuance adds ≤ 5 s to booking flow (SC-006); reconciliation detects payment within 30 min worst case (SC-003) — 15-min cadence + on-demand trigger; admin status queries < 1 s.
 
-**Constraints**: Bexio rate limits (429 + `RateLimit-*` headers, exact quota unpublished — backoff-driven, research R-10); access token TTL 1 h / refresh token 365 d with rotation; no native Bexio webhooks (polling mandated); no credit-note API (hybrid manual refunds, spec §Cancellation); brownfield — no changes to existing tables' semantics, RLS patterns, or legacy invoice path for historical records; secrets never in tables/logs/responses.
+**Constraints**: Bexio rate limits (429 + `RateLimit-*` headers, exact quota unpublished — backoff-driven, research R-10); access token TTL 1 h / refresh token 365 d with rotation; no native Bexio webhooks (polling mandated); no credit-note API (paid refunds stay in Bexio; AGC only cancels unpaid lesson invoices from My Payments); brownfield — no changes to existing tables' semantics, RLS patterns, or legacy invoice path for historical records; secrets never in tables/logs/responses.
 
 **Scale/Scope**: Academy scale — 59 users, 31 bookings, a few invoices/day, ~4 poll cycles/hour over tens of open documents. 4 new Edge Functions, 1 new admin page, 1 frontend lib module, 1 migration.
 

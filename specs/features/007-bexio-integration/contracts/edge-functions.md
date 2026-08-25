@@ -4,7 +4,7 @@
 
 All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` and follow the existing project conventions (see `specs/project-context/api-contracts.md`): `Content-Type: application/json`, caller JWT in `Authorization: Bearer <user-jwt>` for user-facing functions. Error responses are always `{ "error": "<machine-code>", "message": "<human-readable, sanitized>" }` with a non-2xx status. Secrets, tokens, and upstream payload bodies never appear in responses or logs (FR-034).
 
-New source locations (in-repo, research R-13): `supabase/functions/bexio-oauth/index.ts`, `supabase/functions/billing-issue-invoice/index.ts`, `supabase/functions/billing-invoice-document/index.ts`, `supabase/functions/bexio-reconcile/index.ts`, shared code under `supabase/functions/_shared/`.
+New source locations (in-repo, research R-13): `supabase/functions/bexio-oauth/index.ts`, `supabase/functions/billing-issue-invoice/index.ts`, `supabase/functions/billing-invoice-document/index.ts`, `supabase/functions/billing-cancel-invoice/index.ts`, `supabase/functions/bexio-reconcile/index.ts`, shared code under `supabase/functions/_shared/`.
 
 ---
 
@@ -79,6 +79,28 @@ Errors: `401/403`, `502 provider_unavailable`. Nothing is written to Storage (re
 
 ### Responses
 `200 { "checked": n, "confirmed": n, "retried": n, "failed_operations": n }` • `401` • `503 { "error": "requires_reauth" }`
+
+---
+
+## 5. `billing-cancel-invoice` — unpaid lesson cancel (US5, FR-030–FR-032)
+
+**Auth**: caller JWT; booking **owner** (student). Admin JWT is allowed for support but there is no admin cancel UI.
+
+### Request
+```json
+{ "booking_id": "uuid", "idempotency_key": "booking:<uuid>:invoice_cancel:v1" }
+```
+
+### Behavior
+1. Resolve `billing_documents` for the booking (`404 no_document` when none).
+2. **Unpaid `issued`**: `POST /2.0/kb_invoice/{id}/cancel`, persist `billing_documents.status='cancelled'`, event `invoice.cancelled`, then cancel the AGC booking.
+3. **Paid / partially paid**: `409 refund_agreement_required` — paid-lesson and membership cancel rules are future specs; this function MUST NOT move money.
+4. Bexio outage: enqueue `invoice_cancel` (retried by `bexio-reconcile`) and still cancel the AGC booking (`502 provider_unavailable`).
+5. Bexio refuses: event `invoice.cancel_refused`, `409 cancel_refused`, AGC invoice state unchanged.
+
+### Responses
+- `200 { "outcome": "cancelled", "reused": bool, "document": { "id", "document_nr", "status", "total", "currency" } }`
+- `404 { "error": "no_document" }` • `409 { "error": "refund_agreement_required"|"cancel_refused" }` • `401/403` • `502 { "error": "provider_unavailable" }`
 
 ---
 

@@ -23,8 +23,8 @@ import {
   type BillingOperationRow,
   type BillingRepo,
 } from './financial-service.ts';
-import { isOverpaid } from './bexio/bexio-adapter.ts';
-import type { BexioConfig } from './bexio/bexio-mappers.ts';
+import { isOverpaid } from './bexio-adapter.ts';
+import type { BexioConfig } from './bexio-mappers.ts';
 
 export interface ReconcileBookingRow {
   id: string;

@@ -86,4 +86,4 @@ export interface ExternalInvoice {
 2. **Rate limiting**: on `429`, honor `RateLimit-*`/`Retry-After` with exponential backoff + jitter; exhausted budget ⇒ `ProviderUnavailableError` ⇒ caller enqueues into `billing_operations` (FR-008, FR-030).
 3. **Idempotency**: `createInvoice` MUST be preceded by `findInvoiceByApiReference` in the same orchestration step (research R-05); adapters never auto-create duplicates.
 4. **Logging**: adapters log method, status code, correlation id (`api_reference` / idempotency key), and sanitized error class only — never tokens, headers, or full bodies (FR-032/FR-034).
-5. **Cancellation**: `cancelInvoice` is exposed for admin-triggered use only (V1 hybrid per spec §Cancellation/Refunds); callers must confirm the invoice is `issued` and unpaid first.
+5. **Cancellation**: `cancelInvoice` is issued-and-unpaid only. The caller is the **student unpaid-lesson cancel** path, not an admin invoice console.

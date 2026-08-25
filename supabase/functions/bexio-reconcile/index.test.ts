@@ -348,3 +348,57 @@ Deno.test('retry exhaustion marks the operation failed and emits an event', asyn
   assertEquals(result.failed_operations, 1);
   assertEquals(mem.events.some((e) => e.event_type === 'operation.retry_exhausted'), true);
 });
+
+Deno.test('due invoice_cancel operations are retried via cancelInvoiceForBooking', async () => {
+  const mem: Memory = {
+    documents: [makeDoc()],
+    bookings: [pendingBooking()],
+    events: [],
+    operations: [{
+      kind: 'invoice_cancel',
+      idempotency_key: `booking:${BOOKING_ID}:invoice_cancel:v1`,
+      booking_id: BOOKING_ID,
+      billing_document_id: DOC_ID,
+      status: 'pending',
+      attempts: 1,
+      max_attempts: 8,
+      next_retry_at: '2026-08-24T11:00:00.000Z',
+      last_error: 'ProviderUnavailableError',
+    }],
+    integration: { status: 'connected' },
+  };
+  const provider = makeProvider(makeInvoice());
+  let cancelled = false;
+  provider.cancelInvoice = async () => {
+    cancelled = true;
+  };
+  const billingRepo: BillingRepo = {
+    ...stubBillingRepo(),
+    findDocumentByBooking: async () => mem.documents[0],
+    upsertDocument: async (row) => {
+      mem.documents[0] = { ...mem.documents[0], ...row };
+      return mem.documents[0];
+    },
+    findOperation: async (key) => mem.operations.find((o) => o.idempotency_key === key) ?? null,
+    upsertOperation: async (row) => {
+      const idx = mem.operations.findIndex((o) => o.idempotency_key === row.idempotency_key);
+      if (idx >= 0) mem.operations[idx] = { ...mem.operations[idx], ...row };
+      else mem.operations.push(row);
+    },
+    insertEvent: async (event) => {
+      mem.events.push({ event_type: event.event_type, booking_id: event.booking_id, details: event.details ?? {} });
+    },
+  };
+
+  const result = await runReconciliation({
+    provider,
+    repo: memoryRepo(mem),
+    billingRepo,
+    config: CONFIG,
+    now: () => NOW,
+  });
+  assertEquals(cancelled, true);
+  assertEquals(mem.documents[0].status, 'cancelled');
+  assertEquals(mem.operations[0].status, 'succeeded');
+  assertEquals(result.retried >= 1, true);
+});

@@ -148,6 +148,7 @@
 - [X] T041 [US5] Hook unpaid lesson cancel in `src/lib/bookings.js` and My Payments (`PaymentsPage.jsx`): owner sees paid/awaiting/cancelled and can cancel unpaid bookings (enqueue `invoice_cancel` on provider failure). No admin invoice-cancel UI (Decision 2026-08-25).
 - [X] T042 [US5] Do **not** surface cancel/refund controls on the admin integrations page. Invoice state is client-only on My Payments.
 - [ ] T043 [US5] Deploy `billing-cancel-invoice` and verify student unpaid cancel from My Payments (quickstart §7).
+  - **2026-08-25:** Function is reachable on project `jokjxpogvwxbwdaroqkc` (unauthenticated POST → `401` JWT required, not `404`). GitHub Actions `test` is green on `8ab7ffc`. AGC team Vercel Preview succeeded; GitHub’s `Vercel – web-application` check is red because a second Git integration (`josepbarberas-projects`) also reports that status and fails. Live student Cancel on My Payments (quickstart §7) still outstanding — use the AGC Preview, not production. Do not merge until that check is done.
 
 **Checkpoint**: Students see paid/awaiting/cancelled on My Payments; unpaid lesson cancel closes the Bexio invoice; no admin invoice-cancel UI
 

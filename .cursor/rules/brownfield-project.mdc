@@ -60,6 +60,15 @@ Before implementing a new feature or significant change:
 
 For small bug fixes or trivial changes, use judgment and avoid unnecessary documentation overhead.
 
+## Git workflow for spec implementation (NON-NEGOTIABLE)
+
+Spec Kit does **not** create a git branch. Agents must create `sdd/<feature-folder>` from up-to-date `origin/main` before the first implementation change (never from another `sdd/*` branch, never on `main`).
+
+- **Push:** `git push -u origin HEAD` to the feature branch only.
+- **Pull requests:** do **not** open a PR into `main` until the feature’s implementation and quickstart verification are complete **and** the user asks for a PR. Pushing the feature branch is enough while specify / plan / tasks / implement are in progress, so earlier phases can be reverted on that branch. Cloud agents must not auto-open a draft PR after every push.
+- **Commits:** one commit per completed user-story phase (not per task, not one dump at the end).
+- Reverse-engineered live specs (`spec.md` only) do not require a branch.
+
 ## Implementation Rules
 
 - Reuse existing patterns before introducing new ones.

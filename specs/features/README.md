@@ -73,7 +73,7 @@ That produces `specs/features/[FEATURE_ID]-[FEATURE_SLUG]/spec.md` only. No prod
 2. **New-work** specs **delta** against `specs/baseline-system/requirements.md` IDs (`FEAT-*`, `WF-*`, `XR-*`, `ACT-*`). Do not copy the baseline into a change spec. **Reverse-engineered** live specs **may** restate observed behavior with local `FR-*` IDs plus a Baseline coverage map — that is the reverse-spec skill.
 3. Mark assumptions (`> **Assumption:**`) and open questions (`> TODO:`). Do not invent APIs, schema, or business rules.
 4. User review gates: spec → plan → tasks → implement. No implementation of non-trivial work without an approved spec and plan.
-5. Prefer a branch `sdd/<feature-name>` and a Vercel preview before merging to `main`.
+5. Implement on `sdd/<feature-folder>` from `origin/main`. Push that branch only. Open a PR into `main` only after quickstart verification **and** an explicit user request (not after every push). One commit per user-story phase.
 6. When the feature ships, update the baseline files it actually changes (`requirements.md`, `domain-model.md`, `api-contracts.md`, inventory, etc.).
 
 ---

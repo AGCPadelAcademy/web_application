@@ -5,8 +5,8 @@
 -- Live MCP sequence already used 0001–0007 (see constitution / supabase-backend.md).
 -- This checkout only contains 0001–0002 in git; do not reuse 0003.
 --
--- Apply via Supabase MCP apply_migration on a TEST project, not production.
--- If the target already has a migration named 0008, increment the filename.
+-- Apply via Supabase SQL editor (or MCP apply_migration). This project has no
+-- separate test database; payment-proof storage is unused in the live SPA.
 --
 -- Storage: DROP all existing storage.objects policies whose expression
 -- mentions payment-proofs, then recreate owner-path-or-admin policies.

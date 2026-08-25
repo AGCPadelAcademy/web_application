@@ -5,5 +5,5 @@ alwaysApply: true
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/features/007-bexio-integration/plan.md
+specs/features/008-roles-and-permissions/plan.md
 <!-- SPECKIT END -->

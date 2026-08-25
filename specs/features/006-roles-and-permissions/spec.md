@@ -7,6 +7,8 @@
 
 > Reverse spec of **observed** behavior. **Intended** = documented or shown in copy but not implemented. Bugs are in Known gaps, not in FR-*.  
 > `coach` and `accounting` exist on the CHECK constraint only. They are **not** live actors. Do not write FRs that treat those roles as working products.
+>
+> **As-is only.** Target changes (F1.02 — live Coach, isolation tightenings) are [`specs/features/008-roles-and-permissions/spec.md`](../008-roles-and-permissions/spec.md). Do not merge that target into this file until 008 ships.
 
 ---
 

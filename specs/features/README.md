@@ -24,6 +24,15 @@ Do not pre-create empty folders. Add a folder when a spec is started.
 
 ---
 
+## New-work specs
+
+| Folder | Capability |
+|---|---|
+| `007-bexio-integration` | Bexio accounting integration |
+| `008-roles-and-permissions` | F1.02 — live Coach + student isolation tightenings (delta vs `006`) |
+
+---
+
 ## Live reverse specs (as-is)
 
 These folders document **already-live** capabilities. Each has `spec.md` only (no `plan.md` / `tasks.md` until a change is approved):

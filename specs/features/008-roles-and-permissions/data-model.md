@@ -113,7 +113,7 @@ any     --(PostgREST UPDATE)--> REJECTED
 
 1. `coach_id` NULL or references `profiles.id` with `role = 'coach'`.
 2. Non-admin JWT cannot change `profiles.role` or `bookings.coach_id`.
-3. Storage object keys for proofs remain `{booking_id}/…` (current + legacy names). First path segment is the booking id used for ownership.
+3. Storage object keys for proofs remain `{booking_id}/…` (current `{id}/attempt-n.ext` and legacy `{id}/{id}_{ts}.ext`). First path segment is `bookings.id`, compared with a consistent cast (`::uuid` or `::text` on both sides).
 
 ---
 
@@ -129,13 +129,11 @@ any     --(PostgREST UPDATE)--> REJECTED
 
 ## Migration plan
 
-One additive SQL file, numbered as the next unused file **on this branch’s merge-base `main`**.
+One additive SQL file, numbered for the **live** MCP sequence (constitution: `0001`–`0007` already applied remotely), not the next unused file in this checkout (`0001`–`0002` only).
 
-While this worktree only contains `0001` and `0002`, that file is:
+File: `supabase/migrations/0008_f102_roles_and_permissions.sql`
 
-`supabase/migrations/0003_f102_roles_and_permissions.sql`
-
-If `007` (or another spec) lands on `main` first and consumes `0003`, **renumber at rebase**. Apply via Supabase MCP (`apply_migration`) per constitution; live `supabase_migrations` tracking may still be empty.
+If `apply_migration` reports `0008` exists, increment. If `007` lands first with `0003`–`0005` in git only, still prefer live-sequence numbering so this file does not collide with remote `0003`. Apply via Supabase MCP (`apply_migration`) to a **test** project; live `supabase_migrations` tracking may still be empty.
 
 Contents (order):
 

@@ -16,7 +16,7 @@ Close three student-isolation leaks (public profile SELECT, self-service `profil
 
 **Storage**: PostgreSQL — additive `bookings.coach_id`; view `session_roster`; triggers on `profiles.role` and `bookings.coach_id`; DROP public `profiles` SELECT; replace `payment-proofs` object policies. Private bucket `payment-proofs` unchanged as a bucket.
 
-**Testing**: Vitest 4 for new `src/lib/` helpers (mocked client, same pattern as `bookings.test.js` / `profileValidation.test.js`). Written RLS/storage/trigger checklist in this plan and [quickstart.md](quickstart.md) (constitution: RLS changes always have a checklist). `npm run lint` + `npm test` + `npm run build` before done.
+**Testing**: Vitest 4 for new `src/lib/` helpers (mocked client, same pattern as `bookings.test.js` / `profileValidation.test.js`). Written RLS/storage/trigger checklist in this plan and [quickstart.md](quickstart.md) (constitution: RLS changes always have a checklist) — encoded in `tests/sql/0008_f102_roles_and_permissions.test.sql`. `npm run lint` + `npm test` + `npm run build` before done.
 
 **Target Platform**: Vercel SPA (`agcpadelacademy.com`) + Supabase Cloud; modern browsers.
 
@@ -38,7 +38,7 @@ Close three student-isolation leaks (public profile SELECT, self-service `profil
 | II. Spec-driven | specify → plan artifacts; implement only after tasks + approval | PASS |
 | III. Incremental / backward compatible | Additive column + view; no dropped student/admin features; public profile SELECT removed (required by FR-004) | PASS |
 | IV. Security-first | Drop `SELECT true` on profiles; owner-path storage; server-side role immutability; coaches not granted `bookings` SELECT | PASS |
-| V. Migration discipline | One numbered forward SQL file; `price` type debt not touched | PASS |
+| V. Migration discipline | One numbered forward SQL file `0008_f102_…` continuing live `0001`–`0007`; `price` type debt not touched | PASS |
 | VI. Documentation | Feature docs under `specs/features/008-roles-and-permissions/`; `006` remains as-is until this ships | PASS |
 | VII. YAGNI | No sessions table, roles table, JWT claims, or new EFs | PASS |
 | Fixed stack / no custom API | PostgREST + RLS + existing EFs | PASS |
@@ -76,7 +76,7 @@ As-is authorization remains `specs/features/006-roles-and-permissions/spec.md` u
 
 ```text
 supabase/migrations/
-└── 0003_f102_roles_and_permissions.sql   # next number on merge-base; renumber if 007 lands first
+└── 0008_f102_roles_and_permissions.sql   # live MCP sequence (0001–0007 already applied remotely); bump if 0008 exists
 
 src/
 ├── lib/
@@ -94,7 +94,7 @@ src/
 └── App.jsx                               # MODIFIED: /coach/roster route
 
 tests/sql/
-└── 0003_f102_roles_and_permissions.test.sql  # NEW: RLS/trigger checklist as SQL comments + statements
+└── 0008_f102_roles_and_permissions.test.sql  # NEW: RLS/trigger checklist as SQL comments + statements
 ```
 
 **Structure Decision**: Stay on the existing SPA + `supabase/migrations` layout. No `supabase/functions/` work in this feature. Do not modify `007` billing sources (they live on another branch).
@@ -107,7 +107,7 @@ tests/sql/
 
 ## RLS / trigger verification checklist
 
-Constitution requires a written checklist for RLS changes. Run on a test project with three JWTs (see [quickstart.md](quickstart.md)):
+Constitution requires a written checklist for RLS changes. Run on a test project with student A/B, coach, admin, and accounting JWTs (see [quickstart.md](quickstart.md)):
 
 - [ ] Anon SELECT `profiles` returns no PII
 - [ ] Student A cannot SELECT B’s profile, booking, or proof object
@@ -119,3 +119,5 @@ Constitution requires a written checklist for RLS changes. Run on a test project
 - [ ] Admin payment-verification UPDATE still succeeds
 - [ ] Anon SELECT `booking_slots` still works
 - [ ] `is_admin()` / `is_coach()` EXECUTE granted so policies/triggers evaluate
+- [ ] Student A UPDATE/PATCH of B’s profile, booking, or `payment_proofs` row is denied
+- [ ] JWT with `profiles.role = accounting`: `session_roster` empty, `/admin/*` redirect, role PATCH still denied, no coach participant access

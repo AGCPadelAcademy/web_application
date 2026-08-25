@@ -11,12 +11,13 @@ Use a **Supabase test branch or project** (constitution: no shared production DB
 
 ## 0. Prerequisites
 
-1. Migration `0003_f102_roles_and_permissions.sql` (or the then-current next number) applied — see data-model.md §Migration plan.
+1. Migration `0008_f102_roles_and_permissions.sql` applied — see data-model.md §Migration plan (bump the number only if the test project already has `0008`).
 2. App running (`npm run dev`) against that project (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`).
-3. Three Auth users with profiles:
+3. Auth users with profiles:
    - **Student A**, **Student B** (`role = student`)
    - **Coach C** (`role = coach` set **out-of-band** in SQL, same pattern as Admin today)
    - **Admin** (existing admin profile)
+   - **Accounting D** (`role = accounting` set out-of-band; deny checks only — FR-002)
 4. Two bookings: occurrence **A** owned by Student A, occurrence **B** owned by Student B. Admin assigns Coach C to **A** only.
 
 ---
@@ -32,6 +33,8 @@ Use a **Supabase test branch or project** (constitution: no shared production DB
 | 1.5 | As A, `storage.from('payment-proofs').createSignedUrl` for B’s object key | Fail |
 | 1.6 | As A, `PATCH profiles` `{ "role": "admin" }` on self | Rejected; `role` still `student` |
 | 1.7 | As anon, `/lessons` grid | Occupancy via `booking_slots` only; no names (SC-006) |
+| 1.8 | As A, `PATCH`/`UPDATE` B’s `profiles`, `bookings`, or `payment_proofs` | Denied; B unchanged |
+| 1.9 | As D (`accounting`), `GET session_roster`; open `/admin/payment-verification`; `PATCH` own `role` | Empty roster; redirect `/`; role unchanged |
 
 ---
 
@@ -90,4 +93,4 @@ npm test
 npm run build
 ```
 
-Vitest covers new `src/lib/sessionRoster.js` / `src/lib/coachAssignments.js` with a mocked Supabase client. RLS/storage/trigger proofs are this checklist (constitution), run with the three JWTs above — not against production.
+Vitest covers new `src/lib/sessionRoster.js` / `src/lib/coachAssignments.js` with a mocked Supabase client. RLS/storage/trigger proofs are this checklist plus `tests/sql/0008_f102_roles_and_permissions.test.sql` (constitution), run with the JWTs above — not against production.

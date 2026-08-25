@@ -104,9 +104,9 @@ Sources: reverse spec `006`, live RLS/policies inspected 2026-08-24, `supabase/m
 
 ## R-12. Migration numbering
 
-- **Decision**: One additive SQL migration on this branch, named with the next unused number **on merge-base `main`** (currently `0003_f102_roles_and_permissions.sql`). If `007` lands first and consumes `0003`, renumber at rebase. Also GRANT EXECUTE on `is_admin()` / `is_coach()` for RLS evaluation (live project needed this as `0007`).
-- **Rationale**: This worktree’s `supabase/migrations/` only contains `0001`–`0002`. Live remote numbering has diverged; implementers apply against the then-current main sequence.
-- **Alternatives considered**: Skip GRANT because 0001 REVOKE’d it — rejected: RLS helpers must be executable by the table owner/policy evaluator (documented live fix).
+- **Decision**: One additive SQL migration named for the **live** MCP sequence in constitution / `supabase-backend.md` (`0001`–`0007` already applied remotely). This feature’s file is `supabase/migrations/0008_f102_roles_and_permissions.sql`. Do **not** use `0003`: live already used `0003` for `lesson_code`, and `007` may add its own `0003_bexio` on another branch. Before apply, list applied migration names on the **test** project and only bump if `0008` is taken. GRANT EXECUTE on `is_admin()` / `is_coach()` stays in this file (live needed this as `0007`). Skipping `0003`–`0007` in this git tree is expected: those files were never committed here.
+- **Rationale**: This checkout’s `supabase/migrations/` only contains `0001`–`0002`, which is **not** the live sequence. Numbering from the sparse git tree would collide with remote `0003`. MCP `apply_migration` identity is the name string.
+- **Alternatives considered**: Name the file `0003_f102_…` to match this checkout — rejected: live `0003` already exists. Skip GRANT because 0001 REVOKE’d it — rejected: RLS helpers must be executable by the policy evaluator (documented live fix).
 
 ---
 

@@ -113,13 +113,13 @@ PostgREST may expose `is_admin` / `is_coach` as RPCs if GRANT EXECUTE is to `aut
 
 ## 3. Storage — bucket `payment-proofs`
 
-Object key contract (existing): `{booking_id}/attempt-{n}.{ext}` and legacy `{booking_id}/{booking_id}_{unix_ms}.{ext}`. Ownership is the **first path segment** = `bookings.id`.
+Object key contract (existing): `{booking_id}/attempt-{n}.{ext}` and legacy `{booking_id}/{booking_id}_{unix_ms}.{ext}`. Ownership is the **first path segment** equal to `bookings.id`. Compare with a consistent cast, e.g. `(storage.foldername(name))[1]::uuid = bookings.id` (or `::text` on both sides). **Both** live key shapes MUST satisfy WITH CHECK.
 
 At apply time, list `storage.objects` policies for this bucket and **drop** overly broad ones (observed live shape: authenticated SELECT on the whole bucket; INSERT without path check; ALL on `public`). Replace with:
 
 | Command | TO | USING / WITH CHECK |
 |---|---|---|
-| SELECT | authenticated | `bucket_id = 'payment-proofs'` AND (object’s booking is owned by `auth.uid()` OR `is_admin()`) |
+| SELECT | authenticated | `bucket_id = 'payment-proofs'` AND (object’s booking is owned by `auth.uid()` OR `is_admin()`) — first path segment = `bookings.id` as above |
 | INSERT | authenticated | same ownership check on the destination key (admin may insert; not required for v1) |
 | UPDATE / DELETE | authenticated | admin only **or** omit (students do not replace files; `upsert: false`) |
 

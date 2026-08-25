@@ -20,7 +20,7 @@
 **Purpose**: Point tooling at this feature and capture live storage policy names before writing SQL
 
 - [ ] T001 Set `.specify/feature.json` `feature_directory` to `specs/features/008-roles-and-permissions` and point `.cursor/rules/specify-rules.mdc` at `specs/features/008-roles-and-permissions/plan.md`
-- [ ] T002 [P] List live `storage.objects` policies for bucket `payment-proofs` (names + USING/WITH CHECK) and paste them as comments at the top of `supabase/migrations/0003_f102_roles_and_permissions.sql` so later DROP POLICY statements match production (contracts/authorization.md §3)
+- [ ] T002 [P] List live `storage.objects` policies for bucket `payment-proofs` (names + USING/WITH CHECK) and paste them as comments at the top of `supabase/migrations/0008_f102_roles_and_permissions.sql` so later DROP POLICY statements match production (contracts/authorization.md §3)
 
 ---
 
@@ -30,8 +30,8 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Write and apply `supabase/migrations/0003_f102_roles_and_permissions.sql` exactly as data-model.md §Migration plan: GRANT EXECUTE on `public.is_admin()` to `authenticated`; create `public.is_coach()` (same shape as `is_admin()`) + GRANT; additive `bookings.coach_id` uuid NULL FK → `profiles.id` ON DELETE SET NULL + index `bookings_coach_id_idx`; BEFORE UPDATE trigger `prevent_role_self_service` on `profiles` (reject `role` change when `auth.role()` is `authenticated` or `anon`); BEFORE UPDATE trigger `prevent_non_admin_coach_assignment` on `bookings` (only `is_admin()` may change `coach_id`; non-null target must have `profiles.role = 'coach'`); DROP policy `Public profiles are viewable by everyone`; keep `Users can read own profile role`; create `public.session_roster` SECURITY DEFINER / `security_barrier` view with columns in contracts/authorization.md §2.3 (no price/payment/email); GRANT SELECT on the view to `authenticated`, REVOKE from `anon`; replace `payment-proofs` storage policies with owner-path-or-admin SELECT/INSERT per contracts/authorization.md §3 (drop overly broad public ALL). If `007` has already taken `0003` on `main`, renumber this file before apply. Apply via Supabase MCP `apply_migration` to a **test** project, not production.
-- [ ] T004 [P] Add `tests/sql/0003_f102_roles_and_permissions.test.sql` encoding plan.md “RLS / trigger verification checklist” as runnable statements (anon/student isolation, role PATCH reject, owner UPDATE of `verification_status` still allowed, owner UPDATE of `coach_id` rejected, `booking_slots` still selectable, GRANTs on `is_admin`/`is_coach`)
+- [ ] T003 Write and apply `supabase/migrations/0008_f102_roles_and_permissions.sql` exactly as data-model.md §Migration plan: GRANT EXECUTE on `public.is_admin()` to `authenticated`; create `public.is_coach()` (same shape as `is_admin()`) + GRANT; additive `bookings.coach_id` uuid NULL FK → `profiles.id` ON DELETE SET NULL + index `bookings_coach_id_idx`; BEFORE UPDATE trigger `prevent_role_self_service` on `profiles` (reject `role` change when `auth.role()` is `authenticated` or `anon`); BEFORE UPDATE trigger `prevent_non_admin_coach_assignment` on `bookings` (only `is_admin()` may change `coach_id`; non-null target must have `profiles.role = 'coach'`); DROP policy `Public profiles are viewable by everyone`; keep `Users can read own profile role`; create `public.session_roster` SECURITY DEFINER / `security_barrier` view with columns in contracts/authorization.md §2.3 (no price/payment/email); GRANT SELECT on the view to `authenticated`, REVOKE from `anon`; replace `payment-proofs` storage policies with owner-path-or-admin SELECT/INSERT per contracts/authorization.md §3 (drop overly broad public ALL). If the test project already has a migration named `0008`, increment before apply (research R-12). Apply via Supabase MCP `apply_migration` to a **test** project, not production.
+- [ ] T004 [P] Add `tests/sql/0008_f102_roles_and_permissions.test.sql` encoding **every** plan.md “RLS / trigger verification checklist” row as runnable statements, including: anon SELECT `profiles` returns no PII; student A cannot SELECT B’s profile, booking, or proof object; student A cannot UPDATE/PATCH B’s profile, booking, or `payment_proofs` row (FR-004); student A PATCH `role` fails; role unchanged; student A UPDATE own booking `verification_status` still succeeds; UPDATE `coach_id` fails; coach SELECT `session_roster` = assigned only; SELECT others’ `bookings` empty; coach cannot SELECT/sign payment-proof objects they do not own; admin UPDATE `coach_id` to a coach profile succeeds; to a student profile fails; admin payment-verification UPDATE still succeeds; anon SELECT `booking_slots` still works; `is_admin()` / `is_coach()` EXECUTE granted; `accounting` JWT: empty `session_roster`, not `is_admin()`, role PATCH denied (FR-002)
 
 **Checkpoint**: Test project has the migration; student A cannot read B’s profile; role PATCH fails; `session_roster` exists (empty for students). User stories can start.
 
@@ -41,14 +41,14 @@
 
 **Goal**: Existing student/admin/anon journeys still work, and the three leaks are gone — no public profiles, no self-service role change, no unscoped payment-proof files
 
-**Independent Test**: quickstart.md §1 and §5 — student A completes own profile/payments; A cannot read B’s profile, booking, or proof file; A cannot PATCH `role`; anon `/lessons` still uses `booking_slots`
+**Independent Test**: quickstart.md §1 and §5 — student A completes own profile/payments; A cannot read **or change** B’s profile, booking, or proof file/row; A cannot PATCH `role`; accounting D has no roster or admin; anon `/lessons` still uses `booking_slots`
 
 ### Implementation for User Story 1
 
 - [ ] T005 [P] [US1] Verify `src/lib/profileService.js` never writes `role` (`EDITABLE_PROFILE_FIELDS` only) and always `eq('id', userId)` on SELECT/UPDATE; tighten any caller in `src/pages/ProfileManagementPage.jsx` / `src/components/modals/ProfileCompletionModal.jsx` that still sends extra columns
 - [ ] T006 [P] [US1] Verify `src/components/layout/Header.jsx` and `src/contexts/SupabaseAuthContext.jsx` (`fetchRole`) query `profiles` by `id = auth user` only so they keep working after the public SELECT drop
-- [ ] T007 [P] [US1] Verify `src/components/payments/PaymentProofUpload.jsx` and `src/lib/storage.js` keep the `{bookingId}/…` object key so the new storage WITH CHECK accepts own uploads; adjust only the path helper if the live key shape cannot satisfy `(storage.foldername(name))[1] = booking_id`
-- [ ] T008 [US1] Run `specs/features/008-roles-and-permissions/quickstart.md` §1 and §5 against the test project (including REST `PATCH` of `role` and signed URL for B’s proof) and fix any remaining SPA/query mismatch in `src/lib/profileService.js`, `src/components/payments/PaymentProofUpload.jsx`, or `src/lib/storage.js`
+- [ ] T007 [P] [US1] Verify `src/components/payments/PaymentProofUpload.jsx` and `src/lib/storage.js` keep `{bookingId}/…` keys so the new storage WITH CHECK accepts own uploads for both `{booking_id}/attempt-{n}.{ext}` and legacy `{booking_id}/{booking_id}_{unix_ms}.{ext}`; ownership is `(storage.foldername(name))[1]::uuid = bookings.id` (or `::text` on both sides) per contracts/authorization.md §3
+- [ ] T008 [US1] Run `specs/features/008-roles-and-permissions/quickstart.md` §1 and §5 against the test project (including REST `PATCH` of `role`, signed URL for B’s proof, A UPDATE of B’s rows, and accounting D denies) and fix any remaining SPA/query mismatch in `src/lib/profileService.js`, `src/components/payments/PaymentProofUpload.jsx`, or `src/lib/storage.js`
 
 **Checkpoint**: Isolation MVP is demoable with zero coach UI. `006` student/admin journeys still pass.
 
@@ -155,7 +155,7 @@ Task: "Add Coach assignment tab in src/pages/AdminDashboardPage.jsx"
 3. + US2 → coach roster + admin assignment
 4. Polish → docs + full quickstart
 
-Each increment is additive. Do not implement on `main` or on `sdd/007-bexio-integration`. Stay on `sdd/008-roles-and-permissions`. If `007` merges first and takes migration `0003`, renumber before apply (research R-12).
+Each increment is additive. Do not implement on `main` or on `sdd/007-bexio-integration`. Stay on `sdd/008-roles-and-permissions`. Migration file is `0008_f102_roles_and_permissions.sql` (research R-12); bump only if the test project already has `0008`.
 
 ---
 

@@ -66,7 +66,6 @@ export const AuthProvider = ({ children }) => {
     setSession(session);
     const currentUser = session?.user ?? null;
     setUser(currentUser);
-    setLoading(false);
 
     if (currentUser) {
       await ensureProfile(currentUser);
@@ -77,6 +76,7 @@ export const AuthProvider = ({ children }) => {
       setRole('student');
       setProfile(null);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {

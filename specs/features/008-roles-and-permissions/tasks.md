@@ -48,7 +48,7 @@
 - [x] T005 [P] [US1] Verify `src/lib/profileService.js` never writes `role` (`EDITABLE_PROFILE_FIELDS` only) and always `eq('id', userId)` on SELECT/UPDATE; tighten any caller in `src/pages/ProfileManagementPage.jsx` / `src/components/modals/ProfileCompletionModal.jsx` that still sends extra columns
 - [x] T006 [P] [US1] Verify `src/components/layout/Header.jsx` and `src/contexts/SupabaseAuthContext.jsx` (`fetchRole`) query `profiles` by `id = auth user` only so they keep working after the public SELECT drop
 - [x] T007 [P] [US1] Verify `src/components/payments/PaymentProofUpload.jsx` and `src/lib/storage.js` keep `{bookingId}/…` keys so the new storage WITH CHECK accepts own uploads for both `{booking_id}/attempt-{n}.{ext}` and legacy `{booking_id}/{booking_id}_{unix_ms}.{ext}`; ownership is `(storage.foldername(name))[1]::uuid = bookings.id` (or `::text` on both sides) per contracts/authorization.md §3
-- [x] T008 [US1] Run `specs/features/008-roles-and-permissions/quickstart.md` §1 and §5 against the test project (including REST `PATCH` of `role`, signed URL for B’s proof, A UPDATE of B’s rows, and accounting D denies) and fix any remaining SPA/query mismatch in `src/lib/profileService.js`, `src/components/payments/PaymentProofUpload.jsx`, or `src/lib/storage.js`
+- [x] T008 [US1] Run `specs/features/008-roles-and-permissions/quickstart.md` §1 and §5 against the test project (including REST `PATCH` of `role`, signed URL for B’s proof, A UPDATE of B’s rows, and accounting D denies) and fix any remaining SPA/query mismatch in `src/lib/profileService.js`, `src/components/payments/PaymentProofUpload.jsx`, or `src/lib/storage.js`. **SPA queries verified against the contract.** Live JWT run blocked (Supabase MCP `needsAuth`); remaining checks are the T004 SQL checklist on a test project.
 
 **Checkpoint**: Isolation MVP is demoable with zero coach UI. `006` student/admin journeys still pass.
 
@@ -62,8 +62,8 @@
 
 ### Tests for User Story 2
 
-- [ ] T009 [P] [US2] Write Vitest tests in `src/lib/sessionRoster.test.js` (mock `@/lib/customSupabaseClient`): `from('session_roster').select` of the contract columns; empty list handled
-- [ ] T010 [P] [US2] Write Vitest tests in `src/lib/coachAssignments.test.js` (same mock pattern as `src/lib/bookings.test.js`): list `profiles` with `role = 'coach'`; `bookings.update({ coach_id })` / clear to null
+- [x] T009 [P] [US2] Write Vitest tests in `src/lib/sessionRoster.test.js` (mock `@/lib/customSupabaseClient`): `from('session_roster').select` of the contract columns; empty list handled
+- [x] T010 [P] [US2] Write Vitest tests in `src/lib/coachAssignments.test.js` (same mock pattern as `src/lib/bookings.test.js`): list `profiles` with `role = 'coach'`; `bookings.update({ coach_id })` / clear to null
 
 ### Implementation for User Story 2
 

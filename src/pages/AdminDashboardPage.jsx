@@ -1,8 +1,7 @@
-
-import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PaymentVerificationPanel from '@/components/admin/PaymentVerificationPanel';
+import CoachAssignmentPanel from '@/components/admin/CoachAssignmentPanel';
 
 const AdminDashboard = () => {
   return (
@@ -21,11 +20,16 @@ const AdminDashboard = () => {
             <TabsTrigger value="payments" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
               Payment Verification
             </TabsTrigger>
-            {/* Future admin tabs can go here */}
+            <TabsTrigger value="coach-assignment" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
+              Coach assignment
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="payments" className="mt-0">
             <PaymentVerificationPanel />
+          </TabsContent>
+          <TabsContent value="coach-assignment" className="mt-0">
+            <CoachAssignmentPanel />
           </TabsContent>
         </Tabs>
       </div>

@@ -44,7 +44,7 @@ These folders document **already-live** capabilities. Each has `spec.md` only (n
 | `003-payment-proof-upload` | My Payments + proof upload |
 | `004-admin-payment-verification` | Approve / reject proofs |
 | `005-auth-and-profile-completion` | Signup, session, profile gate |
-| `006-roles-and-permissions` | Live `student` / `admin` matrix |
+| `006-roles-and-permissions` | Live `student` / `admin` / `coach` matrix (F1.02 as-is after `0008`) |
 
 ---
 

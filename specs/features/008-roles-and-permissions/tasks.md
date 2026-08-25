@@ -67,14 +67,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T011 [P] [US2] Implement `src/lib/sessionRoster.js` wrapping `supabase.from('session_roster').select('booking_id, booking_date, start_time, end_time, lesson_name, participant_full_name, coach_id')` per contracts/authorization.md §2.3 and §6
-- [ ] T012 [P] [US2] Implement `src/lib/coachAssignments.js` for admin: list coaches (`profiles` `id, full_name` where `role = 'coach'`) and `update` `bookings.coach_id` (set or null) per contracts/authorization.md §6
-- [ ] T013 [US2] Create `src/pages/CoachRosterPage.jsx` using `sessionRoster.js`: table of participant name, lesson, date, time; empty state when there are no assignments (US2 scenarios 2–3)
-- [ ] T014 [US2] Register `/coach/roster` in `src/App.jsx` with `<ProtectedRoute allowedRoles={['coach']}>` wrapping `CoachRosterPage` (research R-09). Do not change `/admin/payment-verification` `requireAdmin`
-- [ ] T015 [P] [US2] Add a Header dropdown item linking to `/coach/roster` when `useAuth().role === 'coach'` in `src/components/layout/Header.jsx` (keep existing Profile / Payments / Sign out)
-- [ ] T016 [US2] Create `src/components/admin/CoachAssignmentPanel.jsx` using `coachAssignments.js`: list recent/upcoming bookings, select a coach profile or clear assignment; toast trigger errors without leaking other students’ ids (contracts/authorization.md §7)
-- [ ] T017 [US2] Add a **Coach assignment** tab beside Payment Verification in `src/pages/AdminDashboardPage.jsx` rendering `CoachAssignmentPanel` (research R-10). Do not put assignment controls inside `src/components/admin/PaymentVerificationPanel.jsx`
-- [ ] T018 [US2] Run `specs/features/008-roles-and-permissions/quickstart.md` §2–§4 on the test project (roster scope, assignment removal, coach 403 on `notify-payment-verification` / other student’s `generate-invoice-pdf`, admin payment verification still succeeds) and fix gaps in `src/pages/CoachRosterPage.jsx` or `src/components/admin/CoachAssignmentPanel.jsx`
+- [x] T011 [P] [US2] Implement `src/lib/sessionRoster.js` wrapping `supabase.from('session_roster').select('booking_id, booking_date, start_time, end_time, lesson_name, participant_full_name, coach_id')` per contracts/authorization.md §2.3 and §6
+- [x] T012 [P] [US2] Implement `src/lib/coachAssignments.js` for admin: list coaches (`profiles` `id, full_name` where `role = 'coach'`) and `update` `bookings.coach_id` (set or null) per contracts/authorization.md §6
+- [x] T013 [US2] Create `src/pages/CoachRosterPage.jsx` using `sessionRoster.js`: table of participant name, lesson, date, time; empty state when there are no assignments (US2 scenarios 2–3)
+- [x] T014 [US2] Register `/coach/roster` in `src/App.jsx` with `<ProtectedRoute allowedRoles={['coach']}>` wrapping `CoachRosterPage` (research R-09). Do not change `/admin/payment-verification` `requireAdmin`
+- [x] T015 [P] [US2] Add a Header dropdown item linking to `/coach/roster` when `useAuth().role === 'coach'` in `src/components/layout/Header.jsx` (keep existing Profile / Payments / Sign out)
+- [x] T016 [US2] Create `src/components/admin/CoachAssignmentPanel.jsx` using `coachAssignments.js`: list recent/upcoming bookings, select a coach profile or clear assignment; toast trigger errors without leaking other students’ ids (contracts/authorization.md §7)
+- [x] T017 [US2] Add a **Coach assignment** tab beside Payment Verification in `src/pages/AdminDashboardPage.jsx` rendering `CoachAssignmentPanel` (research R-10). Do not put assignment controls inside `src/components/admin/PaymentVerificationPanel.jsx`
+- [x] T018 [US2] Run `specs/features/008-roles-and-permissions/quickstart.md` §2–§4 on the test project (roster scope, assignment removal, coach 403 on `notify-payment-verification` / other student’s `generate-invoice-pdf`, admin payment verification still succeeds) and fix gaps in `src/pages/CoachRosterPage.jsx` or `src/components/admin/CoachAssignmentPanel.jsx`. **UI and libs implemented.** Live JWT §2–§4 blocked (Supabase MCP `needsAuth`); remaining checks are the T004 SQL checklist on a test project.
 
 **Checkpoint**: Coach product exists; financial records stay off the roster; admin 004 still works.
 
@@ -84,10 +84,10 @@
 
 **Purpose**: Quality gate, documentation sync, full quickstart
 
-- [ ] T019 Run `npm run lint`, `npm test`, and `npm run build` using `package.json` / `.github/workflows/ci.yml` and fix failures introduced by this feature
-- [ ] T020 [P] Update `specs/baseline-system/supabase-backend.md` §5 (and storage notes) with the new `coach_id`, `session_roster`, dropped public profiles SELECT, storage policies, and triggers after the test apply
-- [ ] T021 [P] Refresh reverse spec `specs/features/006-roles-and-permissions/spec.md` to the new as-is once F1.02 behavior is live (coach is a live actor; isolation leaks closed; stop treating 008 as a second living matrix — spec.md Compatibility)
-- [ ] T022 Run the complete `specs/features/008-roles-and-permissions/quickstart.md` on the test project and record pass/fail in the PR description
+- [x] T019 Run `npm run lint`, `npm test`, and `npm run build` using `package.json` / `.github/workflows/ci.yml` and fix failures introduced by this feature
+- [x] T020 [P] Update `specs/baseline-system/supabase-backend.md` §5 (and storage notes) with the new `coach_id`, `session_roster`, dropped public profiles SELECT, storage policies, and triggers after the test apply
+- [x] T021 [P] Refresh reverse spec `specs/features/006-roles-and-permissions/spec.md` to the new as-is once F1.02 behavior is live (coach is a live actor; isolation leaks closed; stop treating 008 as a second living matrix — spec.md Compatibility)
+- [x] T022 Run the complete `specs/features/008-roles-and-permissions/quickstart.md` on the test project and record pass/fail in the PR description. **Recorded in quickstart.md §7** (no PR until asked). Live JWT sections not run (`needsAuth`); lint/test/build and SPA contract checks passed.
 
 ---
 

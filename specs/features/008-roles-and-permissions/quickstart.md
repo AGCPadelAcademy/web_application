@@ -94,3 +94,17 @@ npm run build
 ```
 
 Vitest covers new `src/lib/sessionRoster.js` / `src/lib/coachAssignments.js` with a mocked Supabase client. RLS/storage/trigger proofs are this checklist plus `tests/sql/0008_f102_roles_and_permissions.test.sql` (constitution), run with the JWTs above — not against production.
+
+---
+
+## 7. Environment verification log (2026-08-25)
+
+Recorded during `/speckit-implement` on `sdd/008-roles-and-permissions`. No PR description — PRs wait for an explicit user request.
+
+| Check | Result |
+|---|---|
+| `npm run lint` | PASS |
+| `npm test` | PASS (33 passed, 2 skipped) |
+| `npm run build` | PASS with placeholder `VITE_SUPABASE_*` (no project secrets in this environment) |
+| Quickstart §1–§5 live JWT / REST | **NOT RUN** — Supabase MCP `needsAuth`; apply `0008` on a test project, then re-run this file and tick the plan.md RLS checklist |
+| SPA contract | `profileService` never writes `role`; Header/`fetchRole` own-id SELECT; proof keys `{bookingId}/attempt-n.ext`; `/coach/roster` + admin assignment tab present |

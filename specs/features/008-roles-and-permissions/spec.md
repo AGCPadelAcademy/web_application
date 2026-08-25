@@ -4,11 +4,11 @@
 
 **Created**: 2026-08-24
 
-**Status**: Draft
+**Status**: Implemented on `sdd/008-roles-and-permissions` (pending remote apply of `0008`)
 
 **Input**: F1.02 — three live roles (Admin, Student, Coach); Admin unrestricted; Students only authorized resources; Coaches only participants of sessions assigned to them; reuse existing auth and profile role (no roles table); server-side authorization; preserve brownfield behavior unless these rules change it.
 
-> **Forward spec (delta).** Current live authorization is [`specs/features/006-roles-and-permissions/spec.md`](../006-roles-and-permissions/spec.md) plus ACT-001–005, XR-003, XR-004. This file specifies **only gaps and changes**. Do not re-implement student/admin behavior that `006` already documents.
+> **Forward spec (delta).** Living as-is after this ships is [`specs/features/006-roles-and-permissions/spec.md`](../006-roles-and-permissions/spec.md) (refreshed 2026-08-25). This file remains the F1.02 change record.
 
 ---
 
@@ -140,6 +140,6 @@ A Coach signs in like any other user. An Admin assigns them to some session occu
 
 ## Compatibility
 
-- Reverse spec `006` remains the as-is record until this feature ships; then update `006` and the baseline ACT/XR text.
+- Reverse spec `006` was refreshed 2026-08-25 to this F1.02 as-is. Keep the living matrix in `006`, not a second copy here.
 - Preserve `001`–`007` student and admin journeys except the tightenings in FR-003 and FR-004.
-- After implementation, do not keep a second living copy of the role matrix in this file — refresh `006` instead.
+- Remote schema matches this spec only after `0008_f102_roles_and_permissions.sql` is applied.

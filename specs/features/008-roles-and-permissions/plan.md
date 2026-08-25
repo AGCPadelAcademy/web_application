@@ -70,7 +70,7 @@ specs/features/008-roles-and-permissions/
 └── tasks.md                # Phase 2 — NOT created by /speckit-plan
 ```
 
-As-is authorization remains `specs/features/006-roles-and-permissions/spec.md` until this feature ships.
+As-is authorization is `specs/features/006-roles-and-permissions/spec.md` (refreshed 2026-08-25 after this feature).
 
 ### Source Code (repository root)
 

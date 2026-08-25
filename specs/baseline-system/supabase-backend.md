@@ -6,6 +6,7 @@
 > Refreshed 2026-08-10: five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the `receipts` bucket deleted by the owner. 8 functions remain.
 > Refreshed 2026-08-10 (PM): RLS hardening (migration `0006`) — `booking_slots` non-PII view created; `bookings` public-read policy replaced by owner/admin SELECT policies. Edge Function auth hardened — `generate-invoice-pdf` v21 and `notify-payment-verification` v5 run with `verify_jwt: true` + in-function JWT/authorization checks.
 > Refreshed 2026-08-19: live Edge Function versions are `generate-invoice-pdf` **v22** and `notify-payment-verification` **v6** (explicit JWT); payment-proof storage path is `{booking_id}/attempt-{n}.{ext}`.
+> Refreshed 2026-08-25: F1.02 (`0008_f102_roles_and_permissions`) — `bookings.coach_id`, `is_coach()`, role/assignment triggers, `session_roster` view, dropped public `profiles` SELECT, owner-path `payment-proofs` storage policies. **Apply `0008` on the target project** for the remote schema to match this snapshot.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -100,6 +101,7 @@ The legacy `public.users` table (pre-`profiles`, 1 mock row) has been dropped. `
 | `proof_uploaded_at` | `timestamptz` | nullable |
 | `payment_date` | `timestamptz` | nullable |
 | `created_at` / `updated_at` | `timestamptz` NOT NULL | default `now()` |
+| `coach_id` | `uuid` NULL | FK → `profiles.id` ON DELETE SET NULL — F1.02 coach assignment (migration `0008`). Not `availability.trainer_id`. |
 
 Referenced by: `payment_proofs`, `invoices`, `notifications_log`.
 
@@ -339,6 +341,7 @@ erDiagram
 
     auth_users ||--|| profiles : "id"
     profiles ||--o{ bookings : "user_id"
+    profiles ||--o{ bookings : "coach_id"
     profiles ||--o{ availability : "trainer_id"
     profiles ||--o{ credits : "user_id"
     profiles ||--o{ memberships : "user_id"
@@ -353,6 +356,9 @@ erDiagram
 
 #### `booking_slots` — **ADDED 2026-08-10 (migration `0006`)**
 Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `end_time`, `payment_status` only (no `client_email` / `client_phone` / `notes` / `user_id`). Granted SELECT to `anon` + `authenticated`; runs with view-owner rights so the public availability grid on `/lessons` keeps working after the `bookings` SELECT policy was tightened to owner/admin. Sole consumer: `src/lib/bookings.js` (`fetchDayBookings`).
+
+#### `session_roster` — **ADDED (migration `0008`, F1.02)**
+Operational roster projection over `bookings` ⨝ `profiles`: `booking_id`, `booking_date`, `start_time`, `end_time`, `lesson_name`, `participant_full_name`, `coach_id` (no price, payment, email, or proof columns). `SECURITY DEFINER` / `security_barrier`; rows where `is_admin()` or (`is_coach()` and `coach_id = auth.uid()`). GRANT SELECT to `authenticated`; REVOKE `anon`. Consumers: `src/lib/sessionRoster.js`, `/coach/roster`.
 
 ---
 
@@ -383,7 +389,7 @@ Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `
 |---|---|---|---|---|
 | `invoices` | Yes | Generated invoice PDFs (`Pending/YYYY/MM/DD/` prefix; planned: `Paid/`, `Refused/` on finance verification) + `assets/logo.png` | None | None |
 | `qr-codes` | Yes | Swiss QR payment slips embedded in invoices (`QR_<amount>.pdf`) | None | None |
-| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/attempt-<n>.<ext>`; legacy `<booking_id>/<booking_id>_<ts>.<ext>` files remain valid), accessed via 24h signed URLs | None | None |
+| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/attempt-<n>.<ext>`; legacy `<booking_id>/<booking_id>_<ts>.<ext>` files remain valid), accessed via 24h signed URLs. F1.02 (`0008`): SELECT/INSERT allowed when the first path segment equals an owned `bookings.id` or `is_admin()` | None | None |
 
 > ~~`receipts`~~ bucket **deleted 2026-08-10** (legacy Stripe-era invoice PDFs; verified unreferenced before deletion).
 >
@@ -397,17 +403,18 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`).
 
 | Table | Policy | Role | Command | Condition |
 |---|---|---|---|---|
-| `profiles` | Public profiles are viewable by everyone | public | SELECT | `true` ⚠️ |
+| `profiles` | ~~Public profiles are viewable by everyone~~ | — | — | **DROPPED (migration `0008`)** — was `true`, exposed email/role to anon |
 | `profiles` | Users can insert their own profile | public | INSERT | (check via trigger) |
 | `profiles` | Users can read own profile role | authenticated | SELECT | `id = auth.uid()` OR `is_admin()` |
-| `profiles` | Users can update own profile | public | UPDATE | `auth.uid() = id` |
+| `profiles` | Users can update own profile | public | UPDATE | `auth.uid() = id` — `role` changes rejected by `prevent_role_self_service` when `auth.role()` is `authenticated`/`anon` |
 | `bookings` | ~~Public read bookings~~ | — | — | **DROPPED 2026-08-10 (migration `0006`)** — was `true`, exposed PII to anonymous callers |
 | `bookings` | Users can view own bookings | authenticated | SELECT | `auth.uid() = user_id` (added 2026-08-10) |
 | `bookings` | Admins can view all bookings | authenticated | SELECT | `is_admin()` (added 2026-08-10) |
 | `bookings` | Users insert own bookings | public | INSERT | `auth.uid() = user_id` |
 | `bookings` | Users update own bookings | public | UPDATE | `auth.uid() = user_id` |
-| `bookings` | Admins can update any booking | authenticated | UPDATE | `is_admin()` |
+| `bookings` | Admins can update any booking | authenticated | UPDATE | `is_admin()` — `coach_id` changes also require `prevent_non_admin_coach_assignment` (admin-only; target must be `role = coach`) |
 | `booking_slots` (view) | *(view grant)* | anon, authenticated | SELECT | view-owner rights over a non-PII projection (added 2026-08-10, migration `0006`) |
+| `session_roster` (view) | *(view grant)* | authenticated | SELECT | admin all operational rows; coach assigned rows only (migration `0008`) |
 | `lessons` | lessons_public_read | public | SELECT | `true` (intentional — public catalogue) |
 | `availability` | Public can view availability | public | SELECT | `true` |
 | `credits` | Users can view own credits | public | SELECT | `auth.uid() = user_id` |
@@ -422,7 +429,9 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`).
 
 > Dropped 2026-08-07 (migration `0004`): `profiles` policies "Users can update own stripe_customer_id" / "Users can view their own stripe_customer_id" (Stripe-era duplicates).
 >
-> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view now serves the `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only. Remaining hardening (`profiles` public SELECT, `invoices` read policy): `api-contracts.md §7.1`.
+> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view now serves the `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only.
+>
+> Hardening executed 2026-08-25 (migration `0008`, F1.02): public `profiles` SELECT dropped; PostgREST cannot change `profiles.role`; `payment-proofs` storage is owner-path-or-admin; coaches read `session_roster` only. Remaining: `invoices` read policy (`api-contracts.md §7.1`).
 
 ---
 
@@ -441,6 +450,7 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 | ⚠️ WARN | `handle_new_user()` is callable by `anon` and `authenticated` as `SECURITY DEFINER` | `public.handle_new_user` | Revoke `EXECUTE` from `anon`/`authenticated`, or switch to `SECURITY INVOKER`. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) |
 | ⚠️ WARN | `invoices` and `receipts` Storage buckets are public and allow directory listing | `storage.invoices`, `storage.receipts` | Remove broad SELECT storage policies; object URLs still work without listing. `receipts` is pending deletion (2026-08-07). [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0025_public_bucket_allows_listing) |
 | ⚠️ WARN | ~~`bookings` SELECT policy is `true` — all bookings are readable by anyone (including unauthenticated)~~ | `bookings` | **Resolved 2026-08-10** (migration `0006`): public-read policy dropped; owner (`auth.uid() = user_id`) + admin (`is_admin()`) SELECT policies added; public availability served by the non-PII `booking_slots` view. |
+| ⚠️ WARN | ~~`profiles` SELECT policy is `true` — anyone can read email/role~~ | `profiles` | **Resolved 2026-08-25** (migration `0008`): public SELECT dropped; own-or-admin SELECT remains. |
 | ⚠️ WARN | Leaked password protection is disabled in Supabase Auth | Auth settings | Enable HaveIBeenPwned.org check in Supabase Auth dashboard → Settings → Auth → Password. |
 
 ---
@@ -463,7 +473,7 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 
 ## 8. Open Items / Deferred Decisions
 
-- **Role system:** Implemented as a `role` column on `public.profiles` (`student`, `coach`, `accounting`, `admin`; default `student`). Applied to remote on 2026-07-07 as migration `0001_add_roles_and_admin_rls` (tracked in `supabase_migrations`). A helper `public.is_admin()` is used by RLS policies on `payment_proofs` and `bookings` to enforce admin-only writes server-side. The frontend reads `profile.role` via `useAuth().role`. JWT custom claims and a separate `user_roles` join table were considered and rejected (claims require session refresh on role change; the join table adds complexity for a single-role-per-user model). The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
+- **Role system:** Canonical store is `public.profiles.role` (`student`, `coach`, `accounting`, `admin`; default `student`). Helpers: `is_admin()`, `is_coach()` (GRANT EXECUTE to `authenticated`). Live actors after F1.02: student, admin, coach (assigned-session roster). `accounting` remains unused (non-admin, no roster). Role promotion stays out-of-band SQL (`prevent_role_self_service`). JWT custom claims and a `user_roles` table remain rejected. Apply migration `0008` on the target project before treating this as the remote as-is. The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
 - ~~**`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:**~~ **Resolved 2026-08-07** — the `-v2` function no longer exists in the live project; `generate-invoice-pdf` (v18) is the sole canonical generator.
 - ~~**`cleanup-pending-bookings`:**~~ **Resolved 2026-08-07** — no scheduler exists and none should be added; time-based auto-cancellation is rejected. To be replaced by an explicit cancel-reservation flow (customer/admin/coach), spec'd as a future feature.
 - ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10.

@@ -1,6 +1,6 @@
 import { addMinutes, format } from 'date-fns';
 import { supabase } from '@/lib/customSupabaseClient';
-import { isBexioBillingEnabled, issueBexioInvoice } from '@/lib/billing';
+import { isBexioBillingEnabled, issueBexioInvoice, cancelBexioInvoice } from '@/lib/billing';
 
 // Payment statuses that reserve a slot on the availability grid.
 export const ACTIVE_BOOKING_STATUSES = ['confirmed', 'pending'];
@@ -104,4 +104,20 @@ export async function requestInvoice({ booking, lesson, profile, userId }) {
     throw new Error(detail || data?.error || 'Invoice generation failed');
   }
   return data;
+}
+
+// Client cancel of an unpaid lesson booking (US5, Decision 2026-08-25).
+// Membership subscriptions and paid-lesson / token rules are future specs.
+// If Bexio is down, the AGC booking still cancels and invoice_cancel is queued.
+export async function cancelBooking(bookingId) {
+  if (await isBexioBillingEnabled()) {
+    return cancelBexioInvoice(bookingId);
+  }
+  const { error } = await supabase
+    .from('bookings')
+    .update({ status: 'cancelled', payment_status: 'cancelled' })
+    .eq('id', bookingId)
+    .neq('payment_status', 'cancelled');
+  if (error) throw error;
+  return { outcome: 'cancelled', reused: false, document: null };
 }

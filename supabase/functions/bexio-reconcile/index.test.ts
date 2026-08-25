@@ -129,6 +129,7 @@ function stubBillingRepo(): BillingRepo {
     findOperation: async () => null,
     upsertOperation: async () => {},
     insertEvent: async () => {},
+    cancelBooking: async () => {},
   };
 }
 
@@ -347,4 +348,60 @@ Deno.test('retry exhaustion marks the operation failed and emits an event', asyn
   assertEquals(mem.operations[0].status, 'failed');
   assertEquals(result.failed_operations, 1);
   assertEquals(mem.events.some((e) => e.event_type === 'operation.retry_exhausted'), true);
+});
+
+Deno.test('queued invoice_cancel is retried by the worker', async () => {
+  const mem: Memory = {
+    documents: [makeDoc()],
+    bookings: [pendingBooking()],
+    events: [],
+    operations: [{
+      kind: 'invoice_cancel',
+      idempotency_key: `booking:${BOOKING_ID}:invoice_cancel:v1`,
+      booking_id: BOOKING_ID,
+      billing_document_id: DOC_ID,
+      status: 'pending',
+      attempts: 1,
+      next_retry_at: '2026-08-24T11:00:00.000Z',
+      last_error: 'ProviderUnavailableError',
+    }],
+    integration: { status: 'connected' },
+  };
+  let cancelled = false;
+  const provider = makeProvider(makeInvoice());
+  provider.cancelInvoice = async () => {
+    cancelled = true;
+  };
+  const billingRepo: BillingRepo = {
+    ...stubBillingRepo(),
+    findDocumentByBooking: async () => mem.documents[0],
+    upsertDocument: async (row) => {
+      mem.documents[0] = { ...mem.documents[0], ...row };
+      return mem.documents[0];
+    },
+    findOperation: async () => mem.operations[0],
+    upsertOperation: async (row) => {
+      mem.operations[0] = { ...mem.operations[0], ...row };
+    },
+    insertEvent: async (event) => {
+      mem.events.push({ event_type: event.event_type, booking_id: event.booking_id, details: event.details ?? {} });
+    },
+    cancelBooking: async () => {
+      mem.bookings[0].payment_status = 'cancelled';
+    },
+  };
+
+  const result = await runReconciliation({
+    provider,
+    repo: memoryRepo(mem),
+    billingRepo,
+    config: CONFIG,
+    now: () => NOW,
+  });
+
+  assertEquals(cancelled, true);
+  assertEquals(mem.documents[0].status, 'cancelled');
+  assertEquals(mem.operations[0].status, 'succeeded');
+  assertEquals(mem.bookings[0].payment_status, 'cancelled');
+  assertEquals(result.retried, 1);
 });

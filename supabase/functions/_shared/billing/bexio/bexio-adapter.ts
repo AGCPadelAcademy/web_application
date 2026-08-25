@@ -228,9 +228,15 @@ export class BexioAdapter implements AccountingProvider {
     });
   }
 
-  // T040 (US5) — implemented with the cancellation story.
-  cancelInvoice(_ref: ExternalInvoiceRef): Promise<void> {
-    throw new Error('cancelInvoice is implemented in T040 (US5)');
+  async cancelInvoice(ref: ExternalInvoiceRef): Promise<void> {
+    const invoice = await this.getInvoice(ref);
+    if (invoice.status === 'cancelled') return;
+    if (invoice.status === 'paid' || invoice.status === 'partially_paid') {
+      throw new ProviderClientError('invoice is not cancellable (payment recorded)', 409);
+    }
+    await this.client.request('POST', `/2.0/kb_invoice/${ref.externalId}/cancel`, {
+      correlationId: ref.externalId,
+    });
   }
 
   private async contactPayload(input: ContactInput): Promise<BexioContactPayload> {

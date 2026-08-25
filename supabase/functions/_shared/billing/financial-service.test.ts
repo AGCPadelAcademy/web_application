@@ -129,6 +129,7 @@ interface MockRepo extends BillingRepo {
   contacts: Map<string, Record<string, unknown>>;
   operations: Map<string, Record<string, unknown>>;
   events: Record<string, unknown>[];
+  cancelledBookings: string[];
 }
 
 function makeRepo(overrides: Partial<MockRepo> = {}): MockRepo {
@@ -136,11 +137,13 @@ function makeRepo(overrides: Partial<MockRepo> = {}): MockRepo {
   const contacts = new Map<string, Record<string, unknown>>();
   const operations = new Map<string, Record<string, unknown>>();
   const events: Record<string, unknown>[] = [];
+  const cancelledBookings: string[] = [];
   return {
     documents,
     contacts,
     operations,
     events,
+    cancelledBookings,
     getBooking: (id) => Promise.resolve(id === BOOKING.id ? { ...BOOKING } : null),
     getProfile: (userId) => Promise.resolve(userId === PROFILE.id ? { ...PROFILE } : null),
     getLesson: (code) => Promise.resolve(code === LESSON.lesson_code ? { ...LESSON } : null),
@@ -162,6 +165,10 @@ function makeRepo(overrides: Partial<MockRepo> = {}): MockRepo {
     },
     insertEvent: (event) => {
       events.push({ ...event });
+      return Promise.resolve();
+    },
+    cancelBooking: (id) => {
+      cancelledBookings.push(id);
       return Promise.resolve();
     },
     ...overrides,

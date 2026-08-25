@@ -2,7 +2,7 @@
 
 **Feature Branch**: `007-bexio-integration`
 **Created**: 2026-08-20
-**Status**: Draft — clarifications resolved 2026-08-20 (Q1-A, Q2-A); proof-of-payment removed 2026-08-24
+**Status**: Draft — clarifications resolved 2026-08-20 (Q1-A, Q2-A); proof-of-payment removed 2026-08-24; cancellation actor corrected 2026-08-25
 **Input**: User description: "Integrate Bexio as the external financial and accounting system of the AGC Padel Academy web application. AGC remains the operational system of record (users, bookings, memberships, schedules, pricing, application-level payment state); Bexio becomes the financial/accounting system (accounting contacts, invoices, invoice PDFs, receivables, payment reconciliation, VAT/accounting workflows, financial reporting). No card payments. Preserve existing brownfield behavior."
 
 > **Forward spec.** This document deltas against the brownfield baseline (`specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, `specs/baseline-system/supabase-backend.md`) and the live reverse specs `001`–`006` under `specs/baseline-system/features/`. It does not restate baseline behavior. External-system claims are grounded in the official Bexio API reference (docs.bexio.com, retrieved 2026-08-20) — see §"Verified External Capabilities".
@@ -23,6 +23,14 @@
 ### Session 2026-08-24 (proof-of-payment removed)
 
 - Q: Does AGC still need student proof upload and admin proof verification now that Bexio reconciliation confirms payments? → A: **No.** Proof-of-payment is removed from the product. Bank transfer against the Bexio QR invoice is the only confirmation path. AGC MUST NOT offer upload or admin approve/reject of payment proofs. Historical `payment_proofs` rows and the storage bucket MAY remain in the database unused.
+
+### Session 2026-08-25 (who cancels, membership vs lesson)
+
+- Q: Should an admin cancel invoices from the AGC admin page? → A: **No.** Admins connect Bexio and run reconciliation. Invoice **state** (paid / awaiting payment / cancelled) is a **client** concern on My Payments.
+- Q: Who cancels, and what is being cancelled? → A: Two different products, both mostly future:
+  - **Membership** (future spec): a recurring subscription (like Netflix/Spotify). After purchase it will auto-issue invoices; the client may pay by QR each month or by domiciliation. Not in 007 V1.
+  - **Lesson** (this purchase flow): today a lesson booking produces one invoice. The **client** may cancel an **unpaid** lesson booking from My Payments, which cancels the Bexio invoice. **Paid** lesson cancellation and membership-token consumption rules are a later spec — not invented here.
+- Q: Does 007 build an admin “who owes money?” invoice list (US6)? → A: **No.** Clients see their own invoice status. Receivables and accounting stay in Bexio. Admin AGC surfaces stay connection + worker health.
 
 ---
 
@@ -96,36 +104,30 @@ When a customer pays a Bexio invoice by Swiss bank transfer (QR invoice), and th
 
 ---
 
-### User Story 5 - Cancellation and refund handling (Priority: P2)
+### User Story 5 - Client invoice status and unpaid lesson cancel (Priority: P2)
 
-When a booking that has not been paid is cancelled in AGC, the corresponding Bexio invoice is cancelled programmatically so receivables stay clean. When money has already moved (paid bookings, partial payments, corrections), AGC records the operational truth (cancelled/refund agreed) and the financial correction (credit note / refund booking) is executed in Bexio — manually in V1, because Bexio does not offer a credit-note API (verified limitation, see research findings).
+A student opens My Payments and sees whether each **lesson** invoice is awaiting payment, paid, or cancelled, and can open the PDF. While the lesson invoice is still unpaid, the student can cancel that booking; AGC then cancels the Bexio invoice so it does not stay as an open receivable. Admins do **not** cancel invoices from the AGC admin UI.
 
-**Why this priority**: Unpaid cancellations are common (plan changes, no-shows before payment) and must not leave phantom receivables. Paid refunds are rarer and legally sensitive; a documented manual workflow in Bexio is safer than inventing automation around an API capability that does not exist.
+**Memberships** (recurring subscription, domiciliation vs monthly QR, token draw-down) and **paid-lesson cancellation rules** (notice period, refunds, token restore) are **not** this story — they belong to future specs.
 
-**Independent Test**: Cancel an unpaid, invoiced booking → the Bexio invoice shows as cancelled. Cancel a paid booking → AGC marks the operational state and the admin sees an explicit "financial correction required in Bexio" task/indicator; no automatic money movement is attempted.
+**Why this priority**: Unpaid lesson invoices must not linger if the client changes their mind. Paid refunds and membership billing are legally and product-sensitive; inventing those rules inside 007 would be wrong.
+
+**Independent Test**: As the booking owner, an unpaid invoiced lesson can be cancelled from My Payments and the Bexio invoice becomes cancelled. A paid lesson shows Paid and offers no cancel. The admin Integrations page has no cancel-invoice or record-refund actions.
 
 **Acceptance Scenarios**:
 
-1. **Given** a booking in an unpaid state with an issued Bexio invoice, **When** the booking is cancelled, **Then** the Bexio invoice is cancelled via API and AGC persists that cancellation state.
-2. **Given** a paid booking that is cancelled with a refund agreed, **When** the cancellation executes, **Then** AGC records the refund expectation against the transaction and flags it for manual financial processing in Bexio, without attempting a programmatic credit note.
-3. **Given** a cancellation request while Bexio is unavailable, **When** the Bexio-side cancellation fails, **Then** the AGC-side operational cancellation still completes (or is queued per the cancellation feature's own rules) and the pending financial cancellation is retried or surfaced to an admin — the two systems never silently diverge.
-4. **Given** an invoice that Bexio refuses to cancel (e.g., already paid or locked in a closed business year), **When** the cancel attempt fails, **Then** AGC surfaces the conflict to an admin instead of forcing state.
+1. **Given** an unpaid lesson booking with an issued Bexio invoice, **When** the owner cancels it from My Payments, **Then** the Bexio invoice is cancelled via API and AGC shows the booking/invoice as cancelled.
+2. **Given** a paid lesson invoice, **When** the owner views My Payments, **Then** they see Paid and can open the PDF; they MUST NOT be offered a cancel action in this feature.
+3. **Given** an unpaid cancel while Bexio is unavailable, **When** the Bexio-side cancellation fails, **Then** the AGC booking still cancels and the invoice cancel is retried — the two systems never silently diverge.
+4. **Given** Bexio refuses to cancel (e.g. already paid), **When** the student cancel attempt fails, **Then** AGC does not force the invoice to cancelled and shows a clear error to the student.
 
 ---
 
-### User Story 6 - Admin financial overview without a second accounting dashboard (Priority: P3)
+### User Story 6 - Admin financial overview without a second accounting dashboard (Priority: P3) — **deferred 2026-08-25**
 
-An admin sees operationally useful financial information inside the existing admin area — payment status, invoice status, Bexio document reference, outstanding amounts — and a link/action to the corresponding record in Bexio for anything beyond that. AGC deliberately does not rebuild financial statements, the general ledger, VAT workflows, bank reconciliation, or any other Bexio dashboard capability.
+AGC MUST NOT rebuild Bexio's receivables dashboard. **Decision 2026-08-25:** students see their own invoice paid/unpaid state on My Payments (US3/US5). Admins use Bexio for outstanding invoices and accounting, and AGC admin only for connection health and reconciliation worker status (US1/US4). This story is not implemented in 007.
 
-**Why this priority**: Valuable for daily operations ("who still owes money?") but strictly read-only aggregation over data already synchronized by stories 2–4. It is independently shippable and deliberately minimal to protect the "no second ERP" principle.
-
-**Independent Test**: An admin opens the financial overview, identifies all outstanding payments, and follows a reference link to the matching Bexio record for one of them.
-
-**Acceptance Scenarios**:
-
-1. **Given** synchronized invoices, **When** an admin opens the financial area, **Then** they see per-transaction payment/invoice status, outstanding indicator, and the Bexio reference.
-2. **Given** a transaction whose financial operation failed or is pending retry, **When** an admin views it, **Then** the failure state and a re-run action are visible.
-3. **Given** any financial report, ledger view, or VAT workflow need, **When** evaluating AGC, **Then** these remain exclusively in Bexio — AGC links out instead of re-implementing.
+**Independent Test**: Confirm no admin invoice-list / “who owes money?” UI exists in AGC; outstanding invoices are followed up in Bexio.
 
 ---
 
@@ -196,13 +198,13 @@ An admin sees operationally useful financial information inside the existing adm
 
 #### F. Cancellation, refunds, corrections
 
-- **FR-030**: When an unpaid transaction is cancelled in AGC, the corresponding Bexio invoice MUST be cancelled via Bexio's invoice-cancel capability, and AGC MUST persist the outcome. (Customer-facing cancellation UX itself belongs to the separate `cancel-reservation` feature; this spec covers the financial side effect and an admin-triggerable path.)
-- **FR-031**: Refunds of received payments, partial refunds, and payment corrections MUST be handled in Bexio (manual or hybrid workflow) in V1, because Bexio does not expose credit notes via API (verified limitation). AGC MUST record the refund expectation/state against the transaction and surface pending financial corrections to admins so the two systems cannot silently diverge.
-- **FR-032**: If Bexio refuses a programmatic cancellation (already paid, closed/locked business year, or other provider rule), AGC MUST surface the conflict for manual resolution instead of forcing inconsistent state.
+- **FR-030**: When a **student** cancels an **unpaid lesson** booking in AGC (My Payments), the corresponding Bexio invoice MUST be cancelled via Bexio's invoice-cancel capability, and AGC MUST persist the outcome. AGC MUST NOT offer admin invoice-cancel or refund-handoff controls. Membership cancellation, paid-lesson cancellation, notice windows, token restore, and domiciliation are **out of this feature**.
+- **FR-031**: Refunds of received payments, partial refunds, and payment corrections MUST be handled in Bexio in V1 (no credit-note API). AGC MUST NOT invent a paid-lesson or membership refund UI in this feature.
+- **FR-032**: If Bexio refuses a programmatic cancellation (already paid, closed/locked business year, or other provider rule), AGC MUST NOT force the invoice cancelled; the student MUST see a clear error.
 
 #### G. Admin financial visibility (bounded)
 
-- **FR-033**: AGC MUST expose only operationally useful financial information: payment status, invoice status, outstanding indicators, recent transactions, external invoice reference, sync/failure state, and a navigation path to the corresponding Bexio record. The confirmation source MUST be distinguishable per transaction.
+- **FR-033**: Students MUST see their own invoice payment state on My Payments (awaiting payment / paid / cancelled). Admins MUST see Bexio connection status and reconciliation worker health only. AGC MUST NOT add an admin invoice ledger. Detailed receivables remain in Bexio.
 - **FR-034**: Full accounting capabilities MUST remain exclusively in Bexio: financial statements, general ledger, detailed VAT workflows, bank reconciliation interface, professional accounting reports, expense accounting, fiduciary operations. AGC MUST NOT rebuild any of these.
 
 #### H. Reconciliation authority (Decision 2026-08-24: proof path removed)
@@ -232,7 +234,7 @@ An admin sees operationally useful financial information inside the existing adm
 - **SC-002**: A payment recorded in the accounting system confirms the corresponding AGC transaction — without admin action — within one synchronization interval (target ≤ 1 hour), with 0 double-applied payments over any rolling 30-day window.
 - **SC-003**: During an accounting-system outage, 100% of bookings still complete and 0 financial operations are lost — all missed operations become recoverable without re-entering data after the outage ends.
 - **SC-004**: Students and admins can open the official invoice document from AGC in under 10 seconds in the normal case; unauthorized access attempts are denied 100% of the time.
-- **SC-005**: Admins can answer "which transactions are still unpaid?" from AGC alone for at least 95% of daily checks; full accounting questions continue to be answered in Bexio.
+- **SC-005**: Each student can see paid / awaiting payment / cancelled for their own invoices on My Payments. Academy-wide receivables (“who still owes?”) are answered in Bexio, not in an AGC admin ledger.
 - **SC-006**: Security audit confirms 0 Bexio secrets or tokens in browser bundles, client responses, or client-readable storage; all integration calls originate server-side.
 - **SC-007**: An admin can detect and re-run a failed financial operation from within AGC in under 2 minutes, without touching server logs or the accounting system.
 

@@ -11,6 +11,7 @@
 
 import {
   ProviderAuthError,
+  ProviderClientError,
   ProviderUnavailableError,
   type AccountingProvider,
   type ContactInput,
@@ -28,6 +29,17 @@ import {
 
 export class BookingNotBillableError extends Error {
   override readonly name = 'BookingNotBillableError';
+}
+
+/** Paid invoices and provider refusals must not be forced cancelled (US5). */
+export class InvoiceCancelConflictError extends Error {
+  override readonly name = 'InvoiceCancelConflictError';
+  constructor(
+    message: string,
+    readonly code: 'paid' | 'cancel_refused',
+  ) {
+    super(message);
+  }
 }
 
 export interface BillingDocumentRow {
@@ -77,6 +89,7 @@ export interface BillingRepo {
     billing_document_id?: string | null;
     details?: Record<string, unknown>;
   }): Promise<void>;
+  cancelBooking(bookingId: string): Promise<void>;
 }
 
 export interface FinancialServiceDeps {
@@ -89,6 +102,12 @@ export interface FinancialServiceDeps {
 export interface IssueInvoiceResult {
   document: BillingDocumentRow;
   reused: boolean;
+}
+
+export interface CancelInvoiceResult {
+  document: BillingDocumentRow | null;
+  reused: boolean;
+  outcome: 'cancelled';
 }
 
 function log(event: Record<string, unknown>): void {
@@ -225,6 +244,119 @@ export async function issueInvoiceForBooking(
   }
 }
 
+/**
+ * Student unpaid-lesson cancel (US5, Decision 2026-08-25).
+ * Cancels the AGC booking even when Bexio is down (invoice_cancel is queued).
+ * Paid invoices are refused — paid-lesson / membership rules are future specs.
+ */
+export async function cancelInvoiceForBooking(
+  deps: FinancialServiceDeps,
+  bookingId: string,
+  options: { persistRetryQueue?: boolean } = {},
+): Promise<CancelInvoiceResult> {
+  const persistRetryQueue = options.persistRetryQueue ?? true;
+  const { provider, repo } = deps;
+  const now = deps.now?.() ?? new Date();
+  const idempotencyKey = `booking:${bookingId}:invoice_cancel:v1`;
+
+  const existingOp = await repo.findOperation(idempotencyKey);
+  if (existingOp?.status === 'succeeded') {
+    const existing = await repo.findDocumentByBooking(bookingId);
+    await repo.cancelBooking(bookingId);
+    return { document: existing, reused: true, outcome: 'cancelled' };
+  }
+
+  const document = await repo.findDocumentByBooking(bookingId);
+  if (!document || document.status === 'cancelled') {
+    await repo.cancelBooking(bookingId);
+    await repo.upsertOperation({
+      kind: 'invoice_cancel',
+      idempotency_key: idempotencyKey,
+      booking_id: bookingId,
+      billing_document_id: document?.id ?? null,
+      status: 'succeeded',
+      attempts: (existingOp?.attempts ?? 0) + 1,
+      next_retry_at: null,
+      last_error: null,
+    });
+    if (document?.status !== 'cancelled') {
+      await repo.insertEvent({
+        event_type: 'invoice.cancelled',
+        booking_id: bookingId,
+        billing_document_id: document?.id ?? null,
+        details: { reason: document ? 'already_cancelled' : 'no_document' },
+      });
+    }
+    return {
+      document: document ?? null,
+      reused: document?.status === 'cancelled',
+      outcome: 'cancelled',
+    };
+  }
+
+  if (document.status === 'paid' || document.status === 'partially_paid') {
+    throw new InvoiceCancelConflictError(
+      'This invoice is already paid. Cancellation after payment is not available here yet.',
+      'paid',
+    );
+  }
+
+  try {
+    await provider.cancelInvoice({ externalId: document.external_id });
+    const cancelled = await repo.upsertDocument({ ...document, status: 'cancelled' });
+    await repo.cancelBooking(bookingId);
+    await repo.upsertOperation({
+      kind: 'invoice_cancel',
+      idempotency_key: idempotencyKey,
+      booking_id: bookingId,
+      billing_document_id: cancelled.id ?? document.id ?? null,
+      status: 'succeeded',
+      attempts: (existingOp?.attempts ?? 0) + 1,
+      next_retry_at: null,
+      last_error: null,
+    });
+    await repo.insertEvent({
+      event_type: 'invoice.cancelled',
+      booking_id: bookingId,
+      billing_document_id: cancelled.id ?? document.id ?? null,
+      details: { provider: provider.name, document_nr: cancelled.document_nr },
+    });
+    log({ event: 'invoice_cancelled', bookingId, documentNr: cancelled.document_nr });
+    return { document: cancelled, reused: false, outcome: 'cancelled' };
+  } catch (err) {
+    if (err instanceof ProviderClientError) {
+      await repo.insertEvent({
+        event_type: 'invoice.cancel_refused',
+        booking_id: bookingId,
+        billing_document_id: document.id ?? null,
+        details: { status: err.status },
+      });
+      throw new InvoiceCancelConflictError(
+        'Bexio refused to cancel this invoice. It was not marked cancelled in AGC.',
+        'cancel_refused',
+      );
+    }
+    if (err instanceof ProviderAuthError || err instanceof ProviderUnavailableError) {
+      await repo.cancelBooking(bookingId);
+      if (persistRetryQueue) {
+        const attempts = (existingOp?.attempts ?? 0) + 1;
+        await repo.upsertOperation({
+          kind: 'invoice_cancel',
+          idempotency_key: idempotencyKey,
+          booking_id: bookingId,
+          billing_document_id: document.id ?? null,
+          status: 'pending',
+          attempts,
+          next_retry_at: nextRetryAt(attempts, now),
+          last_error: err.name,
+        });
+        log({ event: 'invoice_cancel_enqueued', bookingId, error: err.name, attempts });
+      }
+    }
+    throw err;
+  }
+}
+
 // --- PostgREST repository (service role; Edge Functions are the only writers) ---
 
 export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string): BillingRepo {
@@ -292,6 +424,17 @@ export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string)
         body: JSON.stringify({ details: {}, ...event }),
       });
       if (!res.ok) log({ event: 'event_insert_failed', status: res.status });
+    },
+    cancelBooking: async (bookingId) => {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/bookings?id=eq.${bookingId}&payment_status=neq.cancelled`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'cancelled', payment_status: 'cancelled' }),
+        },
+      );
+      if (!res.ok) throw new Error(`db cancel booking failed: ${res.status}`);
     },
   };
 }

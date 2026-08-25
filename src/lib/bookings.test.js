@@ -8,6 +8,8 @@ const { mockSupabase, makeChain } = vi.hoisted(() => {
       eq: vi.fn(() => chain),
       in: vi.fn(() => chain),
       insert: vi.fn(() => chain),
+      update: vi.fn(() => chain),
+      neq: vi.fn(() => chain),
       single: vi.fn(() => chain),
       maybeSingle: vi.fn(() => chain),
       then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
@@ -33,6 +35,7 @@ import {
   buildBookingPayload,
   createBooking,
   requestInvoice,
+  cancelBooking,
   ACTIVE_BOOKING_STATUSES,
 } from '@/lib/bookings';
 
@@ -216,5 +219,39 @@ describe('requestInvoice', () => {
       error: { message: 'Edge function returned a non-2xx status code', context: { json: () => Promise.resolve({ error: 'provider_unavailable' }) } },
     });
     await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('provider_unavailable');
+  });
+});
+
+describe('cancelBooking', () => {
+  it('updates the booking when Bexio billing is off', async () => {
+    const flagChain = makeChain({ data: { integration_enabled: false }, error: null });
+    const updateChain = makeChain({ data: null, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(flagChain)
+      .mockReturnValueOnce(updateChain);
+
+    const result = await cancelBooking('booking-1');
+
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(2, 'bookings');
+    expect(updateChain.update).toHaveBeenCalledWith({ status: 'cancelled', payment_status: 'cancelled' });
+    expect(updateChain.eq).toHaveBeenCalledWith('id', 'booking-1');
+    expect(result.outcome).toBe('cancelled');
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('invokes billing-cancel-invoice when Bexio billing is on', async () => {
+    mockSupabase.from.mockReturnValue(makeChain({ data: { integration_enabled: true }, error: null }));
+    mockSupabase.functions.invoke.mockResolvedValue({
+      data: { outcome: 'cancelled', reused: false, document: { status: 'cancelled' } },
+      error: null,
+    });
+
+    const result = await cancelBooking('booking-1');
+
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('billing-cancel-invoice', {
+      headers: { Authorization: 'Bearer test-token' },
+      body: { booking_id: 'booking-1', idempotency_key: 'booking:booking-1:invoice_cancel:v1' },
+    });
+    expect(result.outcome).toBe('cancelled');
   });
 });

@@ -49,6 +49,12 @@ export const issueBexioInvoice = (bookingId) =>
     idempotency_key: `booking:${bookingId}:invoice:v1`,
   });
 
+export const cancelBexioInvoice = (bookingId) =>
+  invokeBillingFunction('billing-cancel-invoice', {
+    booking_id: bookingId,
+    idempotency_key: `booking:${bookingId}:invoice_cancel:v1`,
+  });
+
 export const runBexioReconciliation = () =>
   invokeBillingFunction('bexio-reconcile', {});
 

@@ -132,41 +132,37 @@
 
 ---
 
-## Phase 7: User Story 5 - Cancellation and refund handling (Priority: P2)
+## Phase 7: User Story 5 - Client invoice status and unpaid lesson cancel (Priority: P2)
 
-**Goal**: Unpaid cancellations cancel the Bexio invoice programmatically; paid cancellations record the refund expectation and route the financial correction to manual processing in Bexio (no credit-note API — verified)
+**Goal**: Students see paid/unpaid/cancelled on My Payments and can cancel an **unpaid lesson**. Admins do not cancel invoices in AGC. Memberships and paid-lesson rules are future specs.
 
-**Independent Test**: quickstart.md §8 — unpaid cancel cancels the invoice; outage queues the cancel; paid cancel raises the manual-correction indicator without money movement; Bexio-refused cancel surfaces a conflict
+**Independent Test**: quickstart.md §7 — unpaid cancel from My Payments; paid lesson has no cancel; admin Integrations has no cancel-invoice UI
 
 ### Tests for User Story 5
 
-- [ ] T039 [P] [US5] Write Deno unit tests in `supabase/functions/_shared/billing/financial-service.cancel.test.ts`: cancel only allowed for `issued`/unpaid documents; paid cancellation creates refund-expectation event + admin flag instead of API cancel; provider refusal surfaces conflict without forcing AGC state
+- [X] T039 [P] [US5] Write Deno unit tests in `supabase/functions/_shared/billing/financial-service.cancel.test.ts`: cancel only allowed for `issued`/unpaid documents; paid cancel is refused (future paid-lesson spec); provider refusal surfaces conflict without forcing AGC state
 
 ### Implementation for User Story 5
 
-- [ ] T040 [US5] Add `cancelInvoice` (`POST /2.0/kb_invoice/{id}/cancel`, issued-only) to `supabase/functions/_shared/billing/bexio/bexio-adapter.ts` and the `cancelInvoiceForBooking(bookingId)` orchestration to `supabase/functions/_shared/billing/financial-service.ts` (operation kind `invoice_cancel`, same idempotency/retry machinery)
-- [ ] T041 [US5] Hook booking cancellation in the existing cancel path in `src/lib/bookings.js` (and the admin cancel handler if separate): for bookings with a `billing_documents` row — unpaid → invoke invoice cancel (enqueue `invoice_cancel` on provider failure, FR per US5 scenario 3); paid with refund agreed → record refund expectation + `billing_events` flag for manual Bexio processing, never attempting programmatic money movement
-- [ ] T042 [US5] Surface pending financial cancellations and refund-required flags in the admin integrations/overview UI (`src/pages/AdminIntegrationsPage.jsx`), including the Bexio-refusal conflict state (US5 scenario 4)
-- [ ] T043 [US5] Deploy affected functions and verify quickstart.md §8.1–§8.4 on the test branch
+- [X] T040 [US5] Add `cancelInvoice` (`POST /2.0/kb_invoice/{id}/cancel`, issued-only) to `supabase/functions/_shared/billing/bexio/bexio-adapter.ts` and the `cancelInvoiceForBooking(bookingId)` orchestration to `supabase/functions/_shared/billing/financial-service.ts` (operation kind `invoice_cancel`, same idempotency/retry machinery)
+- [X] T041 [US5] Hook unpaid lesson cancel in `src/lib/bookings.js` and My Payments (`PaymentsPage.jsx`): owner sees paid/awaiting/cancelled and can cancel unpaid bookings (enqueue `invoice_cancel` on provider failure). No admin invoice-cancel UI (Decision 2026-08-25).
+- [X] T042 [US5] Do **not** surface cancel/refund controls on the admin integrations page. Invoice state is client-only on My Payments.
+- [ ] T043 [US5] Deploy `billing-cancel-invoice` and verify student unpaid cancel from My Payments (quickstart §7).
 
-**Checkpoint**: Receivables stay clean on cancellations; refunds are an explicit, documented manual step in Bexio
+**Checkpoint**: Students see paid/awaiting/cancelled on My Payments; unpaid lesson cancel closes the Bexio invoice; no admin invoice-cancel UI
 
 ---
 
-## Phase 8: User Story 6 - Admin financial overview (Priority: P3)
+## Phase 8: User Story 6 - Admin financial overview (Priority: P3) — deferred 2026-08-25
 
-**Goal**: Read-only operational financial visibility (statuses, outstanding, Bexio reference, failure re-run) inside the existing admin area — no accounting features rebuilt
+Clients see invoice status on My Payments. Admins use Bexio for receivables. Do not build `AdminFinancialOverview`.
 
-**Independent Test**: quickstart.md §9 — outstanding payments identifiable at a glance; failed operations re-runnable; Bexio link lands on the matching record; no ledger/VAT UI exists
+- [ ] T044 [P] [US6] Deferred — no admin per-transaction financial list in 007
+- [ ] T045 [US6] Deferred
+- [ ] T046 [P] [US6] Deferred
+- [ ] T047 [US6] Deferred — quickstart §8 notes US6 is not in 007
 
-### Implementation for User Story 6
-
-- [ ] T044 [P] [US6] Create the read-only overview component in `src/components/billing/AdminFinancialOverview.jsx`: per-transaction list joining `bookings` + `billing_documents` (payment status, invoice status, total, outstanding indicator, `document_nr`), plus `PaymentSourceBadge` in `src/components/billing/PaymentSourceBadge.jsx` showing `payment_confirmation_source` when set (FR-033)
-- [ ] T045 [US6] Embed the overview into the admin area (`src/pages/AdminIntegrationsPage.jsx` financial section) with the failed-operation re-run action invoking `billing-issue-invoice` (same idempotency key → safe retry) per US6 scenario 2
-- [ ] T046 [P] [US6] Add "Open in Bexio" deep links per row in `src/components/billing/AdminFinancialOverview.jsx` (Bexio web app record URL built from `external_id`; confirm the exact URL format during implementation and document it in the component)
-- [ ] T047 [US6] Verify quickstart.md §9.1–§9.4 on the test branch
-
-**Checkpoint**: Daily "who owes money?" question answerable in AGC; everything beyond remains in Bexio by design
+**Checkpoint**: Deferred — clients see their own invoices; admins follow receivables in Bexio
 
 ---
 

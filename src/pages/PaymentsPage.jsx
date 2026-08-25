@@ -1,14 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { CreditCard, Clock, Calendar, CheckCircle, FileDown, Loader2 } from 'lucide-react';
+import { CreditCard, Clock, Calendar, CheckCircle, FileDown, Loader2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { requestInvoice } from '@/lib/bookings';
+import { requestInvoice, cancelBooking } from '@/lib/bookings';
 import { fetchProfile } from '@/lib/profileService';
 import InvoicePreviewModal from '@/components/modals/InvoicePreviewModal.jsx';
+
+function documentOf(booking) {
+  const docs = booking.billing_documents;
+  if (!docs) return null;
+  return Array.isArray(docs) ? docs[0] : docs;
+}
+
+function invoiceState(booking) {
+  const doc = documentOf(booking);
+  if (booking.payment_status === 'cancelled' || booking.status === 'cancelled' || doc?.status === 'cancelled') {
+    return 'cancelled';
+  }
+  if (booking.payment_status === 'confirmed' || doc?.status === 'paid') {
+    return 'paid';
+  }
+  return 'pending';
+}
 
 const PaymentsPage = () => {
   const { user } = useAuth();
@@ -16,6 +33,7 @@ const PaymentsPage = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [invoiceLoadingId, setInvoiceLoadingId] = useState(null);
+  const [cancelLoadingId, setCancelLoadingId] = useState(null);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedInvoiceUrl, setSelectedInvoiceUrl] = useState(null);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
@@ -26,11 +44,20 @@ const PaymentsPage = () => {
     try {
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*')
+        .select('*, billing_documents(status, document_nr)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (bookingsError) throw bookingsError;
+      if (bookingsError) {
+        const fallback = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (fallback.error) throw fallback.error;
+        setBookings(fallback.data || []);
+        return;
+      }
       setBookings(bookingsData || []);
     } catch (error) {
       console.error('Fetch error:', error);
@@ -44,8 +71,6 @@ const PaymentsPage = () => {
     fetchData();
   }, [user]);
 
-  // Opens the invoice PDF preview. Legacy bookings use receipt_url; Bexio
-  // bookings issue/reuse the document then stream the PDF in the same modal.
   const handleGetInvoice = async (booking) => {
     if (booking.receipt_url) {
       setSelectedBookingId(booking.id);
@@ -75,14 +100,37 @@ const PaymentsPage = () => {
     }
   };
 
-  const PaymentBadge = ({ status }) => {
-    switch (status) {
-      case 'confirmed':
+  const handleCancel = async (booking) => {
+    if (!window.confirm(
+      'Cancel this unpaid lesson booking? The invoice will be cancelled. Paid lessons and memberships follow different rules and are not cancelled here.',
+    )) return;
+    setCancelLoadingId(booking.id);
+    try {
+      await cancelBooking(booking.id);
+      toast({ title: 'Booking cancelled', description: 'The unpaid invoice was cancelled.' });
+      await fetchData();
+    } catch (error) {
+      if (/queued for retry/i.test(error.message || '')) {
+        toast({ title: 'Booking cancelled', description: 'The invoice cancel will retry automatically.' });
+        await fetchData();
+        return;
+      }
+      toast({ title: 'Could not cancel', description: error.message, variant: 'destructive' });
+    } finally {
+      setCancelLoadingId(null);
+    }
+  };
+
+  const PaymentBadge = ({ state }) => {
+    switch (state) {
+      case 'paid':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/20"><CheckCircle className="w-3 h-3" /> Paid</span>;
       case 'pending':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"><Clock className="w-3 h-3" /> Pending</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"><Clock className="w-3 h-3" /> Awaiting payment</span>;
+      case 'cancelled':
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20"><XCircle className="w-3 h-3" /> Cancelled</span>;
       default:
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">{status}</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">{state}</span>;
     }
   };
 
@@ -105,44 +153,69 @@ const PaymentsPage = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {bookings.map((booking) => (
-              <div key={booking.id} className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 shadow-lg">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-4">
-                  <div>
-                    <h3 className="font-bold text-xl text-white mb-1">{booking.lesson_name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-400">
-                      <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {booking.booking_date ? format(new Date(booking.booking_date), 'dd MMM yyyy') : 'N/A'}</span>
-                      <span className="font-medium text-green-400">{booking.price}</span>
+            {bookings.map((booking) => {
+              const state = invoiceState(booking);
+              const doc = documentOf(booking);
+              const canViewInvoice = Boolean(booking.receipt_url || doc || state === 'pending');
+              return (
+                <div key={booking.id} className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 shadow-lg">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-4">
+                    <div>
+                      <h3 className="font-bold text-xl text-white mb-1">{booking.lesson_name}</h3>
+                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                        <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {booking.booking_date ? format(new Date(booking.booking_date), 'dd MMM yyyy') : 'N/A'}</span>
+                        <span className="font-medium text-green-400">{booking.price}</span>
+                        {doc?.document_nr && <span>{doc.document_nr}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {canViewInvoice && state !== 'cancelled' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGetInvoice(booking)}
+                          disabled={invoiceLoadingId === booking.id}
+                          className="border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                        >
+                          {invoiceLoadingId === booking.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <FileDown className="w-4 h-4 mr-2" />
+                          )}
+                          {booking.receipt_url || doc ? 'Invoice (PDF)' : 'Get invoice'}
+                        </Button>
+                      )}
+                      {state === 'pending' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancel(booking)}
+                          disabled={cancelLoadingId === booking.id}
+                          className="border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                        >
+                          {cancelLoadingId === booking.id ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : null}
+                          Cancel booking
+                        </Button>
+                      )}
+                      <PaymentBadge state={state} />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {(booking.receipt_url || booking.payment_status === 'pending') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleGetInvoice(booking)}
-                        disabled={invoiceLoadingId === booking.id}
-                        className="border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
-                      >
-                        {invoiceLoadingId === booking.id ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <FileDown className="w-4 h-4 mr-2" />
-                        )}
-                        {booking.receipt_url ? 'Invoice (PDF)' : 'Get invoice'}
-                      </Button>
-                    )}
-                    <PaymentBadge status={booking.payment_status} />
-                  </div>
-                </div>
 
-                {booking.payment_status === 'pending' && (
-                  <p className="text-sm text-gray-400">
-                    Pay with the QR slip on the invoice. This booking is confirmed automatically after the bank transfer is recorded in Bexio.
-                  </p>
-                )}
-              </div>
-            ))}
+                  {state === 'pending' && (
+                    <p className="text-sm text-gray-400">
+                      Pay with the QR slip on the invoice. This booking is confirmed automatically after the bank transfer is recorded in Bexio. You can cancel it while it is still unpaid.
+                    </p>
+                  )}
+                  {state === 'paid' && (
+                    <p className="text-sm text-gray-400">
+                      This invoice is paid. Cancellation after payment is not available here yet.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

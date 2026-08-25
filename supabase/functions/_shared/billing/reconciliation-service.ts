@@ -13,6 +13,8 @@ import {
 } from './accounting-provider.ts';
 import {
   BookingNotBillableError,
+  cancelInvoiceForBooking,
+  InvoiceCancelConflictError,
   issueInvoiceForBooking,
   nextRetryAt,
   type BillingDocumentRow,
@@ -151,8 +153,24 @@ async function reconcileDocument(
 async function processRetries(deps: ReconcileDeps, now: Date, counts: ReconcileResult): Promise<void> {
   const due = await deps.repo.listDueOperations(now);
   for (const op of due) {
-    if (op.kind === 'invoice_cancel') continue; // US5
     try {
+      if (op.kind === 'invoice_cancel' && op.booking_id) {
+        await cancelInvoiceForBooking({
+          provider: deps.provider,
+          repo: deps.billingRepo,
+          config: deps.config,
+          now: () => now,
+        }, op.booking_id, { persistRetryQueue: false });
+        await deps.repo.upsertOperation({
+          ...op,
+          status: 'succeeded',
+          attempts: op.attempts + 1,
+          next_retry_at: null,
+          last_error: null,
+        });
+        counts.retried += 1;
+        continue;
+      }
       if (op.kind === 'invoice_issue' && op.booking_id) {
         await issueInvoiceForBooking({
           provider: deps.provider,
@@ -179,7 +197,7 @@ async function processRetries(deps: ReconcileDeps, now: Date, counts: ReconcileR
       counts.failed_operations += 1;
     } catch (err) {
       if (err instanceof ProviderAuthError) throw err;
-      if (err instanceof BookingNotBillableError) {
+      if (err instanceof BookingNotBillableError || err instanceof InvoiceCancelConflictError) {
         await deps.repo.upsertOperation({
           ...op,
           status: 'failed',

@@ -236,3 +236,6 @@ CREATE POLICY "payment-proofs owner insert"
       )
     )
   );
+
+-- Reload PostgREST so `coach_id` / `session_roster` are visible without a restart.
+NOTIFY pgrst, 'reload schema';

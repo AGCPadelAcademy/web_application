@@ -25,6 +25,8 @@ import {
   listBookingsForAssignment,
   updateBookingCoachId,
   coachAssignmentErrorMessage,
+  isCoachAssignmentAvailable,
+  isMissingCoachAssignmentSchema,
 } from '@/lib/coachAssignments';
 
 describe('listCoachProfiles', () => {
@@ -119,6 +121,38 @@ describe('updateBookingCoachId', () => {
     });
 
     expect(chain.update).toHaveBeenCalledWith({ coach_id: null });
+  });
+});
+
+describe('isCoachAssignmentAvailable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true when bookings.coach_id can be selected', async () => {
+    const chain = makeChain({ data: [], error: null });
+    mockSupabase.from.mockReturnValue(chain);
+
+    await expect(isCoachAssignmentAvailable()).resolves.toBe(true);
+    expect(mockSupabase.from).toHaveBeenCalledWith('bookings');
+    expect(chain.select).toHaveBeenCalledWith('coach_id');
+  });
+
+  it('returns false when PostgREST has not cached coach_id yet', async () => {
+    const chain = makeChain({
+      data: null,
+      error: { code: 'PGRST204', message: "Could not find the 'coach_id' column of 'bookings' in the schema cache" },
+    });
+    mockSupabase.from.mockReturnValue(chain);
+
+    await expect(isCoachAssignmentAvailable()).resolves.toBe(false);
+  });
+});
+
+describe('isMissingCoachAssignmentSchema', () => {
+  it('detects missing-column errors', () => {
+    expect(isMissingCoachAssignmentSchema({ code: '42703', message: 'column coach_id does not exist' })).toBe(true);
+    expect(isMissingCoachAssignmentSchema({ message: 'permission denied' })).toBe(false);
   });
 });
 

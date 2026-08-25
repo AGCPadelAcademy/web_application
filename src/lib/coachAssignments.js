@@ -1,5 +1,30 @@
 import { supabase } from '@/lib/customSupabaseClient';
 
+export function isMissingCoachAssignmentSchema(error) {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    (message.includes('coach_id') && (
+      message.includes('does not exist') ||
+      message.includes('could not find') ||
+      message.includes('schema cache')
+    ))
+  );
+}
+
+export async function isCoachAssignmentAvailable() {
+  const { error } = await supabase
+    .from('bookings')
+    .select('coach_id')
+    .limit(1);
+
+  if (!error) return true;
+  if (isMissingCoachAssignmentSchema(error)) return false;
+  return true;
+}
+
 export function coachAssignmentErrorMessage(error) {
   const raw = String(error?.message || '');
   if (raw.includes('only an administrator can change coach assignment')) {

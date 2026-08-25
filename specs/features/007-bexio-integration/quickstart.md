@@ -74,7 +74,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 
 | Step | Action | Expected |
 |---|---|---|
-| 8.1 | Student: unpaid invoiced lesson → **Cancel booking** on My Payments | Bexio invoice cancelled; My Payments shows Cancelled |
+| 8.1 | Student: unpaid invoiced lesson → **Cancel booking** on My Payments → confirm in the in-app modal | Bexio invoice cancelled; My Payments shows Cancelled |
 | 8.2 | Cancel while Bexio unreachable | Booking still cancelled in AGC; `invoice_cancel` queued for the worker |
 | 8.3 | Paid lesson on My Payments | Shows **Paid**; no cancel action |
 | 8.4 | Admin Integrations page | No cancel-invoice or record-refund controls |

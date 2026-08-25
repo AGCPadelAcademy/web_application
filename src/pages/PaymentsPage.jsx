@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { requestInvoice, cancelBooking } from '@/lib/bookings';
 import { fetchProfile } from '@/lib/profileService';
 import InvoicePreviewModal from '@/components/modals/InvoicePreviewModal.jsx';
+import CancelBookingModal from '@/components/modals/CancelBookingModal.jsx';
 
 function documentOf(booking) {
   const docs = booking.billing_documents;
@@ -37,6 +38,7 @@ const PaymentsPage = () => {
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedInvoiceUrl, setSelectedInvoiceUrl] = useState(null);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
+  const [bookingToCancel, setBookingToCancel] = useState(null);
 
   const fetchData = async () => {
     if (!user) return;
@@ -100,18 +102,24 @@ const PaymentsPage = () => {
     }
   };
 
-  const handleCancel = async (booking) => {
-    if (!window.confirm(
-      'Cancel this unpaid lesson booking? The invoice will be cancelled. Paid lessons and memberships follow different rules and are not cancelled here.',
-    )) return;
+  const closeCancelModal = () => {
+    if (cancelLoadingId) return;
+    setBookingToCancel(null);
+  };
+
+  const confirmCancel = async () => {
+    const booking = bookingToCancel;
+    if (!booking) return;
     setCancelLoadingId(booking.id);
     try {
       await cancelBooking(booking.id);
       toast({ title: 'Booking cancelled', description: 'The unpaid invoice was cancelled.' });
+      setBookingToCancel(null);
       await fetchData();
     } catch (error) {
       if (/queued for retry/i.test(error.message || '')) {
         toast({ title: 'Booking cancelled', description: 'The invoice cancel will retry automatically.' });
+        setBookingToCancel(null);
         await fetchData();
         return;
       }
@@ -189,7 +197,7 @@ const PaymentsPage = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleCancel(booking)}
+                          onClick={() => setBookingToCancel(booking)}
                           disabled={cancelLoadingId === booking.id}
                           className="border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                         >
@@ -228,6 +236,13 @@ const PaymentsPage = () => {
         }}
         bookingId={selectedBookingId}
         invoiceUrl={selectedInvoiceUrl}
+      />
+      <CancelBookingModal
+        open={Boolean(bookingToCancel)}
+        booking={bookingToCancel}
+        loading={Boolean(bookingToCancel && cancelLoadingId === bookingToCancel.id)}
+        onClose={closeCancelModal}
+        onConfirm={confirmCancel}
       />
     </>
   );

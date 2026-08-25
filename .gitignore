@@ -28,3 +28,8 @@ Thumbs.db
 
 # Deno lockfile from local Edge Function tests (this repo is Node/Vite; Deno is Edge-only)
 deno.lock
+
+public/llms.txt
+
+# Supabase CLI scratch
+supabase/.temp/

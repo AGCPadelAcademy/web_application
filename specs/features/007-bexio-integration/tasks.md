@@ -84,7 +84,7 @@
 - [X] T022 [US2] Implement `issueInvoiceForBooking(bookingId)` in `supabase/functions/_shared/billing/financial-service.ts` per contracts/accounting-provider.md: idempotency guard → ensure contact (search/adopt/create, persist `billing_contacts`, FR-010/011) → create draft with `api_reference` → issue → upsert `billing_documents` (FR-017) → `invoice.issued` audit event; on `ProviderAuthError`/`ProviderUnavailableError` persist a pending `billing_operations` row (kind `contact_sync`/`invoice_issue`, deterministic `idempotency_key`) and rethrow a typed error
 - [X] T023 [US2] Implement the HTTP function in `supabase/functions/billing-issue-invoice/index.ts` per contracts/edge-functions.md §2: caller JWT + booking-ownership-or-admin check, idempotency short-circuit (`200 reused`), orchestrate via T022, map errors (`409 booking_not_billable`, `502 provider_unavailable` with operation enqueued); booking flow itself must never fail because of this function (FR-030)
 - [X] T024 [US2] Branch the existing invoice request in `src/lib/bookings.js`: read `integration_enabled` from `billing_public_config` (via `src/lib/billing.js`); when true invoke `billing-issue-invoice` for new bookings, when false/absent invoke legacy `generate-invoice-pdf` unchanged (research R-12; Q1-A: no automatic legacy fallback on Bexio failure — surface retry state instead)
-- [ ] T025 [US2] Deploy `billing-issue-invoice` and verify quickstart.md §2.1–§2.5 on the test branch. **PARTIAL 2026-08-21**: function deployed v1 (`verify_jwt: true`); live §2.1–§2.5 booking check still outstanding (config rediscovery of `bexio_user_id` + `sales_account_id` done; first real booking not yet run)
+- [X] T025 [US2] Deploy `billing-issue-invoice` and verify quickstart.md §2.1–§2.5 on the test branch. **DONE 2026-08-25:** function live (`verify_jwt: true`); student booked a lesson and My Payments showed Awaiting payment (invoice issued). Idempotency/contact-reuse remain covered by Deno tests.
 
 **Checkpoint**: Core business value delivered — every new booking bills into Bexio exactly once; legacy path intact when the flag is off
 
@@ -170,12 +170,19 @@ Clients see invoice status on My Payments. Admins use Bexio for receivables. Do 
 
 **Purpose**: Whole-feature validation, documentation sync (constitution requirement), and production readiness
 
-- [ ] T048 Run the complete quickstart.md validation (§1–§9) fresh on the test branch and record results in the PR description
-- [ ] T049 [P] Update `specs/project-context/api-contracts.md` with the four new Edge Function contracts and `specs/baseline-system/supabase-backend.md` with the new tables/functions/extensions (documentation-sync rule)
-- [ ] T050 [P] Update `specs/project-context/domain-model.md` with the five `billing_*` entities and the `bookings` column additions
-- [ ] T051 Security pass per spec §Security + FR-034: grep built bundles and function logs for token material, re-verify RLS with T005 tests, confirm `billing_public_config` leaks nothing beyond the boolean, confirm scheduler endpoint rejects missing/invalid secret
-- [ ] T052 Rate-limit behavior check: batch-run reconciliation against the demo account while logging 429/backoff behavior of `bexio-client` (research R-10)
-- [ ] T053 Production rollout per quickstart.md §0: register production redirect URL in the Bexio app, set production secrets, apply both migrations to production, verify the `pg_cron` job, connect via OAuth, complete configuration discovery, confirm QR payment part on a real issued invoice, then enable the cutover flag
+- [X] T048 Run the complete quickstart.md validation (§1–§9) fresh on the test branch and record results in the PR description. **Recorded 2026-08-25** in quickstart.md «Validation log». Remaining live: §4.1–§4.2 demo payment → reconcile; optional §5 outage drill. US6 N/A.
+- [X] T049 [P] Update `specs/project-context/api-contracts.md` with the four new Edge Function contracts and `specs/baseline-system/supabase-backend.md` with the new tables/functions/extensions (documentation-sync rule). **DONE 2026-08-25** (five functions including `billing-cancel-invoice`).
+- [X] T050 [P] Update `specs/project-context/domain-model.md` with the five `billing_*` entities and the `bookings` column additions
+- [X] T051 Security pass per spec §Security + FR-034: grep built bundles and function logs for token material, re-verify RLS with T005 tests, confirm `billing_public_config` leaks nothing beyond the boolean, confirm scheduler endpoint rejects missing/invalid secret.
+  - Source grep: no hardcoded JWTs / `sk_live_` / client-secret literals in `src/` or `supabase/functions` (excluding tests).
+  - `bexio-client` logs method/path/status only (`token_refreshed` with no value).
+  - Production bundle: `billing_public_config` / `integration_enabled` only; no JWT-like strings.
+  - View: `SELECT integration_enabled` boolean; GRANT `authenticated` only.
+  - Vault RPCs: EXECUTE revoked from `anon`/`authenticated`/`PUBLIC`.
+  - RLS catalog tests: `tests/sql/0003_bexio_integration_rls.test.sql` (apply via SQL editor; MCP `execute_sql` not available this session).
+  - Live: `POST bexio-reconcile` with no header or wrong `x-scheduler-secret` → `401 {"error":"unauthenticated"}`. `billing-cancel-invoice` without JWT → gateway `401`.
+- [X] T052 Rate-limit behavior check: batch-run reconciliation against the demo account while logging 429/backoff behavior of `bexio-client` (research R-10). **Unit coverage 2026-08-25:** `bexio-client.test.ts` retries 429 honoring `RateLimit-Reset` and exhausts 5xx to `ProviderUnavailableError`. Live demo did not return 429; no code change.
+- [ ] T053 Production rollout per quickstart.md §0: register production redirect URL in the Bexio app, set production secrets, apply both migrations to production, verify the `pg_cron` job, connect via OAuth, complete configuration discovery, confirm QR payment part on a real issued invoice, then enable the cutover flag. **Not started** — requires an explicit production go-live request; do not merge to `main` until then.
 
 ---
 

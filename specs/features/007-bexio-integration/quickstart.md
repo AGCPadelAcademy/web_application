@@ -13,7 +13,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 2. **Bexio company setup** (FR-018 checklist): QR-capable bank account configured; invoice template with QR payment part enabled; automatic invoice numbering on; active sales tax present.
 3. **Supabase secrets** (Edge Function env): `BEXIO_CLIENT_ID`, `BEXIO_CLIENT_SECRET`, `BEXIO_OAUTH_STATE_SECRET`.
 4. **Migration applied**: tables, RLS, view, extensions (`pg_cron`, `pg_net`), cron job — see data-model.md §Migration plan.
-5. **Edge Functions deployed**: `bexio-oauth`, `billing-issue-invoice`, `billing-invoice-document`, `bexio-reconcile`.
+5. **Edge Functions deployed**: `bexio-oauth`, `billing-issue-invoice`, `billing-invoice-document`, `billing-cancel-invoice`, `bexio-reconcile`.
 6. **Test data**: one student account, one admin account, one future lesson slot.
 
 ## 1. Connect (US1)
@@ -86,3 +86,22 @@ Not in 007 (Decision 2026-08-25). Outstanding invoices are followed up in Bexio.
 ## Acceptance mapping
 
 Scenarios 1–9 collectively cover SC-001…SC-010 and the spec's 12 acceptance outcomes; traceability is maintained in `tasks.md` per requirement (FR-001…FR-038).
+
+## Validation log (2026-08-25)
+
+Recorded during 007 implementation on branch `sdd/007-bexio-integration` (T048). Production cutover is T053 and is **not** done.
+
+| Section | Result | Evidence |
+|---|---|---|
+| §0 secrets + OAuth app | Pass | T002/T017 2026-08-21 |
+| §1 Connect | Pass | Live OAuth + config discovery (T017) |
+| §2.1 Book + invoice | Pass | Student booked; My Payments showed Awaiting payment |
+| §2.2–§2.5 Bexio contact reuse / idempotency | Partial | Adapter unit tests pass; live Bexio dashboard contact check not re-run this session |
+| §3 PDF | Pass for owner path | Invoice (PDF) on My Payments; cross-student 403 covered by function auth + tests |
+| §4 Reconciliation payment | Open | Worker deployed; **Run reconciliation now** exists; demo-company payment → AGC confirmed not recorded this session |
+| §5 Failure drills | Unit only | Deno tests for enqueue/retry/auth errors; live outage drill not run |
+| §6 Legacy fallback | Code | `isBexioBillingEnabled()` fail-safe + `requestInvoice` branch |
+| §7 Unpaid cancel | Pass | Student cancelled unpaid booking; in-app modal (not `window.confirm`); `billing-cancel-invoice` live (401 without JWT, not 404) |
+| §8 US6 | N/A | Deferred — no admin invoice list |
+
+Remaining live checks before T053: register a demo payment (quickstart §4.1–§4.2); optional failure drill §5.

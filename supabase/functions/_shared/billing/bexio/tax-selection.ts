@@ -14,6 +14,9 @@ export interface BexioSalesTax {
   value: number | string;
   name?: string;
   code?: string;
+  digit?: string;
+  display_name?: string;
+  type?: string;
 }
 
 export function isZeroPercentTax(tax: { value: number | string } | null | undefined): boolean {
@@ -22,17 +25,23 @@ export function isZeroPercentTax(tax: { value: number | string } | null | undefi
   return Number.isFinite(n) && n === 0;
 }
 
+function fieldEqualsCode(value: string | undefined, want: string): boolean {
+  const raw = (value ?? '').trim().toUpperCase();
+  if (!raw) return false;
+  return raw === want || raw.split(/[^A-Z0-9]+/).includes(want);
+}
+
 export function taxCodeEquals(
-  tax: { code?: string; name?: string } | null | undefined,
+  tax: { code?: string; name?: string; digit?: string; display_name?: string } | null | undefined,
   code: string,
 ): boolean {
   if (tax == null) return false;
   const want = code.trim().toUpperCase();
   if (!want) return false;
-  if ((tax.code ?? '').trim().toUpperCase() === want) return true;
-  // Bexio sometimes returns i18n keys or display names that embed the code.
-  const name = (tax.name ?? '').toUpperCase();
-  return name === want || name.split(/[^A-Z0-9]+/).includes(want);
+  return fieldEqualsCode(tax.code, want)
+    || fieldEqualsCode(tax.digit, want)
+    || fieldEqualsCode(tax.name, want)
+    || fieldEqualsCode(tax.display_name, want);
 }
 
 export function pickZeroPercentSalesTax<T extends BexioSalesTax>(

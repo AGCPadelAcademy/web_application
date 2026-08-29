@@ -27,6 +27,8 @@ Deno.test('taxCodeEquals matches Bexio code case-insensitively', () => {
   assertEquals(taxCodeEquals(TAX_81, 'VIM'), false);
   assertEquals(taxCodeEquals({ name: 'Code VIM (import)' }, 'VIM'), true);
   assertEquals(taxCodeEquals({ name: 'VIMxxx' }, 'VIM'), false);
+  assertEquals(taxCodeEquals({ display_name: 'VIM - Import 0.00%' }, 'VIM'), true);
+  assertEquals(taxCodeEquals({ digit: 'VIM' }, 'VIM'), true);
 });
 
 Deno.test('pickZeroPercentSalesTax prefers 0% over 8.1% and does not use taxes[0]', () => {

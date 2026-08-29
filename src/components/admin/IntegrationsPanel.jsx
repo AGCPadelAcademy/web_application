@@ -247,9 +247,10 @@ const IntegrationsPanel = () => {
                   const isVim = code === 'VIM';
                   const isZero = Number(t.value) === 0;
                   const isSelected = t.id === config.tax_id_sales;
+                  const label = t.display_name || t.name;
                   return (
                     <li key={t.id} className={isVim || isZero || isSelected ? 'text-green-400' : ''}>
-                      {code ? `${code} — ` : ''}{t.name} — {t.value}%
+                      {code ? `${code} — ` : ''}{label} — {t.value}%
                       {isVim && ' (VIM — used on invoices)'}
                       {!isVim && isZero && ' (0% — used on invoices)'}
                       {!isVim && !isZero && isSelected && ' (stored selection)'}

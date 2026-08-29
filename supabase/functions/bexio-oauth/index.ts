@@ -346,9 +346,17 @@ async function handleInitialize(): Promise<Response> {
       value: number;
       name: string;
       code?: string;
+      digit?: string;
       type?: string;
+      display_name?: string;
+      is_active?: boolean;
     };
-    let taxes = await client.request<BexioTaxRow[]>('GET', '/3.0/taxes?scope=active');
+    // Full catalog first (limit 2000). `types=sales_tax` hides VIM
+    // (`pre_tax_material`). Fall back to active-only if the unfiltered call fails.
+    let taxes = await client.request<BexioTaxRow[]>('GET', '/3.0/taxes?limit=2000');
+    if (!Array.isArray(taxes) || taxes.length === 0) {
+      taxes = await client.request<BexioTaxRow[]>('GET', '/3.0/taxes?scope=active');
+    }
     if (!pickPreferredSalesTax(taxes)) {
       const unfiltered = await client.request<BexioTaxRow[]>('GET', '/3.0/taxes').catch(() => []);
       if (unfiltered.length > 0) taxes = unfiltered;
@@ -358,12 +366,22 @@ async function handleInitialize(): Promise<Response> {
       value: t.value,
       name: t.name,
       code: t.code ?? null,
+      digit: t.digit ?? null,
       type: t.type ?? null,
+      display_name: t.display_name ?? null,
+      is_active: t.is_active ?? null,
     }));
     const selected = pickPreferredSalesTax(taxes);
     config.tax_id_sales = selected?.id ?? null;
     config.tax_value_sales = selected?.value ?? null;
     config.tax_code_sales = selected?.code ?? null;
+    log({
+      event: 'tax_selected',
+      tax_id: selected?.id ?? null,
+      tax_code: selected?.code ?? null,
+      tax_type: selected?.type ?? null,
+      catalog_size: taxes.length,
+    });
     if (config.tax_id_sales === null) missing.push('tax_id_sales');
   } catch (err) {
     log({ event: 'discovery_failed', key: 'tax_id_sales', error: (err as Error).name });

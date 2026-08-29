@@ -38,7 +38,7 @@
 
 ### Session 2026-08-29 (production tax code VIM)
 
-- Q: Discover reported missing `tax_id_sales` after selecting by rate 0. Which Bexio tax should lesson invoices use? → A: **Code VIM.** Production `GET /3.0/taxes?types=sales_tax&scope=active` only returns 8.1% (id 14) and 2.6% (id 15). Discovery lists all active taxes and selects `code === 'VIM'`; issuance prefers VIM from `taxes_sales`, then a 0% rate, then the stored id. Never `taxes[0]`.
+- Q: Discover reported missing `tax_id_sales` after selecting by rate 0. Which Bexio tax should lesson invoices use? → A: **Code VIM.** Production `GET /3.0/taxes?types=sales_tax&scope=active` only returns 8.1% (id 14 / UN81) and 2.6% (id 15 / UR26). Live catalog (`GET /3.0/taxes?limit=2000`, 2026-08-29): VIM is id **9**, type `pre_tax_material`, value 0, active, display name `VIM - Import 0.00%`. Discovery lists the full tax catalog (not only `sales_tax`) and selects `code === 'VIM'`; issuance prefers VIM from `taxes_sales`, then a 0% rate, then the stored id. Never `taxes[0]`. Bexio invoice docs say positions normally accept active `sales_tax` only — if issue returns 422, switch to an active sales-side 0% code (UEX id 3 is active; U00 id 8 is the inactive 0% `sales_tax`).
 
 ---
 

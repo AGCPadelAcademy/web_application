@@ -10,6 +10,8 @@ import type {
   ExternalContactRef,
   InvoiceInput,
 } from '../accounting-provider.ts';
+import type { BexioSalesTax } from './tax-selection.ts';
+import { resolveSalesTaxId } from './tax-selection.ts';
 
 /** Subset of billing_integrations.config the mappers rely on. */
 export interface BexioConfig {
@@ -19,6 +21,7 @@ export interface BexioConfig {
   payment_type_id: number;
   sales_account_id: number;
   tax_id_sales: number;
+  taxes_sales?: BexioSalesTax[] | null;
   unit_id: number;
   language_id?: number;
   country_id_ch?: number;
@@ -212,7 +215,7 @@ export function invoiceToBexioPayload(input: InvoiceInput, config: BexioConfig):
       amount: String(line.amount),
       unit_id: config.unit_id,
       account_id: config.sales_account_id,
-      tax_id: config.tax_id_sales,
+      tax_id: resolveSalesTaxId(config),
       text: line.text,
       unit_price: line.unitPrice.toFixed(2),
     })),

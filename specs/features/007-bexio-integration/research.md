@@ -54,7 +54,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-06. First-run configuration discovery (Bexio-internal IDs)
 
-- **Decision**: Invoice creation requires Bexio-internal IDs: `user_id`, `currency_id`, `bank_account_id`, `payment_type_id`, per-position `account_id`, `tax_id`, `unit_id`, plus `language_id`, `country_id`, and optional `template_slug`. These are resolved once during a guided "Verify connection / initialize" step and persisted in `billing_integrations.config` (JSONB). Discovery order: (a) `GET /3.0/users/me` → user; (b) list endpoints for currencies (CHF), banking accounts (QR-capable), payment types, active sales taxes (`/3.0/taxes?types=sales_tax&scope=active`), units, languages, countries (Switzerland), document templates; (c) any ID that cannot be discovered with the granted scopes is entered manually by the admin in the integration settings UI, then validated by a test call. Field-shape gotcha verified against live API (2026-08-21): `/3.0/currencies` exposes the ISO 4217 code in the `name` field — there is no `code` field — so CHF matching must use `name === 'CHF'`.
+- **Decision**: Invoice creation requires Bexio-internal IDs: `user_id`, `currency_id`, `bank_account_id`, `payment_type_id`, per-position `account_id`, `tax_id`, `unit_id`, plus `language_id`, `country_id`, and optional `template_slug`. These are resolved once during a guided "Verify connection / initialize" step and persisted in `billing_integrations.config` (JSONB). Discovery order: (a) `GET /3.0/users/me` → user; (b) list endpoints for currencies (CHF), banking accounts (QR-capable), payment types, active sales taxes (`/3.0/taxes?types=sales_tax&scope=active`) **selecting the tax with `value === 0`**, units, languages, countries (Switzerland), document templates; (c) any ID that cannot be discovered with the granted scopes is entered manually by the admin in the integration settings UI, then validated by a test call. Field-shape gotcha verified against live API (2026-08-21): `/3.0/currencies` exposes the ISO 4217 code in the `name` field — there is no `code` field — so CHF matching must use `name === 'CHF'`.
 - **Rationale**: The create-invoice schema marks `user_id` required and positions require `account_id`/`tax_id`/`unit_id`; these IDs are account-specific integers that cannot be hardcoded. Persisting them avoids per-request discovery calls (rate-limit friendly, R-10).
 - **Alternatives considered**: *Hardcoding IDs in environment variables* — rejected: opaque to admins, no validation path, rotation requires redeploy.
 
@@ -112,9 +112,9 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-14. VAT / tax handling
 
-- **Decision**: Positions carry `tax_id` discovered from the Bexio account's **active sales taxes** at setup; invoice-level `mwst_type` and `mwst_is_net=false` (gross prices, matching AGC's CHF lesson pricing). The chosen tax ID and VAT mode live in `billing_integrations.config` and are confirmed with the academy's accountant during go-live (spec FR-018 checklist). Price amounts come exclusively from AGC's `lesson_types.price` (single source of truth).
-- **Rationale**: Swiss VAT rates and the academy's VAT liability are business facts, not code constants; configuration + documented assumption is the honest design (constitution: document assumptions explicitly).
-- **Alternatives considered**: *Hardcoding 8.1 %* — rejected: rate applicability depends on the academy's VAT registration; wrong tax data on legal invoices is a high-severity error.
+- **Decision**: Positions carry `tax_id` of the Bexio **active sales tax with value 0** (go-live 2026-08-29). Invoice-level `mwst_type` 0 and `mwst_is_net=false` (advertised lesson price is the invoice total). Discovery stores the full tax list and selects 0%; issuance prefers 0% from that list even if a previous initialize stored the demo 8.1% id. If no 0% tax exists, `tax_id_sales` is missing and configuration is incomplete. Price amounts come exclusively from AGC's `lesson_types.price`.
+- **Rationale**: The academy's production invoices must not show 8.1% VAT. Selecting by rate (0) rather than `taxes[0]` avoids the demo-company ordering trap; the id is still discovered from Bexio, not hardcoded.
+- **Alternatives considered**: *Using taxes[0]* — rejected 2026-08-29: that was 8.1% on the demo company. *Hardcoding a tax id* — rejected: production ids differ from demo.
 
 ## R-15. Admin UI surface
 
@@ -131,7 +131,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 | Open question: QR-IBAN/QR invoices confirmation | Setup checklist + connection health check verifies `qr_invoice_id` presence on issued invoices | R-06, plan §quickstart |
 | NEEDS CLARIFICATION: scheduling | `pg_cron` + `pg_net` | R-09 |
 | NEEDS CLARIFICATION: token storage | Supabase Vault | R-02 |
-| NEEDS CLARIFICATION: VAT | Config-discovered `tax_id`, accountant-confirmed | R-14 |
+| NEEDS CLARIFICATION: VAT | 0% active sales tax discovered from Bexio (2026-08-29) | R-14 |
 | NEEDS CLARIFICATION: reconciliation cadence | 15 min via cron; manual trigger available | R-09 |
 
 All Technical Context unknowns are resolved. No remaining `NEEDS CLARIFICATION` items.

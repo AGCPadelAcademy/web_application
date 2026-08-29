@@ -13,6 +13,7 @@
 
 import { signState, verifyState } from './state.ts';
 import { BexioClient } from '../_shared/billing/bexio/bexio-client.ts';
+import { pickZeroPercentSalesTax } from '../_shared/billing/bexio/tax-selection.ts';
 import { readSecret, writeSecret, deleteSecret } from '../_shared/billing/vault.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -275,8 +276,8 @@ async function handleInitialize(): Promise<Response> {
   const config: Record<string, unknown> = {
     payment_term_days: 30,
     manual_paid_grace_days: 30,
-    // Gross prices: the advertised lesson price already includes VAT (R-14,
-    // confirmed 2026-08-21). mwst_type 0 = including taxes.
+    // Advertised lesson price is the invoice total (R-14). Go-live VAT is 0%
+    // (clarification 2026-08-29). mwst_type 0 = including taxes.
     mwst_is_net: false,
     mwst_type: 0,
     template_slug: null,
@@ -335,16 +336,17 @@ async function handleInitialize(): Promise<Response> {
   await discover('sales_account_id', '/2.0/accounts', (rows: { id: number; account_no: string; is_active: boolean }[]) =>
     rows.find((r) => r.is_active && /^3/.test(r.account_no))?.id ?? null);
 
-  // Sales taxes: store the full active list; the accountant confirms which one
-  // applies before go-live (spec Clarifications Q2 — no hardcoded default).
+  // Sales taxes: store the full active list; select the 0% rate (go-live
+  // 2026-08-29). Do not default to taxes[0] — that was 8.1% on the demo company.
   try {
     const taxes = await client.request<{ id: number; value: number; name: string }[]>(
       'GET',
       '/3.0/taxes?types=sales_tax&scope=active',
     );
     config.taxes_sales = taxes.map((t) => ({ id: t.id, value: t.value, name: t.name }));
-    config.tax_id_sales = taxes[0]?.id ?? null;
-    config.tax_value_sales = taxes[0]?.value ?? null;
+    const zero = pickZeroPercentSalesTax(taxes);
+    config.tax_id_sales = zero?.id ?? null;
+    config.tax_value_sales = zero?.value ?? null;
     if (config.tax_id_sales === null) missing.push('tax_id_sales');
   } catch (err) {
     log({ event: 'discovery_failed', key: 'tax_id_sales', error: (err as Error).name });

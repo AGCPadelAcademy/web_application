@@ -2,7 +2,7 @@
 
 **Feature Branch**: `007-bexio-integration`
 **Created**: 2026-08-20
-**Status**: Draft — clarifications resolved 2026-08-20 (Q1-A, Q2-A); proof-of-payment removed 2026-08-24; cancellation actor corrected 2026-08-25
+**Status**: Draft — clarifications resolved 2026-08-20 (Q1-A, Q2-A); proof-of-payment removed 2026-08-24; cancellation actor corrected 2026-08-25; go-live VAT set to 0% 2026-08-29
 **Input**: User description: "Integrate Bexio as the external financial and accounting system of the AGC Padel Academy web application. AGC remains the operational system of record (users, bookings, memberships, schedules, pricing, application-level payment state); Bexio becomes the financial/accounting system (accounting contacts, invoices, invoice PDFs, receivables, payment reconciliation, VAT/accounting workflows, financial reporting). No card payments. Preserve existing brownfield behavior."
 
 > **Forward spec.** This document deltas against the brownfield baseline (`specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, `specs/baseline-system/supabase-backend.md`) and the live reverse specs `001`–`006` under `specs/baseline-system/features/`. It does not restate baseline behavior. External-system claims are grounded in the official Bexio API reference (docs.bexio.com, retrieved 2026-08-20) — see §"Verified External Capabilities".
@@ -16,7 +16,7 @@
 ### Session 2026-08-20
 
 - Q: Invoice delivery channel post-cutover — in-app only, Bexio send-by-email, or both? → A: **In-app preview plus automatic email.** After issuance, AGC fetches the Bexio PDF and emails it via Resend (`RESEND_API_KEY`) from `no-reply@agcpadelacademy.com`. Bexio's send-by-email API is not used. Email failure MUST NOT fail the booking or invoice (FR-030).
-- Q: Swiss VAT treatment of lesson prices (registered incl./excl./exempt)? → A: Confirmed 2026-08-21 by the academy: **standard rate 8.1% applies** (demo Bexio company tax id 14; the production id is re-discovered during production `initialize`). Prices are **gross** — the advertised lesson price already includes VAT (`mwst_is_net = false`, matching research R-14 and the legacy invoice behavior). VAT handling stays config-driven; changing the rate or mode later is a `configure` action, not a code change.
+- Q: Swiss VAT treatment of lesson prices (registered incl./excl./exempt)? → A: Demo company used **8.1%** (tax id 14, 2026-08-21). **Superseded 2026-08-29: go-live rate is 0%.** Advertised prices remain the invoice total (`mwst_is_net = false`). Discovery selects the active Bexio sales tax with value 0; issuance uses that id. Production Bexio must have an active 0% sales tax.
 - Q: Does V1 re-issue pre-integration bookings into Bexio (none / admin-triggered / bulk)? → A: No backfill in V1 — pre-integration bookings permanently keep their legacy documents; any future re-issuance requires its own explicitly specified feature.
 - Q: Grace period for the FR-038 "proof approved but no Bexio payment" discrepancy flag? → A: **Superseded 2026-08-24.** Proof-of-payment is removed; this grace period no longer applies.
 
@@ -31,6 +31,10 @@
   - **Membership** (future spec): a recurring subscription (like Netflix/Spotify). After purchase it will auto-issue invoices; the client may pay by QR each month or by domiciliation. Not in 007 V1.
   - **Lesson** (this purchase flow): today a lesson booking produces one invoice. The **client** may cancel an **unpaid** lesson booking from My Payments, which cancels the Bexio invoice. **Paid** lesson cancellation and membership-token consumption rules are a later spec — not invented here.
 - Q: Does 007 build an admin “who owes money?” invoice list (US6)? → A: **No.** Clients see their own invoice status. Receivables and accounting stay in Bexio. Admin AGC surfaces stay connection + worker health.
+
+### Session 2026-08-29 (go-live VAT)
+
+- Q: What VAT rate must lesson invoices use in production? → A: **0%.** Do not use the demo-company 8.1% tax. `initialize` selects the active sales tax whose `value` is 0; invoice positions use that `tax_id`. If no 0% tax exists, configuration is incomplete until one is created in Bexio and discovery is re-run.
 
 ---
 
@@ -324,7 +328,7 @@ Required by the brownfield workflow (AGENTS.md / brownfield rules). No unrelated
 
 - Exact `kb_item_status_id` ↔ AGC sync-state mapping; whether to derive "paid" from status or from received/remaining totals (lean: totals, per FR-023).
 - ~~Whether Bexio's `send`-by-email should be used for invoice delivery, or AGC keeps surfacing documents in-app only~~ — resolved 2026-08-20 as in-app only; **revised 2026-08-24 (morning)**: in-app preview and AGC/Resend email; **revised 2026-08-24 (evening)**: Bexio send-by-email; **revised 2026-08-24 (night)**: in-app preview and AGC/Resend email from `no-reply@agcpadelacademy.com` (Bexio send abandoned: no academy mailbox for sender confirmation).
-- ~~VAT treatment of lesson prices (VAT-registered status, inclusive/exclusive pricing)~~ — clarified 2026-08-20 as accountant-owned, then **confirmed 2026-08-21: standard rate 8.1%, advertised prices are gross (VAT-included, `mwst_is_net = false`)**. Implementation keeps VAT/tax fully configuration-driven; FR-018 go-live prerequisite is satisfied once the same rate is confirmed in the production Bexio company.
+- ~~VAT treatment of lesson prices (VAT-registered status, inclusive/exclusive pricing)~~ — clarified 2026-08-20 as accountant-owned; demo company **8.1%** on 2026-08-21; **go-live 2026-08-29: 0%**, advertised prices are the invoice total (`mwst_is_net = false`). FR-018 is satisfied when production Bexio has an active 0% sales tax and discovery selects it.
 - Whether the unverified April-2026 third-party claim of a Bexio webhook-registration UI reflects a real, supported product feature (re-check official sources at planning; polling remains the designed mechanism regardless).
 - ~~Whether the legacy static per-amount QR files in the `qr-codes` bucket remain needed post-cutover~~ — resolved by Q1-A: not needed for new transactions (they are inputs to the legacy generator only); the bucket is retained for historical continuity.
 - ~~Grace period and detection rule for the "proof approved but no matching Bexio payment" discrepancy flag (FR-038)~~ — **superseded 2026-08-24**: proof-of-payment removed; FR-038 now covers cancelled-invoice payments and overpayments only.

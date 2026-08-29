@@ -30,7 +30,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 | Step | Action | Expected |
 |---|---|---|
 | 2.1 | As student, book a lesson with "receipt by email" | Booking created; response shows Bexio `document_nr`; **no** legacy PDF email |
-| 2.2 | In Bexio dashboard | New contact (person, student's name/email); issued invoice with QR payment part, line item text naming the lesson/date, correct CHF total and VAT |
+| 2.2 | In Bexio dashboard | New contact (person, student's name/email); issued invoice with QR payment part, line item text naming the lesson/date, correct CHF total and **0% VAT** |
 | 2.3 | In DB: `billing_contacts`, `billing_documents` | One row each; `api_reference = 'agc:booking:<id>'`; status `issued` |
 | 2.4 | Repeat the booking call with the same `idempotency_key` (or re-trigger) | `reused: true`; **no** second invoice in Bexio |
 | 2.5 | Book again as the same student | Same Bexio contact reused (no duplicate) |

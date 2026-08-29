@@ -337,9 +337,9 @@ async function handleInitialize(): Promise<Response> {
   await discover('sales_account_id', '/2.0/accounts', (rows: { id: number; account_no: string; is_active: boolean }[]) =>
     rows.find((r) => r.is_active && /^3/.test(r.account_no))?.id ?? null);
 
-  // Taxes: list all active rates (not only types=sales_tax). Production uses
-  // Bexio code VIM; the sales_tax filter on this company only returns 8.1%/2.6%.
-  // Do not default to taxes[0].
+  // Taxes: list the full catalog (not only types=sales_tax). Production uses
+  // Bexio code UEX (export/exempt 0%). The sales_tax filter only returns
+  // UN81 / UR26. Do not default to taxes[0]. Do not select VIM (import).
   try {
     type BexioTaxRow = {
       id: number;
@@ -351,8 +351,8 @@ async function handleInitialize(): Promise<Response> {
       display_name?: string;
       is_active?: boolean;
     };
-    // Full catalog first (limit 2000). `types=sales_tax` hides VIM
-    // (`pre_tax_material`). Fall back to active-only if the unfiltered call fails.
+    // Full catalog first (limit 2000). `types=sales_tax` hides UEX
+    // (`not_taxable_turnover`). Fall back to active-only if the unfiltered call fails.
     let taxes = await client.request<BexioTaxRow[]>('GET', '/3.0/taxes?limit=2000');
     if (!Array.isArray(taxes) || taxes.length === 0) {
       taxes = await client.request<BexioTaxRow[]>('GET', '/3.0/taxes?scope=active');

@@ -1,13 +1,15 @@
 /**
  * Sales-tax selection for lesson invoices.
  *
- * Production (2026-08-29): Bexio tax code VIM. Discovery must not use
- * taxes[0] (8.1% on the demo/production sales-tax list). The active
- * `sales_tax` filter only returns 8.1% / 2.6% on this company — VIM is
- * a separate Bexio tax code and is selected by `code`, not by rate 0.
+ * Production (2026-08-29): Bexio tax code UEX (export/exempt, 0%).
+ * Discovery must not use taxes[0] (8.1% on the sales-tax list). The
+ * `types=sales_tax` filter only returns UN81 / UR26 on this company —
+ * UEX is `not_taxable_turnover` and is selected by `code`. Do not use
+ * VIM on invoices: it is `pre_tax_material` (import) and Bexio rejects
+ * it on quote/order/invoice positions.
  */
 
-export const PREFERRED_SALES_TAX_CODE = 'VIM';
+export const PREFERRED_SALES_TAX_CODE = 'UEX';
 
 export interface BexioSalesTax {
   id: number;
@@ -51,7 +53,7 @@ export function pickZeroPercentSalesTax<T extends BexioSalesTax>(
   return taxes.find((t) => isZeroPercentTax(t)) ?? null;
 }
 
-/** Prefer Bexio code VIM, then a 0% rate. Never taxes[0]. */
+/** Prefer Bexio code UEX, then a 0% rate. Never taxes[0]. */
 export function pickPreferredSalesTax<T extends BexioSalesTax>(
   taxes: T[] | null | undefined,
 ): T | null {
@@ -60,7 +62,7 @@ export function pickPreferredSalesTax<T extends BexioSalesTax>(
     ?? pickZeroPercentSalesTax(taxes);
 }
 
-/** Invoice `tax_id`: VIM / 0% from the discovered list, else the stored config id. */
+/** Invoice `tax_id`: UEX / 0% from the discovered list, else the stored config id. */
 export function resolveSalesTaxId(config: {
   tax_id_sales: number;
   taxes_sales?: BexioSalesTax[] | null;

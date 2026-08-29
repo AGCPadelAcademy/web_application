@@ -234,7 +234,7 @@ const IntegrationsPanel = () => {
 
           {connected && !state?.config_complete && (
             <p className="text-sm text-yellow-400/90">
-              Run “Discover configuration”. Lesson invoices require Bexio tax code VIM.
+              Run “Discover configuration”. Lesson invoices require Bexio tax code UEX.
             </p>
           )}
 
@@ -244,24 +244,24 @@ const IntegrationsPanel = () => {
               <ul className="list-disc list-inside space-y-0.5">
                 {config.taxes_sales.map((t) => {
                   const code = String(t.code ?? '').toUpperCase();
-                  const isVim = code === 'VIM';
+                  const isUex = code === 'UEX';
                   const isZero = Number(t.value) === 0;
                   const isSelected = t.id === config.tax_id_sales;
                   const label = t.display_name || t.name;
                   return (
-                    <li key={t.id} className={isVim || isZero || isSelected ? 'text-green-400' : ''}>
+                    <li key={t.id} className={isUex || isZero || isSelected ? 'text-green-400' : ''}>
                       {code ? `${code} — ` : ''}{label} — {t.value}%
-                      {isVim && ' (VIM — used on invoices)'}
-                      {!isVim && isZero && ' (0% — used on invoices)'}
-                      {!isVim && !isZero && isSelected && ' (stored selection)'}
+                      {isUex && ' (UEX — used on invoices)'}
+                      {!isUex && isZero && ' (0% — not used; UEX is preferred)'}
+                      {!isUex && !isZero && isSelected && ' (stored selection)'}
                     </li>
                   );
                 })}
               </ul>
-              {!config.taxes_sales.some((t) => String(t.code ?? '').toUpperCase() === 'VIM')
+              {!config.taxes_sales.some((t) => String(t.code ?? '').toUpperCase() === 'UEX')
                 && !config.taxes_sales.some((t) => Number(t.value) === 0) && (
                 <p className="mt-2 text-yellow-400/90">
-                  Bexio tax code VIM was not found. Add or activate it in Bexio, then run Discover
+                  Bexio tax code UEX was not found. Add or activate it in Bexio, then run Discover
                   configuration — 8.1% must not be used on lesson invoices.
                 </p>
               )}

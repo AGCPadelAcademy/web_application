@@ -64,7 +64,7 @@ One row per provider. V1: exactly one row (`provider = 'bexio'`).
 }
 ```
 
-*`status_map` values above are placeholders until discovered at setup (research R-07); `payment_term_days` follows Swiss QR-bill convention and is admin-adjustable. Go-live VAT is **0%** (`tax_id_sales` is the active Bexio sales tax with `value === 0`; research R-14).*
+*`status_map` values above are placeholders until discovered at setup (research R-07); `payment_term_days` follows Swiss QR-bill convention and is admin-adjustable. Go-live VAT uses Bexio tax **code VIM** (`tax_id_sales` discovered from `/3.0/taxes?scope=active`; research R-14).*
 
 **RLS**: `SELECT` for admins (via `is_admin(auth.uid())`, mirroring existing admin policies). No direct `INSERT/UPDATE/DELETE` for any API role — mutations only via service role inside Edge Functions.
 

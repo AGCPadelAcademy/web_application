@@ -112,9 +112,9 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-14. VAT / tax handling
 
-- **Decision**: Positions carry `tax_id` of the Bexio **active sales tax with value 0** (go-live 2026-08-29). Invoice-level `mwst_type` 0 and `mwst_is_net=false` (advertised lesson price is the invoice total). Discovery stores the full tax list and selects 0%; issuance prefers 0% from that list even if a previous initialize stored the demo 8.1% id. If no 0% tax exists, `tax_id_sales` is missing and configuration is incomplete. Price amounts come exclusively from AGC's `lesson_types.price`.
-- **Rationale**: The academy's production invoices must not show 8.1% VAT. Selecting by rate (0) rather than `taxes[0]` avoids the demo-company ordering trap; the id is still discovered from Bexio, not hardcoded.
-- **Alternatives considered**: *Using taxes[0]* — rejected 2026-08-29: that was 8.1% on the demo company. *Hardcoding a tax id* — rejected: production ids differ from demo.
+- **Decision**: Positions carry `tax_id` of Bexio tax **code VIM** (production, 2026-08-29). Invoice-level `mwst_type` 0 and `mwst_is_net=false` (advertised lesson price is the invoice total). Discovery lists **all active taxes** (`/3.0/taxes?scope=active`, not only `types=sales_tax`) and selects `code === 'VIM'`; issuance prefers VIM from that list, then a 0% rate, then the stored id. If VIM (and no 0% fallback) is missing, `tax_id_sales` is incomplete. Price amounts come exclusively from AGC's `lesson_types.price`.
+- **Rationale**: The academy's production invoices must not show 8.1% VAT. The sales-tax-only filter on the production company returns only 8.1% / 2.6%; the accountant-specified code is VIM. Selecting by code (then 0%) rather than `taxes[0]` avoids the demo-company ordering trap; the numeric id is still discovered from Bexio, not hardcoded.
+- **Alternatives considered**: *Using taxes[0]* — rejected 2026-08-29: that was 8.1% on the demo company. *Selecting only value === 0 among sales_tax* — rejected the same day: production has no 0% row in that filter (`tax_id_sales` stayed missing). *Hardcoding a tax id* — rejected: production ids differ from demo.
 
 ## R-15. Admin UI surface
 

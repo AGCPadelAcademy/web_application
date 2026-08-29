@@ -234,29 +234,33 @@ const IntegrationsPanel = () => {
 
           {connected && !state?.config_complete && (
             <p className="text-sm text-yellow-400/90">
-              Run “Discover configuration”. Lesson invoices require an active 0% Bexio sales tax.
+              Run “Discover configuration”. Lesson invoices require Bexio tax code VIM.
             </p>
           )}
 
           {connected && config.taxes_sales?.length > 0 && (
             <div className="text-sm text-gray-400">
-              <p className="mb-1 text-gray-500">Available sales taxes in Bexio:</p>
+              <p className="mb-1 text-gray-500">Available taxes in Bexio:</p>
               <ul className="list-disc list-inside space-y-0.5">
                 {config.taxes_sales.map((t) => {
+                  const code = String(t.code ?? '').toUpperCase();
+                  const isVim = code === 'VIM';
                   const isZero = Number(t.value) === 0;
                   const isSelected = t.id === config.tax_id_sales;
                   return (
-                    <li key={t.id} className={isZero || isSelected ? 'text-green-400' : ''}>
-                      {t.name} — {t.value}%
-                      {isZero && ' (0% — used on invoices)'}
-                      {!isZero && isSelected && ' (stored selection)'}
+                    <li key={t.id} className={isVim || isZero || isSelected ? 'text-green-400' : ''}>
+                      {code ? `${code} — ` : ''}{t.name} — {t.value}%
+                      {isVim && ' (VIM — used on invoices)'}
+                      {!isVim && isZero && ' (0% — used on invoices)'}
+                      {!isVim && !isZero && isSelected && ' (stored selection)'}
                     </li>
                   );
                 })}
               </ul>
-              {!config.taxes_sales.some((t) => Number(t.value) === 0) && (
+              {!config.taxes_sales.some((t) => String(t.code ?? '').toUpperCase() === 'VIM')
+                && !config.taxes_sales.some((t) => Number(t.value) === 0) && (
                 <p className="mt-2 text-yellow-400/90">
-                  No 0% sales tax in this Bexio company. Add one in Bexio, then run Discover
+                  Bexio tax code VIM was not found. Add or activate it in Bexio, then run Discover
                   configuration — 8.1% must not be used on lesson invoices.
                 </p>
               )}

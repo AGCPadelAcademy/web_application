@@ -145,6 +145,20 @@ Deno.test('invoiceToBexioPayload: KbPositionCustom with config IDs, gross VAT mo
   assertEquals(pos.unit_price, '120.00');
 });
 
+Deno.test('invoiceToBexioPayload prefers Bexio code VIM over a stored 8.1% id', () => {
+  const contact: ExternalContactRef = { externalId: '42' };
+  const input = bookingToInvoiceInput(BOOKING, LESSON, contact, CONFIG, new Date('2026-08-21T12:00:00Z'));
+  const payload = invoiceToBexioPayload(input, {
+    ...CONFIG,
+    tax_id_sales: 14,
+    taxes_sales: [
+      { id: 14, value: 8.1, name: 'MWST 8.1%', code: 'UN81' },
+      { id: 7, value: 0, name: 'Einfuhrsteuerfrei', code: 'VIM' },
+    ],
+  });
+  assertEquals(payload.positions[0].tax_id, 7);
+});
+
 Deno.test('invoiceToBexioPayload prefers 0% sales tax over a stored 8.1% id', () => {
   const contact: ExternalContactRef = { externalId: '42' };
   const input = bookingToInvoiceInput(BOOKING, LESSON, contact, CONFIG, new Date('2026-08-21T12:00:00Z'));

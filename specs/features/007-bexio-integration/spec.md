@@ -36,6 +36,10 @@
 
 - Q: What VAT rate must lesson invoices use in production? → A: **0%.** Do not use the demo-company 8.1% tax. `initialize` selects the active sales tax whose `value` is 0; invoice positions use that `tax_id`. If no 0% tax exists, configuration is incomplete until one is created in Bexio and discovery is re-run.
 
+### Session 2026-08-29 (production tax code VIM)
+
+- Q: Discover reported missing `tax_id_sales` after selecting by rate 0. Which Bexio tax should lesson invoices use? → A: **Code VIM.** Production `GET /3.0/taxes?types=sales_tax&scope=active` only returns 8.1% (id 14) and 2.6% (id 15). Discovery lists all active taxes and selects `code === 'VIM'`; issuance prefers VIM from `taxes_sales`, then a 0% rate, then the stored id. Never `taxes[0]`.
+
 ---
 
 ## User Scenarios & Testing *(mandatory)*

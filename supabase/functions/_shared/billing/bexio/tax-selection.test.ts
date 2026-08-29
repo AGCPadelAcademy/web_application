@@ -36,6 +36,8 @@ Deno.test('taxCodeEquals matches Bexio code case-insensitively', () => {
   assertEquals(taxCodeEquals({ name: 'UEXxxx' }, 'UEX'), false);
   assertEquals(taxCodeEquals({ display_name: 'UEX - Export/Exempt 0.00%' }, 'UEX'), true);
   assertEquals(taxCodeEquals({ digit: 'UEX' }, 'UEX'), true);
+  assertEquals(taxCodeEquals({ code: 'lib.model.tax.ch.sales_export.code' }, 'UEX'), true);
+  assertEquals(taxCodeEquals({ code: 'lib.model.tax.ch.import_tax_mat_exempt.code' }, 'UEX'), false);
 });
 
 Deno.test('pickZeroPercentSalesTax prefers 0% over 8.1% and does not use taxes[0]', () => {

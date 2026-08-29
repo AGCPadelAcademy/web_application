@@ -11,6 +11,15 @@
 
 export const PREFERRED_SALES_TAX_CODE = 'UEX';
 
+/** Bexio often returns i18n keys instead of the short Swiss VAT code. */
+const TAX_CODE_I18N_ALIASES: Record<string, string[]> = {
+  UEX: ['sales_export'],
+  ULA: ['sales_abroad'],
+  UNO: ['sales_not_optimized'],
+  U00: ['sales_0'],
+  VIM: ['import_tax_mat_exempt'],
+};
+
 export interface BexioSalesTax {
   id: number;
   value: number | string;
@@ -40,10 +49,16 @@ export function taxCodeEquals(
   if (tax == null) return false;
   const want = code.trim().toUpperCase();
   if (!want) return false;
-  return fieldEqualsCode(tax.code, want)
+  if (
+    fieldEqualsCode(tax.code, want)
     || fieldEqualsCode(tax.digit, want)
     || fieldEqualsCode(tax.name, want)
-    || fieldEqualsCode(tax.display_name, want);
+    || fieldEqualsCode(tax.display_name, want)
+  ) {
+    return true;
+  }
+  const haystack = `${tax.code ?? ''} ${tax.name ?? ''} ${tax.display_name ?? ''}`.toLowerCase();
+  return (TAX_CODE_I18N_ALIASES[want] ?? []).some((alias) => haystack.includes(alias));
 }
 
 export function pickZeroPercentSalesTax<T extends BexioSalesTax>(

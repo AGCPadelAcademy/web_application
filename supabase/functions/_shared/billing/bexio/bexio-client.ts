@@ -158,6 +158,7 @@ export class BexioClient {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'application/json',
+            'Accept-Language': 'en',
             ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           },
           body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

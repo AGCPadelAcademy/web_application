@@ -131,6 +131,7 @@ REVOKE EXECUTE ON FUNCTION public.prevent_non_admin_coach_assignment() FROM PUBL
 GRANT EXECUTE ON FUNCTION public.prevent_non_admin_coach_assignment() TO authenticated;
 
 -- 6. Drop public profile SELECT (FR-004)
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
 
 -- Keep own-or-admin SELECT (recreate idempotently)

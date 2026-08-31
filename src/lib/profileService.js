@@ -9,6 +9,7 @@ function splitFullName(fullName) {
 }
 
 // Editable billing fields — `email` is managed by Supabase Auth and never written here.
+// F1.02: `role` is intentionally omitted; PostgREST also rejects role changes via trigger.
 export const EDITABLE_PROFILE_FIELDS = [
   'first_name',
   'last_name',

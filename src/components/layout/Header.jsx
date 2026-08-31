@@ -2,7 +2,15 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogOut, User, Loader2, Settings, CreditCard, SlidersHorizontal } from 'lucide-react';
+import {
+  LogOut,
+  User,
+  Loader2,
+  Settings,
+  CreditCard,
+  ClipboardList,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,12 +23,13 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 
 const Header = () => {
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut, loading, role } = useAuth();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
+        // Own-row SELECT only — public profiles SELECT was dropped in F1.02.
         const { data, error } = await supabase
           .from('profiles')
           .select('full_name, role')
@@ -99,7 +108,16 @@ const Header = () => {
                 </DropdownMenuItem>
               </Link>
 
-              {profile.role === 'admin' && (
+              {role === 'coach' && (
+                <Link to="/coach/roster">
+                  <DropdownMenuItem className="cursor-pointer focus:bg-gray-800">
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    <span>Session roster</span>
+                  </DropdownMenuItem>
+                </Link>
+              )}
+
+              {role === 'admin' && (
                 <Link to="/admin/integrations">
                   <DropdownMenuItem className="cursor-pointer focus:bg-gray-800">
                     <SlidersHorizontal className="mr-2 h-4 w-4" />

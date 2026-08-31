@@ -16,7 +16,11 @@ Read:
 
 Git workflow:
 - Never implement a feature spec on `main`. Use `sdd/<feature-folder>` (e.g. `sdd/007-bexio-integration`).
-- Create that branch before `/speckit-implement` (or before the first code/migration change). Push the feature branch only; merge to `main` only after verification and an explicit user request.
+- Create that branch before `/speckit-implement` (or before the first code/migration change).
+- Push the feature branch only during specify / plan / tasks / implement.
+- Do **not** open a pull request into `main` until the feature’s implementation and quickstart verification are complete **and** the user asks for a PR. Do not auto-open a draft PR after every push.
+- One commit per completed user-story phase (not per task).
+- Merge to `main` only after verification and an explicit user request.
 
 When documentation is missing:
 - infer from code

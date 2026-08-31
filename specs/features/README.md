@@ -24,6 +24,15 @@ Do not pre-create empty folders. Add a folder when a spec is started.
 
 ---
 
+## New-work specs
+
+| Folder | Capability |
+|---|---|
+| `007-bexio-integration` | Bexio accounting integration |
+| `008-roles-and-permissions` | F1.02 — live Coach + student isolation tightenings (delta vs `006`) |
+
+---
+
 ## Live reverse specs (as-is)
 
 These folders document **already-live** capabilities. Each has `spec.md` only (no `plan.md` / `tasks.md` until a change is approved):
@@ -35,7 +44,7 @@ These folders document **already-live** capabilities. Each has `spec.md` only (n
 | `003-payment-proof-upload` | My Payments + proof upload |
 | `004-admin-payment-verification` | Approve / reject proofs |
 | `005-auth-and-profile-completion` | Signup, session, profile gate |
-| `006-roles-and-permissions` | Live `student` / `admin` matrix |
+| `006-roles-and-permissions` | Live `student` / `admin` / `coach` matrix (F1.02 as-is after `0008`) |
 
 ---
 
@@ -64,7 +73,7 @@ That produces `specs/features/[FEATURE_ID]-[FEATURE_SLUG]/spec.md` only. No prod
 2. **New-work** specs **delta** against `specs/baseline-system/requirements.md` IDs (`FEAT-*`, `WF-*`, `XR-*`, `ACT-*`). Do not copy the baseline into a change spec. **Reverse-engineered** live specs **may** restate observed behavior with local `FR-*` IDs plus a Baseline coverage map — that is the reverse-spec skill.
 3. Mark assumptions (`> **Assumption:**`) and open questions (`> TODO:`). Do not invent APIs, schema, or business rules.
 4. User review gates: spec → plan → tasks → implement. No implementation of non-trivial work without an approved spec and plan.
-5. **Required git branch:** implement each new-work spec on `sdd/<feature-folder>` (matching `specs/features/<feature-folder>/`). Never implement on `main`. Spec Kit does not create this branch — create it from `main` before the first implementation change. Push the feature branch only; merge to `main` after verification via a PR (Vercel preview). Reverse-engineered live specs (`spec.md` only) do not need a branch.
+5. **Required git branch:** implement each new-work spec on `sdd/<feature-folder>` (matching `specs/features/<feature-folder>/`). Never implement on `main`. Spec Kit does not create this branch — create it from up-to-date `origin/main` before the first implementation change. Push the feature branch only. Open a PR into `main` only after quickstart verification **and** an explicit user request (not after every push). One commit per user-story phase. Reverse-engineered live specs (`spec.md` only) do not need a branch.
 6. When the feature ships, update the baseline files it actually changes (`requirements.md`, `domain-model.md`, `api-contracts.md`, inventory, etc.).
 
 ---

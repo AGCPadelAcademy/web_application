@@ -29,7 +29,7 @@ Sources: reverse spec `006`, live RLS/policies inspected 2026-08-24, `supabase/m
 
 ## R-03. Coach roster is a restricted view, not extra `bookings` SELECT
 
-- **Decision**: Coaches do **not** get a general SELECT on other students’ `bookings` rows (those rows include price, payment status, emails). Expose a `session_roster` view with operational columns only: occurrence id, date/time, lesson name, participant display name, assigned coach. View is `SECURITY DEFINER` with `search_path = ''`, gated by `is_coach()` + `coach_id = auth.uid()`, or `is_admin()`.
+- **Decision**: Coaches do **not** get a general SELECT on other students’ `bookings` rows (those rows include price, payment status, emails). Expose a `session_roster` view with operational columns only: occurrence id, date/time, lesson name, participant display name, assigned coach. After Security Advisor hardening, the public view is a SECURITY INVOKER barrier over fixed-output `private.session_roster_rows()` (SECURITY DEFINER, empty `search_path`), gated by `is_coach()` + `coach_id = auth.uid()`, or `is_admin()`.
 - **Rationale**: FR-008 forbids financial/billing records. Postgres RLS is row-level; granting coach SELECT on `bookings` would leak price and payment fields. A column-restricted view is the existing-stack way to hide them.
 - **Alternatives considered**:
   - *Column privileges on `bookings` for `authenticated`* — rejected: would also strip columns from students’ own SELECT.

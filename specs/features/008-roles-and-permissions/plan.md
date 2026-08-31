@@ -46,7 +46,7 @@ Close three student-isolation leaks (public profile SELECT, self-service `profil
 | Tests for changed behavior | Vitest + RLS checklist | PASS |
 | Secrets / PII | No new secrets; roster omits email | PASS |
 
-**Gate result: PASS** — no unresolved clarifications. The `SECURITY DEFINER` roster view is a justified complexity item (column hiding), not a principle waiver.
+**Gate result: PASS** — no unresolved clarifications. After Security Advisor hardening, the public roster is a SECURITY INVOKER barrier view over a fixed-output privileged reader in unexposed `private`.
 
 ### Post-design re-check
 
@@ -97,13 +97,13 @@ tests/sql/
 └── 0008_f102_roles_and_permissions.test.sql  # NEW: RLS/trigger checklist as SQL comments + statements
 ```
 
-**Structure Decision**: Stay on the existing SPA + `supabase/migrations` layout. No `supabase/functions/` work in this feature. Do not modify `007` billing sources (they live on another branch).
+**Structure Decision**: Stay on the existing SPA + `supabase/migrations` layout. No Edge Function work in this feature. Preserve 007 billing sources now merged on `main`.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| `session_roster` `SECURITY DEFINER` view | Hide financial columns while letting a coach see names on assigned rows | Granting coach SELECT on `bookings` leaks price/payment (FR-008). Column GRANT on `authenticated` would strip students’ own columns |
+| `private.session_roster_rows()` SECURITY DEFINER reader behind a public SECURITY INVOKER view | Hide financial columns while letting a coach see names on assigned rows without triggering the public-definer-view advisor | Granting coach SELECT on `bookings` leaks price/payment (FR-008). Column GRANT on `authenticated` would strip students’ own columns |
 
 ## RLS / trigger verification checklist
 

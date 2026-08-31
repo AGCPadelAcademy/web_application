@@ -57,7 +57,7 @@ The student on the occurrence: `bookings.user_id` → `profiles`. Exposed to coa
 | `participant_full_name` | `COALESCE(NULLIF(profiles.full_name, ''), 'Student')` — **not** email |
 | `coach_id` | `bookings.coach_id` |
 
-**Access (view body, `SECURITY DEFINER`, `security_barrier = true`, qualified names, empty `search_path`):**
+**Access:** public `session_roster` is a `SECURITY INVOKER`, `security_barrier = true` view over `private.session_roster_rows()`. The unexposed fixed-output function is `SECURITY DEFINER` with qualified names and empty `search_path`:
 
 - Admin: all occurrences (operational projection).
 - Coach: rows where `coach_id = auth.uid()` AND `is_coach()`.

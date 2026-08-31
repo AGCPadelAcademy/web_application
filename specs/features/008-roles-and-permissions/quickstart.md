@@ -3,7 +3,7 @@
 **Feature**: `specs/features/008-roles-and-permissions/spec.md` | **Date**: 2026-08-24  
 **Artifacts**: [research.md](research.md) · [data-model.md](data-model.md) · [contracts/authorization.md](contracts/authorization.md)
 
-This guide proves the F1.02 **delta** end-to-end. Student booking, admin payment verification, and anonymous occupancy (`006` / `001`–`005`) must still work; this file only adds the isolation and coach-assignment checks.
+This guide proves the F1.02 **delta** end-to-end against the post-007 product. Student booking, Bexio invoice access, Admin integrations, and anonymous occupancy must still work; payment-proof UI remains discarded.
 
 Use a **Supabase test branch or project** (constitution: no shared production DB). Do not run destructive checks against production.
 
@@ -34,7 +34,7 @@ Use a **Supabase test branch or project** (constitution: no shared production DB
 | 1.6 | As A, `PATCH profiles` `{ "role": "admin" }` on self | Rejected; `role` still `student` |
 | 1.7 | As anon, `/lessons` grid | Occupancy via `booking_slots` only; no names (SC-006) |
 | 1.8 | As A, `PATCH`/`UPDATE` B’s `profiles`, `bookings`, or `payment_proofs` | Denied; B unchanged |
-| 1.9 | As D (`accounting`), `GET session_roster`; open `/admin/payment-verification`; `PATCH` own `role` | Empty roster; redirect `/`; role unchanged |
+| 1.9 | As D (`accounting`), `GET session_roster`; open `/admin/integrations`; `PATCH` own `role` | Empty roster; redirect `/`; role unchanged |
 
 ---
 
@@ -55,12 +55,12 @@ Use a **Supabase test branch or project** (constitution: no shared production DB
 
 | Step | Action | Expected |
 |---|---|---|
-| 3.1 | As C, open `/admin/payment-verification` | Redirect `/` |
-| 3.2 | As C, invoke `notify-payment-verification` | 403 |
-| 3.3 | As C, `generate-invoice-pdf` for B’s booking | 403 |
+| 3.1 | As C, open `/admin/integrations` | Redirect `/` |
+| 3.2 | As C, invoke an admin-only `bexio-oauth` action | 403 |
+| 3.3 | As C, request B’s invoice from `billing-invoice-document` | 403 |
 | 3.4 | As C, signed URL for A’s or B’s payment-proof file (unless C personally owns that booking) | Fail |
 
-If `007` billing routes exist in the deployed app: C must not connect Bexio or read another student’s invoice PDF.
+Coach C must not connect Bexio, run reconciliation, or read another student’s invoice PDF.
 
 ---
 
@@ -68,8 +68,8 @@ If `007` billing routes exist in the deployed app: C must not connect Bexio or r
 
 | Step | Action | Expected |
 |---|---|---|
-| 4.1 | Admin payment verification on A or B | Approve/reject still works |
-| 4.2 | Admin assignment tab: assign C to A, clear, assign again | Roster for C follows |
+| 4.1 | Admin opens `/admin/integrations` | Existing 007 Bexio integration UI still works |
+| 4.2 | Coach assignment tab beside Bexio: assign C to A, clear, assign again | Roster for C follows |
 | 4.3 | Admin `GET session_roster` | Sees operational rows (not blocked by assignment) |
 | 4.4 | Admin `GET profiles` for A and C | Succeeds |
 
@@ -80,8 +80,8 @@ If `007` billing routes exist in the deployed app: C must not connect Bexio or r
 | Step | Action | Expected |
 |---|---|---|
 | 5.1 | Student A books a lesson | `001` path unchanged |
-| 5.2 | Student A uploads a proof to `{bookingId}/attempt-n.ext` | Upload + `payment_proofs` insert succeed |
-| 5.3 | Admin verifies that proof | `004` path unchanged |
+| 5.2 | Student A opens their invoice document | Existing 007 owner-only Bexio/legacy document path works |
+| 5.3 | Admin opens Bexio integration status | Existing 007 admin path works |
 
 ---
 

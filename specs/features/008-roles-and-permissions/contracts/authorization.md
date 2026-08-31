@@ -139,7 +139,7 @@ Do **not** add coach as an admin equivalent.
 |---|---|
 | `generate-invoice-pdf` | Owner or `profiles.role = 'admin'` — **unchanged**. Coach who does not own the booking → 403. |
 | `notify-payment-verification` | Admin only — **unchanged**. Coach → 403 (SC-004). |
-| `007` billing functions (when that spec is on `main`) | Stay admin-only / owner-or-admin as specified there. This feature does not grant coaches billing access. |
+| `007` billing functions | Stay admin-only / owner-or-admin as specified there. This feature does not grant coaches billing access. |
 
 Dashboard-only functions not in this repo stay untouched.
 
@@ -152,13 +152,14 @@ Dashboard-only functions not in this repo stay untouched.
 | Path | Guard | Who renders |
 |---|---|---|
 | `/profile`, `/payments` | authenticated | unchanged |
-| `/admin` | redirect | `/admin/payment-verification` unchanged |
-| `/admin/payment-verification` | `requireAdmin` | Admin only (coach → `/`) |
+| `/admin` | redirect | `/admin/integrations` (007) |
+| `/admin/payment-verification` | legacy redirect | `/admin/integrations`; its guard then redirects Coach to `/` |
+| `/admin/integrations` | `requireAdmin` | Admin only (coach → `/`) |
 | `/coach/roster` | `allowedRoles={['coach']}` | Coach; Admin also passes (existing bypass) |
 
 Header: add a roster entry when `role === 'coach'` (Admin may use the admin assignment tab; optional extra roster link is fine because of the admin bypass).
 
-Admin Dashboard: new tab **Coach assignment** (list bookings, set/clear `coach_id` from `profiles` where `role = 'coach'`). Not payment verification. Not a scheduler.
+Admin Dashboard: new tab **Coach assignment** beside 007's **Bexio integration** UI (list bookings, set/clear `coach_id` from `profiles` where `role = 'coach'`). Payment-proof UI remains discarded. This is not a scheduler.
 
 ---
 

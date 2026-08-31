@@ -1,6 +1,7 @@
 # Domain Model — AGC Padel Academy
 
 > Derived from the technical baseline in `specs/baseline-system/supabase-backend.md` (snapshot 2026-06-28, Supabase MCP), **refreshed 2026-08-06** via Supabase MCP for the `profiles.role` column, the `LessonsPage.jsx` catalogue finding, the `users` table deletion, NOT NULL constraint tightening (migration `0002`), and the `bookings.lesson_code` FK migration (migration `0003`). **Refreshed 2026-08-19:** invariant 3 matches live `next_invoice_number`; invariant 2 splits live booking confirmation from intended invoice `paid`.
+> **Refreshed 2026-08-25 (007):** five `billing_*` entities and additive `bookings` payment-confirmation columns. Proof-of-payment is unused by the product UI; Bexio is the financial document of record for new lesson bookings.
 > This document presents the **business/domain view** of the data model: entities, attributes, relationships, and cardinalities. For technical details (RLS policies, row counts, indexes, security findings) refer to the baseline document — **nothing was moved out of it**; the two documents are complementary by design.
 > Convention: ✅ confirmed from schema/code · ⚠️ inferred, marked with TODO.
 
@@ -15,8 +16,13 @@
 | ~~**Legacy User**~~ | ~~`public.users`~~ | **Deleted** | Dropped 2026-08-06 — superseded by `profiles`. |
 | **Lesson** | `public.lessons` | Active — 14 rows | A bookable product in the lesson catalogue (private/group/kids, one-off or subscription). |
 | **Booking** | `public.bookings` | Active — 31 rows | **Pairs a lesson with a client** — a reservation, and the central transactional entity. |
-| **Invoice** | `public.invoices` | Active — 31 rows | The financial document generated for a booking (PDF stored in Storage). |
-| **Payment Proof** | `public.payment_proofs` | Active — 2 rows | A bank-transfer receipt uploaded by the customer, pending admin verification. |
+| **Invoice** | `public.invoices` | Active for **legacy** bookings — 31 rows | Historical AGC-generated PDF (Storage). New bookings after Bexio cutover use `billing_documents` instead. |
+| **Billing integration** | `public.billing_integrations` | Active (007) | Singleton Bexio connection row (status, Vault secret **names**, discovered config). |
+| **Billing contact** | `public.billing_contacts` | Active (007) | AGC user ↔ Bexio accounting contact mapping. |
+| **Billing document** | `public.billing_documents` | Active (007) | Bexio invoice reference for one lesson booking (`issued` / `partially_paid` / `paid` / `cancelled`). |
+| **Billing operation** | `public.billing_operations` | Active (007) | Idempotency + retry queue (`contact_sync`, `invoice_issue`, `invoice_cancel`, `reconcile_check`). |
+| **Billing event** | `public.billing_events` | Active (007) | Append-only sanitized audit log. |
+| **Payment Proof** | `public.payment_proofs` | Table retained — **unused by product UI** (Decision 2026-08-24) | Historical bank-transfer receipts. New paid signal is Bexio reconciliation. |
 | **Notification** | `public.notifications_log` | Active — 0 rows | Audit log of emails/SMS sent about a booking (populated by `notify-payment-verification` v2). |
 | **Trainer Availability** | `public.availability` | Defined, **unused** — 0 rows | A date/time window in which a trainer (a Profile with role `coach`) can teach. |
 | **Credit** | `public.credits` | Defined, **unused** — 0 rows · **retained for future use** | Prepaid token balance a customer can spend on sessions of the **same membership** the tokens were acquired with. |
@@ -42,6 +48,8 @@
 | `email` | text | ⚠️ nullable | Contact email (27 profiles still null — incomplete profiles) |
 | `phone` | text | ⚠️ nullable | Contact phone (20 profiles still null — incomplete profiles) |
 | `address`, `postal_code`, `city`, `country` | text | ⚠️ nullable | Billing address (26 profiles still null — incomplete profiles) |
+| `first_name`, `last_name` | text | ⚠️ nullable | Split name for Bexio person contacts (`name_2` / `name_1`) — 007 |
+| `country_code` | text | ⚠️ nullable | ISO 3166-1 alpha-2 for Bexio `country_id` — 007 |
 | `role` | text | **yes** (NOT NULL, CHECK constraint) | Authorization role. Allowed values: `student`, `coach`, `accounting`, `admin`. Current distribution: `student` (43), `admin` (1). The `coach` role maps to the "trainer" concept referenced by `availability.trainer_id`. |
 | `updated_at` | timestamptz | **yes** (NOT NULL) | Last profile update |
 
@@ -76,23 +84,24 @@ Grouped by concern (full column list in baseline §2 `bookings`):
 - **Scheduling:** `booking_date` (nullable — without_time bookings), `start_time`/`end_time` (nullable — without_time bookings), `time_slot` (⚠️ nullable, redundant text), `requires_scheduling` (NOT NULL, default false), `booking_type` (NOT NULL, default `with_time`), `duration_minutes` (NOT NULL), `group_size` (NOT NULL, default 1)
 - **Lifecycle:** `status` (NOT NULL, default `pending_payment`), `payment_status` (NOT NULL, default `pending`), `verification_status` (NOT NULL, default `pending`) — three overlapping state fields ⚠️
 - **Money:** `amount_paid` (numeric, nullable — set when paid), `payment_date` (nullable — set when paid)
-- **Documents:** `receipt_url` (nullable — set after invoice generation), `proof_uploaded_at` (nullable — set when proof uploaded)
+- **Confirmation attribution (007):** `payment_confirmation_source` (`bexio_reconciliation` \| `manual_proof`), `payment_confirmed_at`
+- **Documents:** `receipt_url` (nullable — legacy Storage PDF); Bexio PDFs are streamed, not stored
 - **Compliance/audit:** `terms_version` (nullable), `ip_address` (nullable), `notes` (nullable)
 - **Audit:** `created_at` / `updated_at` (NOT NULL)
 
 > **TODO — drop orphaned column:** `time_slot_id` (uuid) has no target table and is no longer used. Drop it: `ALTER TABLE bookings DROP COLUMN time_slot_id;` — confirm no Edge Function or frontend code reads it first.
 
-### 2.4 Invoice
+### 2.4 Invoice (legacy AGC PDF)
 
 `id` · `booking_id` (FK) · `invoice_number` (UNIQUE — business key) · `amount` + `currency` · `status` (`pending` | `paid` | `cancelled`) · `pdf_url` (Storage) · `paid_at`
 
-> **TODO — enforce 1:1 with Booking:** the relationship is strictly 1:1 but the schema allows 1:N. Add `ALTER TABLE invoices ADD CONSTRAINT invoices_booking_id_unique UNIQUE (booking_id);`
+> **Post-cutover:** new lesson bookings persist the Bexio invoice on `billing_documents` (see §2.11). Pre-integration bookings keep this table unchanged (no backfill).
 
-### 2.5 Payment Proof
+### 2.5 Payment Proof — unused by product UI
 
 `id` · `booking_id` (FK) · `file_url` (Storage, private bucket) · `verification_status` (`pending` → `approved` | `rejected`) · `admin_notes`
 
-> **Append-only:** all proofs are retained, including re-uploads after rejection. A rejected proof is never replaced — a new row is inserted. Admin verification UI must show proof history per booking, not just the latest.
+> **Decision 2026-08-24:** students do not upload proofs; admins do not approve them. Rows and the bucket MAY remain. Paid = Bexio-recorded payment synchronized by `bexio-reconcile`.
 
 ### 2.6 Notification (log entry)
 
@@ -126,6 +135,26 @@ Grouped by concern (full column list in baseline §2 `bookings`):
 
 > **Soft link to Profile:** when the contact message's email matches a `profiles.email`, the relationship is resolvable at query time. No hard FK (a profile may not exist yet, and emails can change). Contact-message admin views should join to `profiles` on email to surface customer context.
 
+### 2.11 Billing integration (007)
+
+One row per provider (V1: `bexio`). Status: `not_connected` → `connected` → `degraded` / `requires_reauth` / `disconnected`. Holds Vault **names**, granted scopes, and discovered Bexio IDs in `config` JSONB. Never holds token values.
+
+### 2.12 Billing contact (007)
+
+One external accounting contact per AGC user (`user_id` UNIQUE). `external_id` is the Bexio contact id (text). Email snapshot detects drift; the next invoice updates the mapped contact rather than creating a second one.
+
+### 2.13 Billing document (007)
+
+Exactly one Bexio invoice per lesson booking (`booking_id` UNIQUE). `api_reference = 'agc:booking:{uuid}'`. Status: `issued` → `partially_paid` → `paid`, or `issued` → `cancelled`. Totals/currency are snapshots from Bexio. Membership invoices are out of 007.
+
+### 2.14 Billing operation (007)
+
+Retryable work item with a deterministic `idempotency_key`. Kinds: `contact_sync`, `invoice_issue`, `invoice_cancel`, `reconcile_check`. Worker (`bexio-reconcile`) picks `pending` rows with `next_retry_at <= now()`.
+
+### 2.15 Billing event (007)
+
+Append-only audit (`event_type`, optional actor, subjects, sanitized `details` JSONB). Not a domain-event bus.
+
 ---
 
 ## 3. Relationships & Cardinalities
@@ -135,8 +164,12 @@ Grouped by concern (full column list in baseline §2 `bookings`):
 | R1 | User **has** Profile | **1 : 1** | `profiles.id = auth.users.id` (shared PK) | ✅ confirmed |
 | R3 | Profile **places** Booking | **1 : 0..N** | `bookings.user_id` FK | ✅ confirmed |
 | R4 | Lesson **is purchased in** Booking | **1 : 0..N** | `bookings.lesson_code` → `lessons.lesson_code` (FK enforced, migration `0003`) | ✅ confirmed |
-| R5 | Booking **generates** Invoice | **1 : 0..1** (strict) | `invoices.booking_id` FK; strictly 1:1 — a `UNIQUE` constraint on `invoices.booking_id` should be added | ⚠️ constraint not yet enforced |
-| R6 | Booking **is evidenced by** Payment Proof | **1 : 0..N** (history kept) | `payment_proofs.booking_id` FK; all proofs retained, including re-uploads after rejection — append-only, never replace | ✅ confirmed |
+| R5 | Booking **generates** Invoice | **1 : 0..1** (legacy) | `invoices.booking_id` FK for pre-Bexio PDFs | ✅ confirmed |
+| R5b | Booking **is billed as** Billing document | **1 : 0..1** | `billing_documents.booking_id` UNIQUE; Bexio invoice of record after cutover | ✅ confirmed (007) |
+| R6 | Booking **is evidenced by** Payment Proof | **1 : 0..N** (historical) | `payment_proofs.booking_id` FK; **no product UI** after 2026-08-24 | ✅ confirmed |
+| R15 | Profile **maps to** Billing contact | **1 : 0..1** | `billing_contacts.user_id` UNIQUE | ✅ confirmed (007) |
+| R16 | Booking **enqueues** Billing operation | **1 : 0..N** | `billing_operations.booking_id` | ✅ confirmed (007) |
+| R17 | Billing document **is audited by** Billing event | **1 : 0..N** | `billing_events.billing_document_id` | ✅ confirmed (007) |
 | R7 | Booking **triggers** Notification | **1 : 0..N** | `notifications_log.booking_id` FK | ✅ confirmed |
 | R8 | Profile (role=`coach`) **offers** Availability | **1 : 0..N** | `availability.trainer_id` FK → `profiles.id` where `role = 'coach'` | ✅ confirmed structurally |
 | R9 | Profile **holds** Credit | **1 : 0..N** | `credits.user_id` FK; credits are tokens tied to a membership — future `membership_id` FK anticipated | ✅ confirmed structurally |
@@ -156,9 +189,11 @@ Grouped by concern (full column list in baseline §2 `bookings`):
 erDiagram
     PROFILE ||--o{ BOOKING : "places (user_id)"
     LESSON ||--o{ BOOKING : "purchased in (lesson_code, FK enforced)"
-    BOOKING ||--o| INVOICE : "billed by (1:1 strict, UNIQUE pending)"
-    BOOKING ||--o{ PAYMENT_PROOF : "evidenced by (history kept, append-only)"
+    BOOKING ||--o| INVOICE : "legacy PDF (pre-cutover)"
+    BOOKING ||--o| BILLING_DOCUMENT : "Bexio invoice (007)"
+    BOOKING ||--o{ PAYMENT_PROOF : "historical proofs; UI removed"
     BOOKING ||--o{ NOTIFICATION_LOG : "notified via (booking_id)"
+    PROFILE ||--o| BILLING_CONTACT : "maps to Bexio contact"
 
     PROFILE {
         uuid id PK
@@ -196,6 +231,19 @@ erDiagram
         time end_time
         uuid time_slot_id "DEPRECATED, to be dropped"
         text receipt_url
+        text payment_confirmation_source "bexio_reconciliation|manual_proof"
+    }
+    BILLING_DOCUMENT {
+        uuid id PK
+        uuid booking_id UK
+        text document_nr
+        text status "issued|partially_paid|paid|cancelled"
+        numeric total
+    }
+    BILLING_CONTACT {
+        uuid id PK
+        uuid user_id UK
+        text external_id
     }
     INVOICE {
         uuid id PK

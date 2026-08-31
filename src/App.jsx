@@ -63,9 +63,10 @@ function App() {
               }
             />
 
-            <Route path="admin" element={<Navigate to="/admin/payment-verification" replace />} />
+            <Route path="admin" element={<Navigate to="/admin/integrations" replace />} />
+            <Route path="admin/payment-verification" element={<Navigate to="/admin/integrations" replace />} />
             <Route
-              path="admin/payment-verification"
+              path="admin/integrations"
               element={
                 <ProtectedRoute requireAdmin={true}>
                   <AdminDashboard />

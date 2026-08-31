@@ -2,16 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { isProfileComplete, getProfileCompletionStatus } from '@/lib/profileValidation';
 
 const completeProfile = {
-  full_name: 'Jane Doe',
+  first_name: 'Jane',
+  last_name: 'Doe',
   phone: '+41791234567',
   address: 'Rue du Lac 1',
   postal_code: '1000',
   city: 'Lausanne',
-  country: 'Switzerland',
+  country_code: 'CH',
 };
 
 describe('isProfileComplete', () => {
-  it('returns true when all required fields are non-empty strings', () => {
+  it('returns true when all required billing fields are non-empty strings', () => {
     expect(isProfileComplete(completeProfile)).toBe(true);
   });
 
@@ -20,7 +21,7 @@ describe('isProfileComplete', () => {
     expect(isProfileComplete(undefined)).toBe(false);
   });
 
-  it.each(['full_name', 'phone', 'address', 'postal_code', 'city', 'country'])(
+  it.each(['first_name', 'last_name', 'phone', 'address', 'postal_code', 'city', 'country_code'])(
     'returns false when %s is missing',
     (field) => {
       const profile = { ...completeProfile };
@@ -48,10 +49,10 @@ describe('getProfileCompletionStatus', () => {
     const { isComplete, missingFields } = getProfileCompletionStatus({
       ...completeProfile,
       phone: '',
-      country: undefined,
+      country_code: undefined,
     });
     expect(isComplete).toBe(false);
-    expect(missingFields).toEqual(['phone', 'country']);
+    expect(missingFields).toEqual(['phone', 'country_code']);
   });
 
   it('reports ["all"] for a null profile', () => {

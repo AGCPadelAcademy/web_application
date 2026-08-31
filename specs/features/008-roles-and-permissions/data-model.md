@@ -120,10 +120,10 @@ any     --(PostgREST UPDATE)--> REJECTED
 ## What does not change
 
 - Student INSERT/SELECT/UPDATE of **own** bookings (except `coach_id`).
-- `payment_proofs` **table** INSERT/SELECT/UPDATE policies (owner INSERT already live).
+- `payment_proofs` **table** INSERT/SELECT/UPDATE policies (owner INSERT already live). The 007 removal of payment-proof UI is unaffected.
 - `booking_slots` public occupancy (XR-004 / SC-006).
 - `invoices` / `invoice_counters` service-role-only.
-- Admin payment-verification writes (`is_admin()` UPDATE on bookings and proofs).
+- Existing admin/Bexio authorization remains unchanged; Coach gains no billing access.
 
 ---
 

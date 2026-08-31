@@ -15,18 +15,18 @@
 
 ### User Story 1 - Student owns their data (Priority: P1)
 
-A signed-in user with `profiles.role = student` (the default) can create and see their own bookings and proofs, and cannot use admin APIs or other students’ profiles/files.
+A signed-in user with `profiles.role = student` (the default) can create and see their own bookings and invoice documents, and cannot use admin APIs or other students’ profiles/files. Payment-proof UI is dormant after 007, but its table/storage authorization remains enforced.
 
 **Why this priority**: Almost all live users are students.
 
-**Independent Test**: As a student, SELECT own bookings; INSERT own booking; `/admin/payment-verification` redirects home; `GET profiles?id=eq.<other>` is empty; `PATCH role` fails; `generate-invoice-pdf` for another user’s booking returns 403.
+**Independent Test**: As a student, SELECT own bookings; INSERT own booking; `/admin/integrations` redirects home; `GET profiles?id=eq.<other>` is empty; `PATCH role` fails; invoice retrieval for another user’s booking returns 403.
 
 **Acceptance Scenarios**:
 
 1. **Given** a new profile, **When** the row is created, **Then** `role` defaults to `student` and CHECK allows `student|coach|accounting|admin`.
 2. **Given** `bookings.user_id = auth.uid()`, **When** the student SELECTs/INSERTs/UPDATEs bookings (except `coach_id`), **Then** RLS allows those owner operations.
-3. **Given** a student session, **When** `/admin/payment-verification` is requested, **Then** client navigates to `/`.
-4. **Given** a student JWT, **When** `notify-payment-verification` is invoked, **Then** the function returns 403.
+3. **Given** a student session, **When** `/admin/integrations` is requested, **Then** client navigates to `/`.
+4. **Given** a student JWT, **When** an admin-only Bexio action is invoked, **Then** the function returns 403.
 5. **Given** student A, **When** they SELECT student B’s profile, booking, or payment-proof object, **Then** no row / storage deny.
 6. **Given** any PostgREST JWT, **When** they PATCH `profiles.role`, **Then** the trigger refuses and the row is unchanged.
 
@@ -34,16 +34,16 @@ A signed-in user with `profiles.role = student` (the default) can create and see
 
 ### User Story 2 - Admin is unrestricted operationally (Priority: P1)
 
-A user with `profiles.role = admin` can read all bookings/proofs, update any proof/booking for verification, assign coaches, and call admin Edge Functions.
+A user with `profiles.role = admin` can manage the Bexio integration, inspect operational billing records, assign coaches, and call admin Edge Functions.
 
-**Independent Test**: Set role to admin (out-of-band SQL); open `/admin/payment-verification`; approve a proof; set `bookings.coach_id` to a coach profile.
+**Independent Test**: Set role to admin (out-of-band SQL); open `/admin/integrations`; inspect Bexio state; set `bookings.coach_id` to a coach profile.
 
 **Acceptance Scenarios**:
 
 1. **Given** `profiles.role = admin`, **When** `fetchRole` runs, **Then** `useAuth().role` is `admin`.
-2. **Given** admin, **When** `is_admin()` is evaluated in RLS, **Then** SELECT all bookings, SELECT all payment_proofs, UPDATE any booking, UPDATE any payment_proof.
+2. **Given** admin, **When** `is_admin()` is evaluated in RLS, **Then** admin SELECT/UPDATE policies and admin-only billing reads succeed.
 3. **Given** admin JWT, **When** `generate-invoice-pdf` is called for any booking, **Then** ownership-or-admin check passes.
-4. **Given** `ProtectedRoute requireAdmin`, **When** role is admin, **Then** `AdminDashboardPage` renders (Payment Verification + Coach assignment tabs).
+4. **Given** `ProtectedRoute requireAdmin`, **When** role is admin, **Then** `AdminDashboardPage` renders (Bexio integration + Coach assignment tabs).
 5. **Given** admin, **When** they set `coach_id` to a profile with `role = coach`, **Then** the assignment succeeds; setting it to a student fails.
 
 ---
@@ -52,14 +52,14 @@ A user with `profiles.role = admin` can read all bookings/proofs, update any pro
 
 A user with `profiles.role = coach` signs in like any user and sees only operational roster rows for bookings assigned to them.
 
-**Independent Test**: Assign coach C to occurrence A only; C’s `/coach/roster` lists A not B; `/admin/payment-verification` redirects; `notify-payment-verification` is 403.
+**Independent Test**: Assign coach C to occurrence A only; C’s `/coach/roster` lists A not B; `/admin/integrations` redirects; admin-only billing actions return 403.
 
 **Acceptance Scenarios**:
 
 1. **Given** coach C assigned to booking A, **When** they open `/coach/roster` or SELECT `session_roster`, **Then** they see A’s participant name, lesson, date, and time — not price, payment, or email.
 2. **Given** coach C, **When** they SELECT another student’s `bookings` row, **Then** RLS returns no row.
 3. **Given** admin clears `coach_id` on A, **When** C refreshes the roster, **Then** A is gone.
-4. **Given** coach C, **When** they open `/admin/payment-verification`, **Then** the client navigates to `/`.
+4. **Given** coach C, **When** they open `/admin/integrations`, **Then** the client navigates to `/`.
 
 ---
 
@@ -78,7 +78,7 @@ Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking
 
 ### Edge Cases
 
-- `ProtectedRoute` documents that it is **not** a security boundary. `/coach/roster` uses `allowedRoles={['coach']}` (admin still bypasses). `/admin/payment-verification` stays `requireAdmin`.
+- `ProtectedRoute` documents that it is **not** a security boundary. `/coach/roster` uses `allowedRoles={['coach']}` (admin still bypasses). `/admin/integrations` uses `requireAdmin`; the legacy `/admin/payment-verification` path redirects there.
 - `fetchRole` errors default to `student` (fail-closed on the client). Session loading stays true until role is resolved.
 - `accounting` passes the CHECK and is treated as a non-admin authenticated user: no roster rows, no admin UI, role PATCH still denied.
 - Role promotion to coach or admin remains out-of-band SQL.
@@ -92,10 +92,10 @@ Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking
 
 - **FR-001**: Canonical authorization attribute MUST be `profiles.role` with CHECK `student | coach | accounting | admin` and default `student`.
 - **FR-002**: Student ownership of a booking MUST be `bookings.user_id = auth.uid()`.
-- **FR-003**: Admin MUST be `profiles.role = admin`. Client `/admin/payment-verification` uses `ProtectedRoute requireAdmin`. Server uses `is_admin()` and EF role checks. PostgREST MUST NOT change `role` (out-of-band SQL only).
+- **FR-003**: Admin MUST be `profiles.role = admin`. Client `/admin/integrations` uses `ProtectedRoute requireAdmin`. Server uses `is_admin()` and EF role checks. PostgREST MUST NOT change `role` (out-of-band SQL only).
 - **FR-004**: Unauthenticated access to `/profile`, `/payments`, `/admin/*`, `/coach/*` MUST redirect to `/login`. Anon MUST NOT read profile PII.
-- **FR-005**: Non-admin authenticated users MUST be redirected to `/` from `/admin/payment-verification`.
-- **FR-006**: `/admin` MUST redirect to `/admin/payment-verification`.
+- **FR-005**: Non-admin authenticated users MUST be redirected to `/` from `/admin/integrations`.
+- **FR-006**: `/admin` and legacy `/admin/payment-verification` MUST redirect to `/admin/integrations`.
 - **FR-007**: Anonymous PII MUST NOT be readable from `bookings`; public occupancy is `booking_slots` only.
 - **FR-008**: `is_admin()` and `is_coach()` MUST be executable by the roles that evaluate RLS.
 - **FR-009**: The SPA MUST read role via `useAuth().role` (`fetchRole` on session).
@@ -117,9 +117,9 @@ Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: Students cannot read or mutate another user’s profile, bookings, proofs, or proof files, and cannot change `role`.
-- **SC-002**: Admins can complete payment verification and coach assignment without using the student’s account.
+- **SC-002**: Admins can manage Bexio and coach assignment without using the student’s account.
 - **SC-003**: A coach assigned only to occurrence A sees A’s participant on the roster and not occurrence B.
-- **SC-004**: Coaches cannot complete admin payment verification or another student’s invoice.
+- **SC-004**: Coaches cannot manage Bexio or retrieve another student’s invoice.
 - **SC-005**: Anonymous visitors can use `/lessons` without seeing who booked a slot or profile emails.
 - **SC-006**: Removing `ProtectedRoute` would still leave RLS/EF blocking unauthorized writes.
 
@@ -140,14 +140,14 @@ Live matrix (after `0008`):
 | Action | student | admin | coach | accounting | anon |
 |---|---|---|---|---|---|
 | Book lesson / own bookings | yes | yes | own only | own only | no |
-| `/payments` proofs | own | via RLS all | own only | own only | no |
-| `/admin/payment-verification` | redirect `/` | yes | redirect `/` | redirect `/` | `/login` |
+| `/payments` invoices | own | own view + admin APIs | own only | own only | no |
+| `/admin/integrations` | redirect `/` | yes | redirect `/` | redirect `/` | `/login` |
 | `/coach/roster` | redirect `/` | yes (bypass) | assigned roster | redirect `/` | `/login` |
 | `session_roster` | empty | all operational | assigned | empty | none |
 | Change `profiles.role` via PostgREST | no | no | no | no | no |
 | Change `bookings.coach_id` | no | yes (coach target) | no | no | no |
 | `generate-invoice-pdf` | own booking | any | 403 unless own | 403 unless own | 401 |
-| `notify-payment-verification` | 403 | yes | 403 | 403 | 401 |
+| Admin-only Bexio actions | 403 | yes | 403 | 403 | 401 |
 | `booking_slots` | yes | yes | yes | yes | yes |
 | Public `profiles` SELECT | no | own-or-admin | own | own | no |
 
@@ -157,9 +157,9 @@ Live matrix (after `0008`):
 
 ## UI impact
 
-- `ProtectedRoute` on `/profile`, `/payments`, `/admin/payment-verification`, `/coach/roster`.
+- `ProtectedRoute` on `/profile`, `/payments`, `/admin/integrations`, `/coach/roster`.
 - Header: profile, payments, sign out; **Session roster** when `role === 'coach'`. Still no admin Header link.
-- Admin Dashboard: Payment Verification + Coach assignment tabs.
+- Admin Dashboard: Bexio integration + Coach assignment tabs.
 
 ---
 

@@ -6,7 +6,8 @@
 > Refreshed 2026-08-10: five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the `receipts` bucket deleted by the owner. 8 functions remain.
 > Refreshed 2026-08-10 (PM): RLS hardening (migration `0006`) — `booking_slots` non-PII view created; `bookings` public-read policy replaced by owner/admin SELECT policies. Edge Function auth hardened — `generate-invoice-pdf` v21 and `notify-payment-verification` v5 run with `verify_jwt: true` + in-function JWT/authorization checks.
 > Refreshed 2026-08-19: live Edge Function versions are `generate-invoice-pdf` **v22** and `notify-payment-verification` **v6** (explicit JWT); payment-proof storage path is `{booking_id}/attempt-{n}.{ext}`.
-> Refreshed 2026-08-25: F1.02 (`0008_f102_roles_and_permissions`) — `bookings.coach_id`, `is_coach()`, role/assignment triggers, `session_roster` view, dropped public `profiles` SELECT, owner-path `payment-proofs` storage policies. **Apply `0008` on the target project** for the remote schema to match this snapshot.
+> Refreshed 2026-08-25 (007 Bexio): migrations `0003_bexio_integration`, `0004_bexio_reconcile_cron`, `0005_profile_billing_fields` add billing tables, `pg_cron`/`pg_net`, profile name/country_code columns, and five billing Edge Functions. Proof UI removed; Bexio is the paid signal. Full schema: `specs/features/007-bexio-integration/data-model.md`.
+> Refreshed 2026-08-31 (008 F1.02): `bookings.coach_id`, `is_coach()`, role/assignment triggers, `session_roster`, dropped public `profiles` SELECT, and owner-path `payment-proofs` storage policies are live. Exact policy-name hardening is tracked as `f102_drop_public_profiles_policy_exact_name`.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -35,8 +36,10 @@
 | `uuid-ossp` | `extensions` | 1.1 |
 | `pgcrypto` | `extensions` | 1.3 |
 | `supabase_vault` | `vault` | 0.3.1 |
+| `pg_cron` | *(installed 007)* | used by `0004_bexio_reconcile_cron` |
+| `pg_net` | *(installed 007)* | HTTP from cron to `bexio-reconcile` |
 
-All other extensions (PostGIS, vector, pg_cron, pg_net, etc.) are available but **not installed**.
+`pg_cron` and `pg_net` were enabled by migration `0003_bexio_integration` (007). `supabase_vault` was already installed and is used for Bexio token names.
 
 ---
 
@@ -56,6 +59,8 @@ Primary user profile. Linked 1:1 to `auth.users`. Holds the canonical `role` fie
 | `city` | `text` | nullable (26 incomplete profiles) |
 | `country` | `text` | nullable (26 incomplete profiles) |
 | `role` | `text` NOT NULL | default `'student'`, CHECK constraint: `student`, `coach`, `accounting`, `admin`. Current values: `student` (43), `admin` (1). |
+| `first_name` / `last_name` | `text` | nullable — added 007 migration `0005_profile_billing_fields`; mapped to Bexio person `name_2` / `name_1` |
+| `country_code` | `text` | nullable ISO 3166-1 alpha-2 (CHECK `^[A-Z]{2}$`); mapped to Bexio `country_id` |
 | `updated_at` | `timestamptz` NOT NULL | default `now()` |
 
 Referenced by: `bookings`, `availability`, `memberships`, `credits`.
@@ -100,10 +105,12 @@ The legacy `public.users` table (pre-`profiles`, 1 mock row) has been dropped. `
 | `terms_version` | `text` | nullable |
 | `proof_uploaded_at` | `timestamptz` | nullable |
 | `payment_date` | `timestamptz` | nullable |
+| `payment_confirmation_source` | `text` | nullable CHECK `'bexio_reconciliation'` \| `'manual_proof'` — 007 additive |
+| `payment_confirmed_at` | `timestamptz` | nullable — 007 additive |
 | `created_at` / `updated_at` | `timestamptz` NOT NULL | default `now()` |
 | `coach_id` | `uuid` NULL | FK → `profiles.id` ON DELETE SET NULL — F1.02 coach assignment (migration `0008`). Not `availability.trainer_id`. |
 
-Referenced by: `payment_proofs`, `invoices`, `notifications_log`.
+Referenced by: `payment_proofs`, `invoices`, `notifications_log`, `billing_documents`, `billing_operations`.
 
 > **Schema debt:**
 > - `price` is `text` instead of `numeric` — inconsistent with `amount_paid` which is `numeric`.
@@ -348,7 +355,25 @@ erDiagram
     bookings ||--o{ payment_proofs : "booking_id"
     bookings ||--o{ invoices : "booking_id"
     bookings ||--o{ notifications_log : "booking_id"
+    bookings ||--o| billing_documents : "booking_id"
+    profiles ||--o| billing_contacts : "user_id"
 ```
+
+---
+
+#### Billing tables — **ADDED 2026-08-25 (007 migrations `0003`/`0004`)**
+
+Provider-neutral financial mapping. Writes are service-role only (Edge Functions). Full columns and state machines: `specs/features/007-bexio-integration/data-model.md`.
+
+| Table | RLS | SELECT | Writes |
+|---|---|---|---|
+| `billing_integrations` | enabled | admin (`is_admin()`) | service role |
+| `billing_contacts` | enabled | admin | service role |
+| `billing_documents` | enabled | admin **or** booking owner | service role |
+| `billing_operations` | enabled | admin | service role |
+| `billing_events` | enabled | admin | service role |
+
+Vault secret **names** live on `billing_integrations`; values are in `vault.secrets` (`bexio_refresh_token`, `bexio_access_token_cache`, `bexio_scheduler_secret`).
 
 ---
 
@@ -360,22 +385,30 @@ Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `
 #### `session_roster` — **ADDED (migration `0008`, F1.02)**
 Operational roster projection over `bookings` ⨝ `profiles`: `booking_id`, `booking_date`, `start_time`, `end_time`, `lesson_name`, `participant_full_name`, `coach_id` (no price, payment, email, or proof columns). `SECURITY DEFINER` / `security_barrier`; rows where `is_admin()` or (`is_coach()` and `coach_id = auth.uid()`). GRANT SELECT to `authenticated`; REVOKE `anon`. Consumers: `src/lib/sessionRoster.js`, `/coach/roster`.
 
+#### `billing_public_config` — **ADDED 2026-08-25 (007 migration `0003`)**
+One boolean: `integration_enabled` (true when a `billing_integrations` row for `bexio` is `connected` or `degraded`). Granted SELECT to `authenticated`. Powers the frontend invoice cutover. Does not expose tokens, config IDs, or status strings.
+
 ---
 
 ## 3. Edge Functions
 
-8 functions are **ACTIVE** (reconciled with the live project 2026-08-10). Since 2026-08-10 (PM), `generate-invoice-pdf` and `notify-payment-verification` run with **`verify_jwt: true`** at the gateway plus in-function JWT verification and authorization checks; the other 6 still run with `verify_jwt: false` (trust enforced inside each function, or not at all). Full request/response contracts: `specs/project-context/api-contracts.md §1`.
+13 functions are **ACTIVE** (8 pre-007 helpers + 5 Bexio billing functions, 2026-08-25). JWT at the gateway: `generate-invoice-pdf`, `notify-payment-verification`, `billing-issue-invoice`, `billing-invoice-document`, `billing-cancel-invoice` use `verify_jwt: true`. `bexio-oauth` and `bexio-reconcile` use `verify_jwt: false` with in-function auth (admin JWT / signed OAuth `state` / `x-scheduler-secret`). Full billing contracts: `specs/features/007-bexio-integration/contracts/edge-functions.md`.
 
 | Function | Version | Purpose | Status |
 |---|---|---|---|
-| `generate-invoice-pdf` | v22 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — main invoice generator** (called via `src/lib/bookings.js` from `LessonsPage.jsx` and `PaymentsPage.jsx`). Auth: caller JWT + booking ownership (or admin). |
+| `generate-invoice-pdf` | v22 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — legacy generator** when Bexio is disconnected. Auth: caller JWT + booking ownership (or admin). |
 | `submit-contact-form` | v13+ | Persist contact message + trainer/customer emails | **Active** (called by `ContactPage.jsx`) |
-| `notify-payment-verification` | v6 | Email customer on proof approval/rejection; audits to `notifications_log` | **Active** (called by `PaymentVerificationPanel.jsx`). Auth: caller JWT + admin role. |
-| `cleanup-pending-bookings` | v15+ | Time-based auto-cancel of pending bookings | **Dormant — do NOT schedule.** Rejected approach; to be replaced by an explicit cancel-reservation flow (decision 2026-08-07). |
+| `notify-payment-verification` | v6 | Email customer on proof approval/rejection; audits to `notifications_log` | **Dormant** — proof UI removed 2026-08-24; no `src/` caller. Auth: caller JWT + admin role. |
+| `cleanup-pending-bookings` | v15+ | Time-based auto-cancel of pending bookings | **Dormant — do NOT schedule.** Rejected approach; unpaid cancel is explicit on My Payments (007 US5). |
 | `upload-invoice-to-storage` | v2+ | Verify invoice PDF in storage, set status | Active, no frontend caller. To become the flag-driven invoice status-transition helper (future spec). |
 | `merge-invoice-qr` | v1+ | Merge QR page into a base64 invoice PDF | Active, no frontend caller (QR merge now inline in `generate-invoice-pdf`) |
 | `verify-invoice-generation` | v1+ | Scan generated PDF for unresolved placeholders | Active — QA/debug utility |
 | `upload-logo-once` | v1+ | One-off upload of `assets/logo.png` to `invoices` bucket | Active — setup helper |
+| `bexio-oauth` | in-repo | Bexio OAuth connect / status / disconnect / initialize | **Active** (`IntegrationsPanel.jsx`). `verify_jwt` off; admin JWT or signed callback `state`. |
+| `billing-issue-invoice` | in-repo | Contact sync + issue one Bexio invoice per booking | **Active** (`src/lib/bookings.js` when integration enabled). `verify_jwt` on. |
+| `billing-invoice-document` | in-repo | Stream Bexio PDF for owner/admin | **Active** (`InvoicePreviewModal` / `billing.js`). `verify_jwt` on. |
+| `billing-cancel-invoice` | in-repo | Cancel unpaid issued invoice + booking | **Active** (`PaymentsPage.jsx`). `verify_jwt` on. |
+| `bexio-reconcile` | in-repo | Payment sync + retry queue | **Active** (`pg_cron` every 15 min + admin Run now). `verify_jwt` off; scheduler secret or admin JWT. |
 
 > **Deleted 2026-08-10** (by owner, via dashboard/CLI): `create-booking` (Stripe), `handle-stripe-webhook` (Stripe), `verify-booking-saved` (validated the dropped Stripe column), `generate-booking-receipt` and `assign-booking-time` (verified unused — no callers, no invocations, broken source bundles). Earlier snapshots also listed `create-booking-with-invoice` and `generate-invoice-pdf-v2`, which no longer exist.
 >
@@ -426,6 +459,12 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`).
 | `notifications_log` | Service Role Full Access | service_role | ALL | `true` |
 | `invoices` | *(none)* | — | — | **No policies — client reads blocked; writes are service-role only** |
 | `invoice_counters` | *(none)* | — | — | **No policies — service-role only (intended)** |
+| `billing_integrations` | Admins can read billing integrations | authenticated | SELECT | `is_admin()` (007) |
+| `billing_contacts` | Admins can read billing contacts | authenticated | SELECT | `is_admin()` (007) |
+| `billing_documents` | Admins and owners can read billing documents | authenticated | SELECT | `is_admin()` OR owner via `bookings.user_id` (007) |
+| `billing_operations` | Admins can read billing operations | authenticated | SELECT | `is_admin()` (007) |
+| `billing_events` | Admins can read billing events | authenticated | SELECT | `is_admin()` (007) |
+| `billing_public_config` (view) | *(view grant)* | authenticated | SELECT | boolean `integration_enabled` only (007) |
 
 > Dropped 2026-08-07 (migration `0004`): `profiles` policies "Users can update own stripe_customer_id" / "Users can view their own stripe_customer_id" (Stripe-era duplicates).
 >
@@ -476,6 +515,7 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 - **Role system:** Canonical store is `public.profiles.role` (`student`, `coach`, `accounting`, `admin`; default `student`). Helpers: `is_admin()`, `is_coach()` (GRANT EXECUTE to `authenticated`). Live actors after F1.02: student, admin, coach (assigned-session roster). `accounting` remains unused (non-admin, no roster). Role promotion stays out-of-band SQL (`prevent_role_self_service`). JWT custom claims and a `user_roles` table remain rejected. Apply migration `0008` on the target project before treating this as the remote as-is. The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
 - ~~**`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:**~~ **Resolved 2026-08-07** — the `-v2` function no longer exists in the live project; `generate-invoice-pdf` (v18) is the sole canonical generator.
 - ~~**`cleanup-pending-bookings`:**~~ **Resolved 2026-08-07** — no scheduler exists and none should be added; time-based auto-cancellation is rejected. To be replaced by an explicit cancel-reservation flow (customer/admin/coach), spec'd as a future feature.
-- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10.
+- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10. 007 added `0003_bexio_integration`, `0004_bexio_reconcile_cron`, `0005_profile_billing_fields` (feature numbering is independent of the earlier 0003–0006 brownfield files in git history — confirm applied names in the live `supabase_migrations` table).
+- **Bexio production cutover (T053):** Preview/test branch is live. Production redirect URL, production secrets, production migrations, and enabling the cutover flag still require an explicit production rollout.
 - **No-file-size or MIME-type restrictions on any Storage bucket:** Any file size / type can be uploaded to `payment-proofs`. Add limits when implementing the payment-proof upload feature spec.
 - **Stripe cleanup:** Edge Functions deleted 2026-08-10; DB artifacts dropped (migration `0004`); Stripe secrets removed from Edge Function secrets 2026-08-10. Last leftover: the webhook endpoint in the Stripe dashboard (Developers → Webhooks, pointing to `…/functions/v1/handle-stripe-webhook`) — delete it there; harmless while it exists (deliveries just fail).

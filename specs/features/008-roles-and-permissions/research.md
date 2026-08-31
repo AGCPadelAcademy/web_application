@@ -89,8 +89,8 @@ Sources: reverse spec `006`, live RLS/policies inspected 2026-08-24, `supabase/m
 
 ## R-10. Minimal admin assignment UI
 
-- **Decision**: New admin tab on the existing Admin Dashboard: list upcoming/recent bookings and set/clear `coach_id` from profiles with `role = 'coach'`. Not a class scheduler. Role promotion to coach stays SQL/out-of-band.
-- **Rationale**: FR-007 requires an administrator to assign; putting it on payment verification would mix financial and operational concerns.
+- **Decision**: New admin tab on the existing Admin Dashboard: list upcoming/recent bookings and set/clear `coach_id` from profiles with `role = 'coach'`. After 007 landed, this tab is composed beside the Bexio integration panel. Not a class scheduler. Role promotion to coach stays SQL/out-of-band.
+- **Rationale**: FR-007 requires an administrator to assign. A separate tab keeps assignment distinct from Bexio configuration while preserving 007's admin surface.
 - **Alternatives considered**: SQL-only assignment — allowed by FR-003 for **roles**, but assignment must be exercisable for SC-003; a small tab is in spec Assumptions.
 
 ---

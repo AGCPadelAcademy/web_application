@@ -9,6 +9,8 @@
 **Input**: F1.02 — three live roles (Admin, Student, Coach); Admin unrestricted; Students only authorized resources; Coaches only participants of sessions assigned to them; reuse existing auth and profile role (no roles table); server-side authorization; preserve brownfield behavior unless these rules change it.
 
 > **Forward spec (delta).** Living as-is after this ships is [`specs/features/006-roles-and-permissions/spec.md`](../006-roles-and-permissions/spec.md) (refreshed 2026-08-25). This file remains the F1.02 change record.
+>
+> **Post-007 integration (2026-08-31):** 007 is now on `main`. Its discarded payment-proof UI remains discarded; F1.02 only keeps the underlying proof storage locked down. The Admin Dashboard composes **Coach assignment** beside **Bexio integration**, and Coach receives no Bexio/admin permissions.
 
 ---
 
@@ -141,5 +143,5 @@ A Coach signs in like any other user. An Admin assigns them to some session occu
 ## Compatibility
 
 - Reverse spec `006` was refreshed 2026-08-25 to this F1.02 as-is. Keep the living matrix in `006`, not a second copy here.
-- Preserve `001`–`007` student and admin journeys except the tightenings in FR-003 and FR-004.
+- Preserve `001`–`007` student and admin journeys except the tightenings in FR-003 and FR-004. In particular, preserve 007's `/admin/integrations`, billing functions, and removal of payment-proof UI.
 - Remote schema matches this spec only after `0008_f102_roles_and_permissions.sql` is applied.

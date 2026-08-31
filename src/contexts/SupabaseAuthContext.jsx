@@ -76,6 +76,9 @@ export const AuthProvider = ({ children }) => {
       setRole('student');
       setProfile(null);
     }
+    // Loading ends only after the role is resolved — otherwise route guards
+    // (ProtectedRoute requireAdmin) evaluate with the initial 'student' role
+    // and bounce admins on a fresh page load.
     setLoading(false);
   }, []);
 

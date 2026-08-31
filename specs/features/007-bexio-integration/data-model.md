@@ -6,7 +6,7 @@
 ## Design rules (from constitution + spec §Data Model)
 
 1. All new tables are **provider-neutral** (`provider` column carries `'bexio'`) — no Bexio-specific column names (FR-013).
-2. Existing tables are **extended, not restructured**: only additive columns on `bookings`; `invoices`, `payments`, `payment_proofs` untouched.
+2. Existing tables are **extended, not restructured**: only additive columns on `bookings`; `invoices`, `payments`, `payment_proofs` left in place but unused by the product UI after 2026-08-24.
 3. Every new table ships with RLS enabled and policies in the same migration (constitution §Security; TD-015/TD-016 patterns not repeated).
 4. Secrets never appear in any table — only Vault secret **names** (research R-02).
 
@@ -52,7 +52,8 @@ One row per provider. V1: exactly one row (`provider = 'bexio'`).
   "bank_account_id": 1,
   "payment_type_id": 1,
   "sales_account_id": 3400,
-  "tax_id": 6,
+  "tax_id_sales": 21,
+  "tax_value_sales": 0,
   "unit_id": 1,
   "language_id": 1,
   "country_id": 1,
@@ -63,7 +64,7 @@ One row per provider. V1: exactly one row (`provider = 'bexio'`).
 }
 ```
 
-*`status_map` values above are placeholders until discovered at setup (research R-07); `payment_term_days` follows Swiss QR-bill convention and is admin-adjustable.*
+*`status_map` values above are placeholders until discovered at setup (research R-07); `payment_term_days` follows Swiss QR-bill convention and is admin-adjustable. Go-live VAT is **0%** (`tax_id_sales` is the active Bexio sales tax with `value === 0`; research R-14).*
 
 **RLS**: `SELECT` for admins (via `is_admin(auth.uid())`, mirroring existing admin policies). No direct `INSERT/UPDATE/DELETE` for any API role — mutations only via service role inside Edge Functions.
 
@@ -136,7 +137,7 @@ Append-only audit log (spec §Events/Domain Boundaries — audit record, not a d
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | bigint | PK, generated always as identity | |
-| `event_type` | text | NOT NULL | e.g. `integration.connected`, `contact.linked`, `invoice.issued`, `payment.reconciled`, `payment.manual_confirmed`, `proof.superseded`, `integration.token_refresh_failed`, `operation.retry_exhausted` |
+| `event_type` | text | NOT NULL | e.g. `integration.connected`, `contact.linked`, `invoice.issued`, `payment.reconciled`, `integration.token_refresh_failed`, `operation.retry_exhausted` |
 | `actor_user_id` | uuid | NULL | NULL for system actions (worker) |
 | `booking_id` / `billing_document_id` | uuid | NULL | subjects |
 | `details` | jsonb | NOT NULL, default `'{}'` | sanitized — never tokens/full payloads |
@@ -150,7 +151,7 @@ Append-only audit log (spec §Events/Domain Boundaries — audit record, not a d
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
-| `payment_confirmation_source` | text | NULL, CHECK IN (`'bexio_reconciliation'`, `'manual_proof'`) | FR-033 attribution |
+| `payment_confirmation_source` | text | NULL, CHECK IN (`'bexio_reconciliation'`, `'manual_proof'`) | FR-033 attribution. New confirms use `bexio_reconciliation` only; `manual_proof` may exist on historical rows. |
 | `payment_confirmed_at` | timestamptz | NULL | |
 
 Existing `payment_status` CHECK values (`'pending' | 'confirmed' | 'cancelled'`, per `specs/baseline-system/supabase-backend.md`) are **unchanged** — the integration writes the exact field set the live admin approval writes (`status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`), so downstream consumers (availability view, payments page) see identical semantics (brownfield compatibility; research R-08). Document-level "paid" is tracked on `billing_documents.status`, not on `bookings`.
@@ -204,7 +205,6 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> pending : booking created (payment_status='pending', status='pending_payment')
     pending --> confirmed : reconcile worker (source=bexio_reconciliation)
-    pending --> confirmed : admin approves proof (source=manual_proof)
     confirmed --> confirmed : later confirmations/rejections ignored (guarded UPDATE)
 ```
 

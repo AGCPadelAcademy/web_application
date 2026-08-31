@@ -24,7 +24,7 @@ Close three student-isolation leaks (public profile SELECT, self-service `profil
 
 **Performance Goals**: Roster and assignment queries at academy scale (tens of users/bookings) — indexed `coach_id`, no new chatty round-trips beyond one list fetch.
 
-**Constraints**: Least-privilege RLS (no `true` on user-scoped tables); secrets never in the client; additive migration only; Swiss nDSG for names/emails; do not rebuild `001`–`007` student/admin flows; `availability.trainer_id` is not assignment; `accounting` stays unused; this branch is from `origin/main` (must not mix with `sdd/007-bexio-integration` WIP).
+**Constraints**: Least-privilege RLS (no `true` on user-scoped tables); secrets never in the client; additive migration only; Swiss nDSG for names/emails; do not rebuild `001`–`007` student/admin flows; `availability.trainer_id` is not assignment; `accounting` stays unused. After 007 landed on `main`, the 008 branch was merged forward and its Coach assignment tab was composed with the live Bexio integration dashboard.
 
 **Scale/Scope**: Three live roles; one migration; one coach page; one admin tab; two small lib modules; Header link. No class scheduler, no coach calendar, no billing access for coaches.
 
@@ -86,7 +86,7 @@ src/
 │   └── coachAssignments.test.js          # NEW
 ├── pages/
 │   ├── CoachRosterPage.jsx               # NEW
-│   └── AdminDashboardPage.jsx            # MODIFIED: Coach assignment tab
+│   └── AdminDashboardPage.jsx            # MODIFIED: Coach assignment tab beside 007 Bexio integration
 ├── components/
 │   ├── admin/CoachAssignmentPanel.jsx    # NEW
 │   ├── auth/ProtectedRoute.jsx           # unchanged API; used with allowedRoles

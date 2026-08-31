@@ -6,13 +6,13 @@
 
 ## Summary
 
-Integrate Bexio as the external financial/accounting system so AGC never builds its own accounting ERP. New bookings produce Bexio-issued invoices (document of record, Q1-A) with Swiss QR payment parts; Bexio's bank reconciliation is authoritative for the `paid` state (Q2-A), synchronized into AGC by a scheduled polling worker. Implementation follows the mandated layering `FinancialService → AccountingProvider → BexioAdapter → Bexio API` inside Supabase Edge Functions (new in-repo sources under `supabase/functions/`), persists provider-neutral integration state in five new Postgres tables (+2 additive columns on `bookings`), stores OAuth tokens in Supabase Vault, schedules reconciliation via `pg_cron` + `pg_net` every 15 minutes, and exposes a new admin Integrations page. Legacy invoice generation and the manual proof flow remain intact for pre-integration records and as break-glass paths (brownfield: additive-only migration, flag-driven cutover).
+Integrate Bexio as the external financial/accounting system so AGC never builds its own accounting ERP. New bookings produce Bexio-issued invoices (document of record, Q1-A) with Swiss QR payment parts; Bexio's bank reconciliation is authoritative for the `paid` state, synchronized into AGC by a scheduled polling worker. Implementation follows the mandated layering `FinancialService → AccountingProvider → BexioAdapter → Bexio API` inside Supabase Edge Functions (new in-repo sources under `supabase/functions/`), persists provider-neutral integration state in five new Postgres tables (+2 additive columns on `bookings`), stores OAuth tokens in Supabase Vault, schedules reconciliation via `pg_cron` + `pg_net` every 15 minutes, and exposes a new admin Integrations page. Legacy invoice generation remains for pre-integration records. Proof-of-payment is removed (Decision 2026-08-24).
 
 ## Technical Context
 
 **Language/Version**: TypeScript (Deno, Supabase Edge Functions); React 18 + Vite frontend; PL/pgSQL for migrations.
 
-**Primary Dependencies**: Supabase platform only — Edge Functions, Postgres + RLS, Vault (`supabase_vault`, already installed), `pg_cron` + `pg_net` (newly enabled for scheduling, research R-09). **Zero new runtime npm dependencies**: Bexio calls use Deno's built-in `fetch`; OAuth/PKCE/HMAC use Deno std + Web Crypto. Bexio API v2.0/3.0 + `idp.bexio.com` OAuth 2.0.
+**Primary Dependencies**: Supabase platform only — Edge Functions, Postgres + RLS, Vault (`supabase_vault`, already installed), `pg_cron` + `pg_net` (newly enabled for scheduling, research R-09). **Zero new runtime npm dependencies**: Bexio calls use Deno's built-in `fetch`; OAuth/PKCE/HMAC use Deno std + Web Crypto. Bexio API v2.0/3.0 + `auth.bexio.com/realms/bexio` OAuth 2.0 (new IdP; `idp.bexio.com` decommissioned 2025-03-31).
 
 **Storage**: PostgreSQL — new tables `billing_integrations`, `billing_contacts`, `billing_documents`, `billing_operations`, `billing_events`; additive columns `bookings.payment_confirmation_source`, `bookings.payment_confirmed_at`; view `billing_public_config`; secrets in Vault (`bexio_refresh_token`, `bexio_access_token_cache`, `bexio_scheduler_secret`). No new Storage buckets; PDFs are streamed from Bexio on demand (research R-11).
 
@@ -40,7 +40,7 @@ Integrate Bexio as the external financial/accounting system so AGC never builds 
 | Auth via Supabase Auth + profiles roles | Reuses existing JWT + `is_admin` pattern; OAuth `state` HMAC for the JWT-less callback | PASS |
 | Secrets server-side, never in client | Client id/secret in Edge Function env; tokens in Vault; only secret *names* in tables | PASS |
 | Spec-driven workflow; documentation synced | spec → research → plan → data-model → contracts → quickstart produced; docs under feature dir | PASS |
-| Brownfield: preserve existing behavior, additive changes | Migration is additive-only; legacy generator, `invoices` table/bucket, proof flow untouched; cutover via flag | PASS |
+| Brownfield: preserve existing behavior, additive changes | Migration is additive-only; legacy generator, `invoices` table/bucket retained; proof UI removed 2026-08-24; cutover via flag | PASS |
 | Minimal dependencies / no unjustified additions | No new npm packages; only platform extensions `pg_cron`/`pg_net` enabled (documented, justified R-09) | PASS (justified) |
 | Tests for changed behavior | Deno unit tests for new shared modules + SQL RLS tests + quickstart E2E | PASS |
 

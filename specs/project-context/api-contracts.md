@@ -4,6 +4,7 @@
 > Updated 2026-08-07 (PM): all open contract questions resolved by project owner decisions — see §7. Stripe artifacts removed (migration `0004`), atomic invoice numbering added (migration `0005`), `generate-invoice-pdf` v18 and `notify-payment-verification` v2 deployed.
 > Updated 2026-08-10: the five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the legacy `receipts` storage bucket were **deleted** by the owner. 8 functions remain.
 > Updated 2026-08-10 (PM): **RLS hardening executed** (migration `0006`): `booking_slots` non-PII view created, `bookings` public-read policy replaced by owner/admin SELECT policies, availability grid switched to the view. **Edge Function auth hardened**: `generate-invoice-pdf` v22 and `notify-payment-verification` v6 now run with `verify_jwt: true` (gateway) plus in-function JWT + authorization checks. **Evening fix**: the in-function check must pass the caller JWT **explicitly** (`auth.getUser(token)`) — the implicit global-header variant returns `AuthSessionMissingError` for valid tokens in the pinned `supabase-js@2.39.3` Deno runtime (v21/v5 bug, fixed in v22/v6).
+> Updated 2026-08-25 (007 Bexio polish): five in-repo billing functions added (`bexio-oauth`, `billing-issue-invoice`, `billing-invoice-document`, `billing-cancel-invoice`, `bexio-reconcile`). Proof-upload UI and `PaymentVerificationPanel` were removed; paid state comes from Bexio reconciliation. Full HTTP contracts: `specs/features/007-bexio-integration/contracts/edge-functions.md`.
 > This document presents the **integration surface** of the application: Edge Function endpoints, direct database (PostgREST) calls, Storage operations, Auth flows, and external services. It is the contract layer referenced by future feature specs.
 > Convention: ✅ contract confirmed from source · ⚠️ inferred or unverified, marked with TODO.
 
@@ -23,7 +24,7 @@ graph LR
     FE -- "3. Storage API" --> STOR[(Supabase Storage)]
     FE -- "4. Edge Functions (functions.invoke)" --> EF[Supabase Edge Functions / Deno]
     EF -- "service role key (bypasses RLS)" --> DB
-    EF --> EXT["External APIs (email providers)"]
+    EF --> EXT["External APIs (Bexio, Resend)"]
     AUTH -. "email confirmation / reset" .-> USER["User inbox"]
 ```
 
@@ -32,13 +33,13 @@ graph LR
 - **Storage**: `supabase.storage.from(...)` → Storage API (`/storage/v1/...`).
 - **Edge Functions**: `supabase.functions.invoke('<slug>')` → Deno serverless functions (`/functions/v1/<slug>`).
 
-> Edge Function gateway auth (`verify_jwt`) — state as of 2026-08-10: **`generate-invoice-pdf` and `notify-payment-verification` run with `verify_jwt: true`** (the gateway rejects unauthenticated calls) plus in-function JWT verification and authorization checks (booking ownership / admin role). The remaining 6 functions still run with `verify_jwt: false` — each is responsible for its own auth, and most use the **service role key**, bypassing RLS entirely. Keep this in mind for every contract below: for those, "who may call this" is effectively "anyone who knows the URL + anon key".
+> Edge Function gateway auth (`verify_jwt`) — state as of 2026-08-25: **`generate-invoice-pdf`**, **`notify-payment-verification`**, **`billing-issue-invoice`**, **`billing-invoice-document`**, and **`billing-cancel-invoice`** run with `verify_jwt: true` plus in-function JWT + authorization. **`bexio-oauth`** and **`bexio-reconcile`** run with `verify_jwt: false` because the OAuth callback and `pg_cron` scheduler cannot send a user JWT — each enforces admin JWT, signed `state`, or `x-scheduler-secret` inside the function. Remaining pre-007 helpers still use `verify_jwt: false` and their own (or no) auth.
 
 ---
 
 ## 1. Edge Functions (Custom Server Actions)
 
-8 functions are currently **ACTIVE** (five unused/legacy functions were deleted on 2026-08-10). This section is the current authority; the baseline `supabase-backend.md §3` was reconciled on 2026-08-07 and again on 2026-08-10.
+13 functions are currently **ACTIVE** (8 pre-007 helpers + 5 Bexio billing functions from feature `007-bexio-integration`). This section is the current authority; the baseline `supabase-backend.md §3` was reconciled on 2026-08-07, 2026-08-10, and 2026-08-25.
 
 ### 1.1 Actively used by the frontend
 
@@ -48,7 +49,7 @@ These are invoked from `src/` via `supabase.functions.invoke(...)`.
 
 #### `generate-invoice-pdf` (v22) ✅ confirmed from source
 **Purpose:** generate an invoice PDF (A4, branded, with logo and an appended Swiss QR payment page), store it in the `invoices` bucket, persist/refresh the `invoices` row, and set `bookings.receipt_url`.
-**Invoked from:** `src/lib/bookings.js` (`requestInvoice()`, called by `src/pages/LessonsPage.jsx`).
+**Invoked from:** `src/lib/bookings.js` (`requestInvoice()`), **only when** `billing_public_config.integration_enabled` is false/absent (legacy path). When Bexio is connected, `requestInvoice()` calls `billing-issue-invoice` instead (007 US2). Callers: `src/pages/LessonsPage.jsx`, `src/pages/PaymentsPage.jsx`.
 **Auth (v22, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function verification: the caller's JWT is validated via `auth.getUser(token)` (**explicit token argument required** — the implicit-header variant fails in this supabase-js runtime), and the caller must **own the booking** (`bookings.user_id = auth user`) or have `profiles.role = 'admin'`. ⚠️ Callers must attach the token explicitly (`headers: { Authorization: 'Bearer <session.access_token>' }`): `functions.invoke` does not reliably refresh its captured Authorization header when sign-in happens after client construction (this caused 401s on 2026-08-10 and is why `src/lib/bookings.js` and `PaymentVerificationPanel.jsx` fetch the session before invoking).
 
 **Request** — `POST /functions/v1/generate-invoice-pdf`, body JSON:
@@ -122,9 +123,9 @@ These are invoked from `src/` via `supabase.functions.invoke(...)`.
 
 ---
 
-#### `notify-payment-verification` (v6) ✅ confirmed from source
+#### `notify-payment-verification` (v6) ✅ confirmed from source — **no frontend caller since 2026-08-24**
 **Purpose:** email the customer after an admin approves/rejects their payment proof, and record the outcome in `notifications_log`.
-**Invoked from:** `src/components/admin/PaymentVerificationPanel.jsx:73`.
+**Invoked from:** none. `PaymentVerificationPanel.jsx` was deleted with the proof-of-payment product path (007 US4 / Decision 2026-08-24). Function remains deployed; do not schedule or re-wire without a new spec.
 **Auth (v6, 2026-08-10):** `verify_jwt: true` at the gateway, plus in-function JWT verification (`auth.getUser(token)` with explicit token — same supabase-js@2.39.3 caveat as `generate-invoice-pdf`) and an **admin-only** check (`profiles.role = 'admin'` for the caller). Returns 401 without a valid token, 403 for non-admin callers.
 
 **Request** — body JSON:
@@ -144,6 +145,26 @@ These are invoked from `src/` via `supabase.functions.invoke(...)`.
 - Sends a plain-text email through **SendGrid** (`https://api.sendgrid.com/v3/mail/send`) if `SENDGRID_API_KEY` is set, else **Resend** (`https://api.resend.com/emails`) if `RESEND_API_KEY` is set.
 - From address: `no-reply@agcpadelacademy.com`.
 - **v2 (2026-08-07):** every outcome is now audited in `notifications_log` — `notification_type='email'`, `recipient_type='client'`, `recipient_email`, `message_subject`, `status='sent'|'failed'` (with `error_message`), `sent_at`. A missing API key is logged as `failed` with an explanatory error message. Insert failures are logged to the console but never fail the request.
+
+---
+
+### 1.1a Bexio billing (in-repo, 007) ✅ confirmed from source
+
+Authoritative request/response shapes: `specs/features/007-bexio-integration/contracts/edge-functions.md`. Frontend wrappers: `src/lib/billing.js`. Shared orchestration: `supabase/functions/_shared/billing/`.
+
+| Function | Gateway JWT | Who may call | Purpose |
+|---|---|---|---|
+| `bexio-oauth` | off | admin JWT for `start`/`status`/`disconnect`/`initialize`/`configure`; signed `state` for `callback` | OAuth connect, token Vault storage, config discovery |
+| `billing-issue-invoice` | on | booking owner or admin | One Bexio contact + issued invoice per booking; emails PDF via Resend; never fails the booking |
+| `billing-invoice-document` | on | booking owner or admin | Stream Bexio PDF (`application/pdf` inline); nothing written to Storage |
+| `billing-cancel-invoice` | on | booking owner (admin JWT allowed, no admin UI) | Cancel unpaid issued invoice + AGC booking; 409 if paid |
+| `bexio-reconcile` | off | `x-scheduler-secret` or admin JWT | Poll issued/partial invoices; confirm paid bookings; retry `billing_operations` |
+
+**Frontend cutover:** `isBexioBillingEnabled()` reads `billing_public_config.integration_enabled` (boolean only). True → `issueBexioInvoice`; false → `generate-invoice-pdf`.
+
+**Student cancel:** `PaymentsPage.jsx` → `cancelBooking()` → `billing-cancel-invoice` when Bexio is on.
+
+**Admin integrations:** `IntegrationsPanel.jsx` → `bexio-oauth` + `runBexioReconciliation()`. No invoice-cancel or refund controls.
 
 ---
 
@@ -199,10 +220,8 @@ Profile read/write goes through `src/lib/profileService.js` (single owner of que
 | Operation | Caller | Filter / payload |
 |---|---|---|
 | SELECT (availability, via view) | `src/lib/bookings.js` `fetchDayBookings` (called by `LessonsPage.jsx`) | `.from('booking_slots').select('booking_date, start_time, end_time, payment_status').eq('booking_date', <date>).in('payment_status', ['confirmed','pending'])` |
-| SELECT (own) | `PaymentsPage.jsx:23` | `.select('*').eq('user_id', user.id).order('created_at', desc)` |
+| SELECT (own) | `PaymentsPage.jsx` | `.select('*, billing_documents(status, document_nr)').eq('user_id', user.id).order('created_at', desc)` (falls back to `.select('*')` if the embed is unavailable) |
 | INSERT | `src/lib/bookings.js` `createBooking` (called by `LessonsPage.jsx`) | booking object — see shape below |
-| UPDATE | `PaymentProofUpload.jsx:59` | `{ verification_status:'pending', proof_uploaded_at }` `.eq('id', bookingId)` |
-| UPDATE | `PaymentVerificationPanel.jsx:65` | approval/rejection payload `.eq('id', proof.booking_id)` |
 
 **`booking_slots` view (migration `0006`, 2026-08-10):** exposes only `booking_date, start_time, end_time, payment_status` — no `client_email`/`client_phone`/`notes`/`user_id`. Granted to `anon` + `authenticated`; runs with view-owner rights (deliberately bypasses `bookings` RLS for this non-PII projection). It is the public availability surface.
 
@@ -227,21 +246,14 @@ Profile read/write goes through `src/lib/profileService.js` (single owner of que
 
 > ✅ RESOLVED 2026-08-10 (migration `0006`): the public-read `bookings` SELECT policy was dropped and replaced by `Users can view own bookings` (`auth.uid() = user_id`) and `Admins can view all bookings` (`is_admin()`). Public availability now flows through the non-PII `booking_slots` view, so the grid keeps working for anonymous visitors without exposing PII.
 
-### 2.4 `payment_proofs`
+### 2.4 `payment_proofs` — unused by the product UI (Decision 2026-08-24)
 
-| Operation | Caller | Filter / payload |
-|---|---|---|
-| SELECT (admin, joined) | `PaymentVerificationPanel.jsx:22` | `.select('*, bookings(id, lesson_name, booking_date, price, user_id, profiles(full_name, email))').order('upload_date', desc)` |
-| SELECT (own) | `PaymentsPage.jsx:31` | `.select('*').in('booking_id', <own booking ids>)` |
-| INSERT | `PaymentProofUpload.jsx:50` | `{ booking_id, file_url, verification_status: 'pending' }` |
-| UPDATE | `PaymentVerificationPanel.jsx:50` | `{ verification_status: status, admin_notes }` `.eq('id', proof.id)` |
-
-> **Append-only rule** (per domain model): proofs are never replaced; a re-upload after rejection inserts a new row. The frontend's own-bookings view keeps only the most recent per booking (`PaymentsPage.jsx:37-43`).
+Table and `payment-proofs` bucket remain. There is **no** `supabase.from('payment_proofs')` caller in `src/` after 007 US4. Paid confirmation is Bexio reconciliation only.
 
 ### 2.5 `invoices`
 
-No direct frontend calls — invoices are written exclusively by `generate-invoice-pdf` (service role) and read via the `invoices` Storage bucket public URL stored in `bookings.receipt_url`. RLS is enabled with **zero policies** — client-side reads are blocked (only service role).
-> DECISION 2026-08-07: the admin will get a unified finance view listing invoices **and** payment proofs together in one place — to be implemented in a future feature spec (after the brownfield definition is complete).
+No direct frontend calls — legacy invoices are written by `generate-invoice-pdf` (service role) and read via `bookings.receipt_url`. Post-cutover invoices live in `billing_documents` + Bexio PDF via `billing-invoice-document`. RLS on `invoices` is enabled with **zero policies** — client-side reads are blocked (only service role).
+> DECISION 2026-08-25: 007 does **not** add an admin invoice ledger (US6 deferred). Students see status on My Payments; receivables stay in Bexio.
 
 ### 2.6 `contact_messages`
 
@@ -249,9 +261,16 @@ Write-only from the frontend's perspective — inserts happen inside `submit-con
 
 ### 2.7 Not accessed by the frontend
 
-`availability`, `credits`, `memberships`, `notifications_log`, `invoice_counters` — no `supabase.from()` calls found in `src/`. These tables exist in the schema but are unused by the current UI.
+`availability`, `credits`, `memberships`, `notifications_log`, `invoice_counters`, `billing_integrations`, `billing_contacts`, `billing_operations`, `billing_events` — no `supabase.from()` calls in `src/` (billing writes are service-role inside Edge Functions; admin/student reads of documents go through functions or the `billing_documents` embed on bookings).
 
-> **Semantics clarified 2026-08-07:** `bookings` pairs a lesson with a client (a reservation). `memberships` is where the *actual* session bookings will live in the future, drawing down `credits` (tokens) acquired with the same membership. See `domain-model.md` for the membership/credit model.
+### 2.8 `billing_public_config` (view) + `billing_documents`
+
+| Operation | Caller | Filter / payload |
+|---|---|---|
+| SELECT | `src/lib/billing.js` `isBexioBillingEnabled` | `.from('billing_public_config').select('integration_enabled').maybeSingle()` — boolean only |
+| SELECT (embed) | `PaymentsPage.jsx` | `bookings` select includes `billing_documents(status, document_nr)` for owner rows |
+
+> **Semantics clarified 2026-08-07:** `bookings` pairs a lesson with a client (a reservation). `memberships` is where the *actual* session bookings will live in the future, drawing down `credits` (tokens) acquired with the same membership. See `domain-model.md` for the membership/credit model. Membership billing is **out of 007**.
 
 ---
 
@@ -261,10 +280,9 @@ Write-only from the frontend's perspective — inserts happen inside `submit-con
 
 | Bucket | Public | Operation | Caller | Details |
 |---|---|---|---|---|
-| `payment-proofs` | No | `upload(path, file, {upsert:false})` | `PaymentProofUpload.jsx` | Path: `<booking_id>/attempt-<n>.<ext>` (semantic attempt numbering, 2026-08-12 — `n` = count of existing `payment_proofs` rows for the booking + 1; DB rows are append-only so the file name mirrors the audit trail). `upsert:false` so a name collision fails instead of overwriting. Legacy files keep the old `<booking_id>/<booking_id>_<unix_ms>.<ext>` names — both patterns are valid. |
-| `payment-proofs` | No | `createSignedUrl(file_url, 86400)` | `PaymentVerificationPanel.jsx:94`, `PaymentProofPreview.jsx:14` | 24-hour signed URLs for admins/customers to view proofs |
-| `invoices` | Yes | *(service role)* upload/download | Edge Functions only | `Pending/YYYY/MM/DD/invoice_*.pdf`, `assets/logo.png`. Planned: `Paid/`, `Refused/` prefixes. |
-| `qr-codes` | Yes | *(service role)* download | `generate-invoice-pdf` | `QR_<amount>.pdf` — unchanged, OK as-is per owner |
+| `payment-proofs` | No | *(none in `src/`)* | — | Bucket retained; upload/preview UI removed 2026-08-24. Historical objects may remain. |
+| `invoices` | Yes | *(service role)* upload/download | Edge Functions only (legacy `generate-invoice-pdf`) | `Pending/YYYY/MM/DD/invoice_*.pdf`, `assets/logo.png`. Bexio PDFs are **not** stored here. |
+| `qr-codes` | Yes | *(service role)* download | `generate-invoice-pdf` | `QR_<amount>.pdf` — unused on the Bexio path (QR is on the Bexio PDF). |
 | ~~`receipts`~~ | — | — | — | **Deleted 2026-08-10** (legacy Stripe-era invoice PDFs; verified unreferenced before deletion). |
 
 > TODO: no file-size or MIME-type limits are configured on any bucket — uploads accept anything (any file type/size the browser provides). Add limits in the payment-proof upload feature spec.
@@ -297,7 +315,8 @@ Custom functions in the `public` schema (callable via `/rest/v1/rpc/<name>` when
 | Function | Type | Called by | Contract |
 |---|---|---|---|
 | `next_invoice_number(p_date_key text) → integer` | FUNCTION (SECURITY DEFINER) | `generate-invoice-pdf` v18 | **Added 2026-08-07 (migration `0005`).** Atomically increments and returns the per-day sequence from `invoice_counters` (single-statement upsert = row lock; concurrent calls cannot collide). EXECUTE revoked from `PUBLIC`/`anon`/`authenticated`; granted to `service_role` only. `invoice_counters` has RLS enabled with no policies (service-role-only table). |
-| `is_admin()` | FUNCTION → boolean | RLS policies only (`payment_proofs`, `bookings` admin checks) | Returns whether the current JWT user has `profiles.role = 'admin'`. Not called from the frontend directly. |
+| `is_admin()` | FUNCTION → boolean | RLS policies (`payment_proofs`, `bookings`, `billing_*`) | Returns whether the current JWT user has `profiles.role = 'admin'`. Not called from the frontend directly. |
+| `billing_get_secret` / `billing_put_secret` / `billing_delete_secret` | FUNCTION (SECURITY DEFINER) | Edge Functions via service role | Vault name/value helpers (007 migration `0003`). EXECUTE revoked from `PUBLIC`/`anon`/`authenticated`. |
 | `handle_new_user()` | trigger function | DB trigger on `auth.users` | Creates the `profiles` row on signup. Not an API surface. |
 | `rls_auto_enable` | event trigger | internal | Infrastructure helper. Not an API surface. |
 
@@ -308,8 +327,9 @@ Custom functions in the `public` schema (callable via `/rest/v1/rpc/<name>` when
 | Service | Where used | How | Config / Status |
 |---|---|---|---|
 | ~~**Stripe**~~ | — | — | **REMOVED 2026-08-07.** DB artifacts dropped (migration `0004`), TermsPage copy updated. Pending manual cleanup: `create-booking` + `handle-stripe-webhook` functions, Stripe secrets, Stripe dashboard webhook endpoint (see §1.3). |
-| **SendGrid** | `notify-payment-verification` | `POST https://api.sendgrid.com/v3/mail/send` | `SENDGRID_API_KEY` |
-| **Resend** | `notify-payment-verification` (fallback) | `POST https://api.resend.com/emails` | `RESEND_API_KEY` |
+| **SendGrid** | `notify-payment-verification` | `POST https://api.sendgrid.com/v3/mail/send` | `SENDGRID_API_KEY` — unused by the 007 product path |
+| **Resend** | `billing-issue-invoice` (Bexio PDF email); also fallback in `notify-payment-verification` | `POST https://api.resend.com/emails` | `RESEND_API_KEY`; from `no-reply@agcpadelacademy.com` |
+| **Bexio** | `_shared/billing/bexio/*` via the five billing functions | OAuth at `auth.bexio.com`; REST at `api.bexio.com` | Client id/secret in Edge Function env; refresh/access tokens in Vault only |
 | **Supabase GoTrue admin mailer** | `submit-contact-form` | `POST /auth/v1/admin/send` with service role key | Internal endpoint; relies on project SMTP config. Undocumented/unstable interface. |
 | **DeepL** | none yet | planned runtime i18n | Planned (see `architecture.md §7`). Not implemented. |
 
@@ -370,4 +390,4 @@ RLS is **already enabled on all 10 business tables** plus `invoice_counters`. Li
 
 ## 8. Baseline Reconciliation
 
-`specs/baseline-system/supabase-backend.md §3` previously listed 14 Edge Functions including `create-booking-with-invoice` and `generate-invoice-pdf-v2`, neither of which exists in the live project. The live set is the **8 functions listed in §1 above** (5 unused/legacy functions were deleted on 2026-08-10). The baseline was reconciled on 2026-08-07 and 2026-08-10 (edge functions, storage buckets, RLS policies, dropped Stripe column, `invoice_counters`, `bookings_old` no longer present in the live schema, `booking_slots` view + `bookings` RLS tightening in migration `0006`, Edge Function auth hardening in `generate-invoice-pdf` v22 / `notify-payment-verification` v6).
+`specs/baseline-system/supabase-backend.md §3` previously listed 14 Edge Functions including `create-booking-with-invoice` and `generate-invoice-pdf-v2`, neither of which exists in the live project. After 2026-08-10 cleanup, 8 pre-007 helpers remained. **2026-08-25:** five Bexio billing functions were added in-repo (see §1.1a). The live set is those 8 plus the 5 billing functions. The baseline was also reconciled for `booking_slots`, `bookings` RLS, and `generate-invoice-pdf` / `notify-payment-verification` JWT hardening.

@@ -8,7 +8,10 @@ const { mockSupabase, makeChain } = vi.hoisted(() => {
       eq: vi.fn(() => chain),
       in: vi.fn(() => chain),
       insert: vi.fn(() => chain),
+      update: vi.fn(() => chain),
+      neq: vi.fn(() => chain),
       single: vi.fn(() => chain),
+      maybeSingle: vi.fn(() => chain),
       then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
     };
     return chain;
@@ -32,6 +35,7 @@ import {
   buildBookingPayload,
   createBooking,
   requestInvoice,
+  cancelBooking,
   ACTIVE_BOOKING_STATUSES,
 } from '@/lib/bookings';
 
@@ -144,6 +148,11 @@ describe('createBooking', () => {
 describe('requestInvoice', () => {
   const booking = { id: 'booking-1', booking_date: '2026-08-15', lesson_name: 'Individual Session 60' };
 
+  beforeEach(() => {
+    // Default: cutover flag off → legacy generate-invoice-pdf path (R-12).
+    mockSupabase.from.mockReturnValue(makeChain({ data: { integration_enabled: false }, error: null }));
+  });
+
   it('invokes generate-invoice-pdf with the invoice contract', async () => {
     mockSupabase.functions.invoke.mockResolvedValue({
       data: { success: true, url: 'https://example/inv.pdf', invoice_id: 'inv-1' },
@@ -184,5 +193,65 @@ describe('requestInvoice', () => {
     mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
     await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('signed in');
     expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('uses billing-issue-invoice when the Bexio cutover flag is on (Q1-A)', async () => {
+    mockSupabase.from.mockReturnValue(makeChain({ data: { integration_enabled: true }, error: null }));
+    mockSupabase.functions.invoke.mockResolvedValue({
+      data: { document: { id: 'doc-1', document_nr: 'RE-00001', status: 'issued', total: 60, currency: 'CHF' }, reused: false },
+      error: null,
+    });
+
+    const result = await requestInvoice({ booking, lesson, profile, userId: 'user-1' });
+
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('billing-issue-invoice', {
+      headers: { Authorization: 'Bearer test-token' },
+      body: { booking_id: 'booking-1', idempotency_key: 'booking:booking-1:invoice:v1' },
+    });
+    expect(result.url).toBeNull();
+    expect(result.document.document_nr).toBe('RE-00001');
+  });
+
+  it('surfaces provider_unavailable from the Bexio path (no legacy fallback)', async () => {
+    mockSupabase.from.mockReturnValue(makeChain({ data: { integration_enabled: true }, error: null }));
+    mockSupabase.functions.invoke.mockResolvedValue({
+      data: null,
+      error: { message: 'Edge function returned a non-2xx status code', context: { json: () => Promise.resolve({ error: 'provider_unavailable' }) } },
+    });
+    await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('provider_unavailable');
+  });
+});
+
+describe('cancelBooking', () => {
+  it('updates the booking when Bexio billing is off', async () => {
+    const flagChain = makeChain({ data: { integration_enabled: false }, error: null });
+    const updateChain = makeChain({ data: null, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(flagChain)
+      .mockReturnValueOnce(updateChain);
+
+    const result = await cancelBooking('booking-1');
+
+    expect(mockSupabase.from).toHaveBeenNthCalledWith(2, 'bookings');
+    expect(updateChain.update).toHaveBeenCalledWith({ status: 'cancelled', payment_status: 'cancelled' });
+    expect(updateChain.eq).toHaveBeenCalledWith('id', 'booking-1');
+    expect(result.outcome).toBe('cancelled');
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('invokes billing-cancel-invoice when Bexio billing is on', async () => {
+    mockSupabase.from.mockReturnValue(makeChain({ data: { integration_enabled: true }, error: null }));
+    mockSupabase.functions.invoke.mockResolvedValue({
+      data: { outcome: 'cancelled', reused: false, document: { status: 'cancelled' } },
+      error: null,
+    });
+
+    const result = await cancelBooking('booking-1');
+
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('billing-cancel-invoice', {
+      headers: { Authorization: 'Bearer test-token' },
+      body: { booking_id: 'booking-1', idempotency_key: 'booking:booking-1:invoice_cancel:v1' },
+    });
+    expect(result.outcome).toBe('cancelled');
   });
 });

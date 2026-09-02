@@ -179,6 +179,23 @@ describe('requestInvoice', () => {
     expect(result.url).toBe('https://example/inv.pdf');
   });
 
+  it('defaults invoice_date to today when booking_date is null', async () => {
+    mockSupabase.functions.invoke.mockResolvedValue({
+      data: { success: true, url: 'https://example/inv.pdf', invoice_id: 'inv-1' },
+      error: null,
+    });
+
+    await requestInvoice({
+      booking: { id: 'booking-1', booking_date: null, lesson_name: 'Individual Session 60' },
+      lesson,
+      profile,
+      userId: 'user-1',
+    });
+
+    const body = mockSupabase.functions.invoke.mock.calls[0][1].body;
+    expect(body.invoice_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   it('throws when the function reports failure', async () => {
     mockSupabase.functions.invoke.mockResolvedValue({ data: { success: false, error: 'pdf exploded' }, error: null });
     await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('pdf exploded');

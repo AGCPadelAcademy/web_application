@@ -50,7 +50,7 @@ Trips and tournaments are **not** bookable. There is **no** live cancel-booking 
 
 1. Keep lesson booking, invoicing, and payment verification **working and correct** (this is the live revenue path).
 2. Preserve existing bookings, invoices, and payment-proof history.
-3. Grow via **feature specs**, not a rewrite: memberships/tokens, skill-rank class assignment (calendar/slots go away), cancellation, trips/tournaments as products, OAuth, i18n, coach/accounting roles.
+3. Grow via **feature specs**, not a rewrite: memberships/tokens, skill-rank class assignment, cancellation, trips/tournaments as products, OAuth, i18n, coach/accounting roles.
 4. Stay the single source of truth for reservations.
 
 ---
@@ -58,7 +58,7 @@ Trips and tournaments are **not** bookable. There is **no** live cancel-booking 
 ## Known concerns
 
 - **AGC vs CAG** is a **confirmed dual identity** (Decision 2026-08-19): CAG on legal/invoices; AGC on product UI/domain. Do not rename one side.
-- Time slot before “Book Now” is **intentionally optional** (`start_time` / `end_time` may be null). Do not add a mandatory-slot fix. Calendar / self-serve slot booking is scheduled for removal when memberships-tokens and skill-rank class assignment land.
+- `/lessons` has **no** self-serve calendar or time-slot grid (**Decision 2026-09-02**). New bookings insert with null `booking_date` / `start_time` / `end_time`; the academy assigns the class.
 - Booking insert and invoice generation are **two steps**, not one transaction (recoverable via “Get invoice”).
 - `invoices.status` does not flip to `paid` on admin approval; `Pending/` → `Paid/` / `Refused/` is **intended** for `invoice-lifecycle` only (Decision 2026-08-19): approve → `paid` + move to `Paid/`; reject proof → invoice stays `pending`; `UNIQUE(booking_id)`; second generate UPDATEs.
 - Overlapping booking fields: `status`, `payment_status`, `verification_status`; `bookings.price` is text.

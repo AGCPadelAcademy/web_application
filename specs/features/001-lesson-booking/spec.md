@@ -2,6 +2,7 @@
 
 **Feature Branch**: `001-lesson-booking`  
 **Created**: 2026-08-19  
+**Updated**: 2026-09-02  
 **Status**: Draft (reverse-engineered, as-is)  
 **Input**: Live capability on `/lessons`
 
@@ -11,20 +12,19 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Browse catalogue and availability (Priority: P1)
+### User Story 1 - Browse catalogue (Priority: P1)
 
-A visitor opens `/lessons`, sees active lessons grouped into Adult Memberships and Individual Sessions, picks a future date, and sees which 30-minute slots are free.
+A visitor opens `/lessons` and sees active lessons grouped into Adult Memberships and Individual Sessions. There is no date picker or time-slot grid.
 
 **Why this priority**: Discovery is public and required before any booking.
 
-**Independent Test**: Open `/lessons` signed out; catalogue and grid load; occupied slots are disabled with no owner identity.
+**Independent Test**: Open `/lessons` signed out; catalogue loads; no calendar or occupancy grid is shown.
 
 **Acceptance Scenarios**:
 
 1. **Given** the `lessons` table has active rows, **When** `/lessons` loads, **Then** cards show `name`, `price_amount` CHF, `description`, and “Cancellation: 48 h” (`src/pages/LessonsPage.jsx` LessonCard; `supabase.from('lessons').select('*').eq('is_active', true).order('price_amount')`).
 2. **Given** `is_subscription` true/false, **When** the page renders, **Then** cards are split into those two sections (`LessonsPage.jsx` `subscriptionLessons` / `singleSessions`).
-3. **Given** a date today or later, **When** the visitor selects it, **Then** slots 08:00–20:30 in 30-minute steps appear; 14:00 is disabled (`timeSlots` `isBlocked` when `hour === 14`).
-4. **Given** `booking_slots` rows with `payment_status` in `pending`/`confirmed` for that date, **When** the grid is built, **Then** overlapping 30-minute slots are `booked` (`src/lib/bookings.js` `fetchDayBookings`, `ACTIVE_BOOKING_STATUSES`; `isSlotBooked`).
+3. **Given** `/lessons` is loaded, **When** the visitor looks at the page, **Then** there is no calendar, date selector, or 30-minute slot grid.
 
 ---
 
@@ -34,7 +34,7 @@ A signed-in student with a complete profile accepts terms, creates a pending boo
 
 **Why this priority**: This is the live revenue path (`docs/sdd-brownfield/project-context.md`).
 
-**Independent Test**: Sign in, complete profile, Book Now, accept terms, confirm; a `bookings` row exists with `status=pending_payment`, `payment_status=pending`.
+**Independent Test**: Sign in, complete profile, Book Now, accept terms, confirm; a `bookings` row exists with `status=pending_payment`, `payment_status=pending`, and null `booking_date` / `start_time` / `end_time`.
 
 **Acceptance Scenarios**:
 
@@ -46,28 +46,12 @@ A signed-in student with a complete profile accepts terms, creates a pending boo
 
 ---
 
-### User Story 3 - Occupied slots stay reserved while pending (Priority: P2)
-
-After insert, the chosen range stays blocked on the public grid until payment is no longer `pending` or `confirmed`.
-
-**Why this priority**: Holds the court for unpaid bookings (`specs/baseline-system/requirements.md` WF-008 assumption).
-
-**Independent Test**: Book a slot; reload `/lessons` as anonymous; that slot is disabled.
-
-**Acceptance Scenarios**:
-
-1. **Given** a booking with `start_time`/`end_time` and `payment_status` pending or confirmed, **When** `fetchDayBookings` runs, **Then** overlapping slots are booked (`booking_slots` view; migration `0006`).
-
----
-
 ### Edge Cases
 
-- **Observed:** Book Now does **not** require `selectedTime`. `buildBookingPayload` sets `start_time`/`end_time` to `null` if no slot (`src/lib/bookings.js`). Availability occupancy then cannot match that booking.
-- **Observed:** Past dates are disabled (`Calendar` `disabled={(date) => date < startOfDay(new Date())}`).
+- **Observed:** Book Now does **not** collect a date or time. `buildBookingPayload` is called with `bookingDate: null` and `selectedTime: null`, so `booking_date` / `start_time` / `end_time` are null (`src/lib/bookings.js`).
 - **Observed:** Spanish copy exists in `translations.ES` but `lang` is hardcoded `"EN"` (`LessonsPage.jsx`).
 - **Observed:** `?product=<lesson_code>` is written into `return_to` but **never read** on `/lessons` — no auto-select of the lesson.
 - **Observed:** Booking insert and invoice invoke are sequential; invoice failure leaves the booking (`executeBookingAndInvoice` try/catch after insert). Recovery is 002 / FEAT-PAY-003.
-- **Observed:** `isSlotBooked` uses a 30-minute probe, not `lesson.duration_minutes`, when building the grid (`timeSlots` calls `isSlotBooked(cursor, 30)`). A longer lesson can still be booked into a window that only looks free in 30-minute chunks.
 - There is **no** cancel action on this page (copy “48 h” is not enforced).
 
 ---
@@ -81,21 +65,19 @@ Observed unless marked intended.
 - **FR-001**: `/lessons` MUST list active `lessons` ordered by `price_amount` (`LessonsPage.jsx`; `api-contracts.md` §2.2; policy `lessons_public_read`).
 - **FR-002**: Catalogue MUST split on `is_subscription`.
 - **FR-003**: Cards MUST show name, CHF amount, description, 48 h cancellation copy.
-- **FR-004**: Calendar MUST allow today or future dates only.
-- **FR-005**: Grid MUST be 08:00–20:30, 30-minute steps; 14:00 MUST be unbookable.
-- **FR-006**: Occupancy MUST come from `booking_slots` (`booking_date`, `start_time`, `end_time`, `payment_status` in `pending`/`confirmed`) — no PII (`bookings.js`; `supabase-backend.md` view `booking_slots`).
-- **FR-007**: Unauthenticated Book Now MUST redirect to login with `return_to`.
-- **FR-008**: Incomplete profile MUST open `ProfileCompletionModal` and MUST NOT insert a booking.
-- **FR-009**: Booking MUST require terms acceptance in the confirm dialog.
-- **FR-010**: Insert payload MUST match `buildBookingPayload`: `user_id`, `lesson_code`, `lesson_name`, `price` as `"<amount> CHF"`, `booking_date`, optional times, `duration_minutes`, `status=pending_payment`, `payment_status=pending`, `client_email`, `client_phone`, `notes` (`bookings.js`; FK `bookings.lesson_code` → `lessons.lesson_code`, migration `0003`).
-- **FR-011**: After insert the page MUST call `requestInvoice` (invoice behavior owned by 002).
-- **FR-012**: On invoice success the page MUST open `InvoicePreviewModal` then navigate to `/payments` on close (`InvoicePreviewModal.jsx` `onClose`).
+- **FR-004**: `/lessons` MUST NOT show a calendar, date picker, or time-slot occupancy grid.
+- **FR-005**: New bookings from `/lessons` MUST insert with `booking_date`, `start_time`, and `end_time` null (academy assigns the class later).
+- **FR-006**: Unauthenticated Book Now MUST redirect to login with `return_to`.
+- **FR-007**: Incomplete profile MUST open `ProfileCompletionModal` and MUST NOT insert a booking.
+- **FR-008**: Booking MUST require terms acceptance in the confirm dialog.
+- **FR-009**: Insert payload MUST match `buildBookingPayload`: `user_id`, `lesson_code`, `lesson_name`, `price` as `"<amount> CHF"`, `booking_date` null, times null, `duration_minutes`, `status=pending_payment`, `payment_status=pending`, `client_email`, `client_phone`, `notes` (`bookings.js`; FK `bookings.lesson_code` → `lessons.lesson_code`, migration `0003`).
+- **FR-010**: After insert the page MUST call `requestInvoice` (invoice behavior owned by 002). When `booking_date` is null, `invoice_date` MUST default to today (`yyyy-MM-dd`).
+- **FR-011**: On invoice success the page MUST open `InvoicePreviewModal` then navigate to `/payments` on close (`InvoicePreviewModal.jsx` `onClose`).
 
 ### Key Entities
 
 - **Lesson** (`lessons`): public catalogue; `lesson_code`, `name`, `price_amount`, `duration_minutes`, `is_subscription`, `is_active` (`domain-model.md`, `supabase-backend.md`).
-- **Booking** (`bookings`): lesson↔client reservation; owner `user_id`.
-- **booking_slots**: non-PII projection for the grid (migration `0006`).
+- **Booking** (`bookings`): lesson↔client reservation; owner `user_id`. Date/time remain nullable until class assignment.
 
 ---
 
@@ -103,18 +85,18 @@ Observed unless marked intended.
 
 ### Measurable Outcomes
 
-- **SC-001**: Anonymous visitors can load catalogue + grid without auth.
+- **SC-001**: Anonymous visitors can load the catalogue without auth and without seeing a calendar.
 - **SC-002**: A signed-in student with a complete profile can create a pending booking from `/lessons`.
-- **SC-003**: Occupied pending/confirmed ranges do not expose who booked them.
-- **SC-004**: Unauthenticated Book Now never inserts a row (RLS insert `auth.uid() = user_id`; `supabase-backend.md` §5).
+- **SC-003**: Unauthenticated Book Now never inserts a row (RLS insert `auth.uid() = user_id`; `supabase-backend.md` §5).
 
 ---
 
 ## Data impact
 
-- **Read:** `lessons` (anon/authenticated); `booking_slots` (anon/authenticated).
+- **Read:** `lessons` (anon/authenticated).
 - **Write:** `bookings` INSERT (authenticated owner). Invoice writes are 002 (service role inside `generate-invoice-pdf`).
 - **Not written here:** `memberships`, `credits`, `availability` (empty / unused).
+- **`booking_slots`:** view still exists (migration `0006`) but is **not** consumed by `/lessons`. `fetchDayBookings` remains in `bookings.js` unused by this page.
 
 ---
 
@@ -122,7 +104,6 @@ Observed unless marked intended.
 
 - Route `/lessons` is public (`src/App.jsx`).
 - Insert RLS: `auth.uid() = user_id` (`supabase-backend.md` §5).
-- Grid MUST NOT use `bookings` SELECT (public-read dropped, migration `0006`).
 - Invoice invoke requires session JWT (`bookings.js` `requestInvoice`) — see 002.
 - `ProtectedRoute` is not used on this page.
 
@@ -131,6 +112,7 @@ Observed unless marked intended.
 ## UI impact
 
 - Route: `/lessons` → `LessonsPage.jsx`.
+- Page shows catalogue cards only (no calendar section).
 - Modals: confirm `Dialog`, `ProfileCompletionModal`, `InvoicePreviewModal`.
 - Header “Book Now” lands here (`FEAT-PUB-001` / WF-002).
 - Language switcher is not implemented (`lang` fixed EN).
@@ -142,9 +124,8 @@ Observed unless marked intended.
 - Trip or tournament booking (`TripsPage` / `TournamentsPage` marketing only).
 - Customer cancel / refund (copy only).
 - Memberships drawing credits (future spec).
-- Skill-rank class assignment / deleting the calendar (future spec).
-- Making a time slot mandatory (decided against 2026-08-19).
-- `plan.md` / `tasks.md` / production code changes.
+- Skill-rank class assignment UI (future spec) — this change only removes self-serve date/slot picking.
+- `plan.md` / `tasks.md`.
 
 ---
 
@@ -153,7 +134,6 @@ Observed unless marked intended.
 - 48 h cancellation copy is not enforced (no cancel UI).
 - `?product=` unused after login.
 - Two-step insert + invoice (orphan `receipt_url`).
-- Grid overlap uses 30 minutes, not lesson duration — **do not harden**; calendar is scheduled for removal.
 - `price` stored as text (`constitution.md` V).
 - Overlapping `status` / `payment_status` / `verification_status` (`domain-model.md`).
 - No page-level tests (`implementation-inventory.md`); unit tests cover `bookings.js` only.
@@ -162,8 +142,6 @@ Observed unless marked intended.
 
 ## Open questions
 
-- ~~Should a time slot be mandatory for `with_time` lessons?~~ **No (2026-08-19).** Slot optional is accepted. Calendar / self-serve slots will be replaced by academy-assigned classes (skill rank) and membership tokens. Do not add a mandatory-slot requirement.
-- ~~Should occupancy use `lesson.duration_minutes`?~~ **No further investment (2026-08-19).** Same reason: calendar is retiring.
 - Should `?product=` open that lesson’s confirm flow after login?
 - Should unpaid holds expire, or only explicit cancel (cleanup function must not be scheduled — `api-contracts.md` §1.2)?
 
@@ -171,9 +149,8 @@ Observed unless marked intended.
 
 ## Assumptions
 
-- Occupying a slot while `payment_status=pending` is intentional **while the calendar exists** (`requirements.md` §8).
 - Bank details live on the invoice PDF/QR, not on `/lessons`.
-- **Intended (future, not this spec):** memberships grant tokens from weeks-in-month and academy-open days; the academy redeems tokens into classes. Students are placed into existing groups (stable people / hours / days) by skill rank. Self-serve date/slot picking goes away.
+- **Intended (future, not this spec):** memberships grant tokens from weeks-in-month and academy-open days; the academy redeems tokens into classes. Students are placed into existing groups (stable people / hours / days) by skill rank.
 
 ---
 
@@ -181,11 +158,14 @@ Observed unless marked intended.
 
 | ID | Covered? |
 |---|---|
-| FEAT-LES-001 … FEAT-LES-008 | Yes (LES-003 copy only for 48 h) |
-| FEAT-BKG-001 … FEAT-BKG-010 | Yes (BKG-007/008/009 via 002 UI handoff) |
+| FEAT-LES-001 … FEAT-LES-003 | Yes (LES-003 copy only for 48 h) |
+| FEAT-LES-004 … FEAT-LES-008 | Retired 2026-09-02 (calendar/grid removed) |
+| FEAT-BKG-001 … FEAT-BKG-009 | Yes (BKG-007/008/009 via 002 UI handoff) |
+| FEAT-BKG-010 | Retired 2026-09-02 (no public grid to occupy) |
 | FEAT-PRF-003, FEAT-PRF-004 | Gate only; profile save is 005 |
 | FEAT-LGL-002 | Booking terms checkbox |
-| WF-002, WF-005, WF-006, WF-008, WF-013 | Yes |
+| WF-002, WF-005, WF-006, WF-013 | Yes |
+| WF-008 | Occupancy clause retired with the grid |
 | XR-001, XR-004, XR-005, XR-006 | Yes (XR-006: EN only) |
 | ACT-002 | Yes (`user_id`) |
 | FEAT-TRP-001, FEAT-TRN-001 | Non-goals (out of capability) |

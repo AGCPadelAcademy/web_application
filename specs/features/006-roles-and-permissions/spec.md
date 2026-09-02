@@ -67,7 +67,7 @@ A user with `profiles.role = coach` signs in like any user and sees only operati
 
 Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking or profile PII.
 
-**Independent Test**: Signed out, `/lessons` grid loads; direct `bookings` or `profiles` SELECT as anon fails.
+**Independent Test**: Signed out, `/lessons` catalogue loads; direct `bookings` or `profiles` SELECT as anon fails.
 
 **Acceptance Scenarios**:
 

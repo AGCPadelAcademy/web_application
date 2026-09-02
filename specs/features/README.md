@@ -39,7 +39,7 @@ These folders document **already-live** capabilities. Each has `spec.md` only (n
 
 | Folder | Capability |
 |---|---|
-| `001-lesson-booking` | Catalogue, availability grid, booking insert |
+| `001-lesson-booking` | Catalogue, booking insert (no self-serve calendar) |
 | `002-invoice-generation` | `generate-invoice-pdf`, numbering, recovery |
 | `003-payment-proof-upload` | My Payments + proof upload |
 | `004-admin-payment-verification` | Approve / reject proofs |
@@ -91,5 +91,5 @@ Shared transactional surface (specify independently; **implement one at a time**
 - `cancel-reservation` — explicit cancel by student / admin / coach
 - `invoice-lifecycle` — `Paid/` / `Refused/` storage move; `invoices.status = paid`
 - `memberships-credits` — tokens from weeks-in-month and academy-open; academy redeems tokens into classes
-- `class-assignment` — replace self-serve calendar/slots; place students into existing groups by skill rank
+- `class-assignment` — place students into existing groups by skill rank (self-serve calendar already removed 2026-09-02)
 - `trips-tournaments` — product tables and booking extension

@@ -2,91 +2,56 @@
 alwaysApply: true
 ---
 
-# Spec Kit Specification Rules
-
-You are operating within the AGC Padel Academy
-Spec-Driven Development (SDD) workflow.
+# AGC Specification Rules
 
 ## Feature Context
 
-The current feature is identified by the GitHub Issue
-being processed.
+The GitHub Issue being processed is the authoritative
+source for the current feature request.
 
-Use the GitHub Issue as the primary feature request and
-business-context source.
-
-Do not assume that another feature's specification,
-plan, or tasks apply to the current feature.
+Do not use another feature's spec, plan, or tasks as
+the current feature context.
 
 ## Brownfield Context
 
-Before generating or modifying a specification:
+For specification work, inspect relevant existing
+documentation and implementation before making
+architectural assumptions:
 
-1. Read `AGENTS.md`.
-2. Read relevant documentation under:
-   - `/docs/sdd-brownfield/`
-   - `/specs/project-context/`
-   - `/specs/baseline-system/`
-3. Inspect relevant existing source code under `/src/`.
-4. Inspect related existing feature specifications when
-   dependencies or shared behavior are involved.
+- /docs/sdd-brownfield/
+- /specs/project-context/
+- /specs/baseline-system/
+- /src/
 
-Documentation must be verified against the current
+Verify documented behavior against the current
 implementation.
 
-If documentation and implementation disagree, explicitly
-identify the discrepancy.
+If documentation and implementation disagree,
+document the discrepancy.
 
-## Specify Workflow
+## Requirements
 
-When executing `/speckit-specify`:
+Preserve confirmed:
 
-1. Read the complete GitHub Issue.
-2. Extract the feature ID and feature intent.
-3. Identify explicit requirements and acceptance criteria.
-4. Identify dependencies and integration boundaries.
-5. Identify relevant existing functionality.
-6. Preserve confirmed business decisions.
-7. Do not invent requirements.
-8. Document assumptions and unresolved questions.
-9. Generate the specification in the correct feature directory.
+- business rules
+- acceptance criteria
+- security requirements
+- integration boundaries
+- existing system constraints
 
-## Specification Quality
+Do not invent requirements or architecture.
 
-The generated specification must:
+## Feature Isolation
 
-- be implementation-independent where appropriate
-- contain testable requirements
-- preserve business rules
-- preserve acceptance criteria
-- identify assumptions
-- identify unresolved ambiguity
-- identify dependencies
-- identify security requirements
-- identify Brownfield compatibility requirements
+The specification must be created under the directory
+corresponding to the current F1.xx feature.
+
+Do not modify another feature's specification, plan,
+or task files.
 
 ## Hooks
 
-After `/speckit-specify`, allow configured Spec Kit
-extension hooks to execute.
+Allow configured Spec Kit extension hooks to execute
+after specification generation.
 
-Do not manually duplicate an enabled automatic hook.
-
-## Scope
-
-During the specification phase:
-
-DO:
-- inspect
-- analyze
-- clarify
-- document
-- generate `spec.md`
-
-DO NOT:
-- implement application code
-- modify unrelated source files
-- execute `/speckit-plan`
-- execute `/speckit-tasks`
-- execute `/speckit-implement`
-- open an implementation PR
+Do not manually duplicate an automatically enabled hook.

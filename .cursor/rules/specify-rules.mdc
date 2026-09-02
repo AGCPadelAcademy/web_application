@@ -2,8 +2,91 @@
 alwaysApply: true
 ---
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-at specs/features/008-roles-and-permissions/plan.md
-<!-- SPECKIT END -->
+# Spec Kit Specification Rules
+
+You are operating within the AGC Padel Academy
+Spec-Driven Development (SDD) workflow.
+
+## Feature Context
+
+The current feature is identified by the GitHub Issue
+being processed.
+
+Use the GitHub Issue as the primary feature request and
+business-context source.
+
+Do not assume that another feature's specification,
+plan, or tasks apply to the current feature.
+
+## Brownfield Context
+
+Before generating or modifying a specification:
+
+1. Read `AGENTS.md`.
+2. Read relevant documentation under:
+   - `/docs/sdd-brownfield/`
+   - `/specs/project-context/`
+   - `/specs/baseline-system/`
+3. Inspect relevant existing source code under `/src/`.
+4. Inspect related existing feature specifications when
+   dependencies or shared behavior are involved.
+
+Documentation must be verified against the current
+implementation.
+
+If documentation and implementation disagree, explicitly
+identify the discrepancy.
+
+## Specify Workflow
+
+When executing `/speckit-specify`:
+
+1. Read the complete GitHub Issue.
+2. Extract the feature ID and feature intent.
+3. Identify explicit requirements and acceptance criteria.
+4. Identify dependencies and integration boundaries.
+5. Identify relevant existing functionality.
+6. Preserve confirmed business decisions.
+7. Do not invent requirements.
+8. Document assumptions and unresolved questions.
+9. Generate the specification in the correct feature directory.
+
+## Specification Quality
+
+The generated specification must:
+
+- be implementation-independent where appropriate
+- contain testable requirements
+- preserve business rules
+- preserve acceptance criteria
+- identify assumptions
+- identify unresolved ambiguity
+- identify dependencies
+- identify security requirements
+- identify Brownfield compatibility requirements
+
+## Hooks
+
+After `/speckit-specify`, allow configured Spec Kit
+extension hooks to execute.
+
+Do not manually duplicate an enabled automatic hook.
+
+## Scope
+
+During the specification phase:
+
+DO:
+- inspect
+- analyze
+- clarify
+- document
+- generate `spec.md`
+
+DO NOT:
+- implement application code
+- modify unrelated source files
+- execute `/speckit-plan`
+- execute `/speckit-tasks`
+- execute `/speckit-implement`
+- open an implementation PR

@@ -1,14 +1,12 @@
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Info, Loader2, Calendar as CalendarIcon, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Info, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { addMinutes, format, setHours, setMinutes, isValid, startOfDay } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -20,9 +18,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/customSupabaseClient';
-import { fetchDayBookings, buildBookingPayload, createBooking, requestInvoice } from '@/lib/bookings';
+import { buildBookingPayload, createBooking, requestInvoice } from '@/lib/bookings';
 import { fetchProfile } from '@/lib/profileService';
-import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
 import ProfileCompletionModal from '@/components/modals/ProfileCompletionModal';
 import InvoicePreviewModal from '@/components/modals/InvoicePreviewModal.jsx';
@@ -31,7 +28,7 @@ import { isProfileComplete } from '@/lib/profileValidation';
 const translations = {
   ES: {
     title: "Reserva de Clases",
-    subtitle: "Elige fecha, hora y el tipo de clase que prefieras.",
+    subtitle: "Elige el tipo de clase que prefieras. La academia asignará tu grupo.",
     bookBtn: "Reservar Ahora",
     cancellation: "Cancelación",
     confirmTitle: "Confirmar Reserva",
@@ -52,7 +49,7 @@ const translations = {
   },
   EN: {
     title: "Lesson Booking",
-    subtitle: "Choose date, time, and your preferred lesson type.",
+    subtitle: "Choose your preferred lesson type. The academy assigns your class.",
     bookBtn: "Book Now",
     cancellation: "Cancellation",
     confirmTitle: "Confirm Booking",
@@ -80,11 +77,7 @@ const LessonsPage = () => {
   const [lang] = useState("EN");
   const t = translations[lang];
 
-  const [bookings, setBookings] = useState([]);
-  const [loadingBookings, setLoadingBookings] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState(null);
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -112,54 +105,6 @@ const LessonsPage = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState('');
   const [selectedInvoiceUrl, setSelectedInvoiceUrl] = useState('');
-
-  const fetchBookings = useCallback(async () => {
-    if (!selectedDate) return;
-    setLoadingBookings(true);
-    try {
-        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-        const data = await fetchDayBookings(formattedDate);
-
-        setBookings(data.map(b => ({
-                start: new Date(`${b.booking_date}T${b.start_time}Z`),
-                end: new Date(`${b.booking_date}T${b.end_time}Z`),
-        })));
-    } catch (error) {
-        toast({ title: t.bookError, description: "Could not load availability.", variant: "destructive" });
-    } finally {
-        setLoadingBookings(false);
-    }
-  }, [user, selectedDate, t, toast]);
-
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
-
-  const isSlotBooked = useCallback((slotDate, duration) => {
-    const slotEnd = addMinutes(slotDate, duration);
-    for (const booking of bookings) {
-      if (slotDate < booking.end && slotEnd > booking.start) {
-        return true;
-      }
-    }
-    return false;
-  }, [bookings]);
-
-  const timeSlots = useMemo(() => {
-    if (!selectedDate || !isValid(selectedDate)) return [];
-    const slots = [];
-    let cursor = setMinutes(setHours(startOfDay(selectedDate), 8), 0);
-    const endOfBookableTime = setMinutes(setHours(startOfDay(selectedDate), 20), 30);
-
-    while (cursor <= endOfBookableTime) {
-      const booked = isSlotBooked(cursor, 30);
-      const hour = cursor.getHours();
-      const isBlocked = hour === 14;
-      slots.push({ date: new Date(cursor), time: format(cursor, 'HH:mm'), booked, isBlocked });
-      cursor = addMinutes(cursor, 30);
-    }
-    return slots;
-  }, [selectedDate, isSlotBooked]);
 
   const handleBookNow = async (lesson) => {
     if (!user) {
@@ -190,21 +135,19 @@ const LessonsPage = () => {
   const executeBookingAndInvoice = async (profileData) => {
     setIsBooking(true);
     try {
-        const bookingDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
-
-        // 1. Insert booking record
+        // 1. Insert booking record (no self-serve date/slot; academy assigns class)
         const insertedBooking = await createBooking(buildBookingPayload({
             userId: user.id,
             lesson: selectedLesson,
-            bookingDate,
-            selectedTime,
+            bookingDate: null,
+            selectedTime: null,
             profile: profileData,
             comments: questionnaire.comments,
         }));
 
         // 2. Invoice: Bexio when enabled, otherwise legacy PDF.
         // FR-030: a billing failure must not present as a failed booking —
-        // the slot is already reserved.
+        // the reservation is already created.
         setIsConfirmOpen(false);
         setSelectedBookingId(insertedBooking.id);
         try {
@@ -259,7 +202,7 @@ const LessonsPage = () => {
             <AlertTriangle className="w-3 h-3" /> {t.cancellation}: 48 h
         </p>
         <Button onClick={() => handleBookNow(lesson)} className="w-full mt-auto bg-green-500 hover:bg-green-600 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2">
-            <CalendarIcon size={20}/> {t.bookBtn}
+            <CheckCircle2 size={20}/> {t.bookBtn}
         </Button>
     </motion.div>
   );
@@ -274,42 +217,6 @@ const LessonsPage = () => {
                 <p className="text-lg text-gray-400 max-w-3xl mx-auto md:mx-0">{t.subtitle}</p>
             </div>
         </div>
-
-        <section className="mb-24 grid lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-2 bg-gray-900/50 border border-gray-800 rounded-2xl p-4">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => { if(date) { setSelectedDate(date); setSelectedTime(null); } }}
-                disabled={(date) => date < startOfDay(new Date())}
-                className="w-full"
-                classNames={{ day_selected: 'bg-green-500 text-black hover:bg-green-600 focus:bg-green-500', day_today: 'text-green-400' }}
-              />
-            </div>
-            <div className="lg:col-span-1">
-              <h3 className="text-2xl font-bold mb-4">{selectedDate && isValid(selectedDate) ? format(selectedDate, 'dd MMMM, yyyy') : '...'}</h3>
-              {loadingBookings ? (
-                <div className="flex justify-center items-center h-48"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                  {timeSlots.map(slot => (
-                    <Button
-                      key={slot.time}
-                      variant={selectedTime?.time === slot.time ? 'default' : 'outline'}
-                      onClick={() => setSelectedTime(slot)}
-                      disabled={slot.booked || slot.isBlocked}
-                      className={cn('w-full', 
-                          selectedTime?.time === slot.time ? 'bg-green-500 hover:bg-green-600 text-black' : 'border-gray-700 bg-gray-800/50 text-white', 
-                          (slot.booked || slot.isBlocked) && 'bg-gray-800/30 border-gray-800 text-gray-600 cursor-not-allowed'
-                      )}
-                    >
-                      {slot.time}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-        </section>
 
         {loadingLessons ? (
           <div className="flex justify-center items-center py-24">

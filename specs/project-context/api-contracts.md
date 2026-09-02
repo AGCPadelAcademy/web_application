@@ -219,11 +219,11 @@ Profile read/write goes through `src/lib/profileService.js` (single owner of que
 
 | Operation | Caller | Filter / payload |
 |---|---|---|
-| SELECT (availability, via view) | `src/lib/bookings.js` `fetchDayBookings` (called by `LessonsPage.jsx`) | `.from('booking_slots').select('booking_date, start_time, end_time, payment_status').eq('booking_date', <date>).in('payment_status', ['confirmed','pending'])` |
+| SELECT (availability, via view) | `src/lib/bookings.js` `fetchDayBookings` (not called by `/lessons` after 2026-09-02) | `.from('booking_slots').select('booking_date, start_time, end_time, payment_status').eq('booking_date', <date>).in('payment_status', ['confirmed','pending'])` |
 | SELECT (own) | `PaymentsPage.jsx` | `.select('*, billing_documents(status, document_nr)').eq('user_id', user.id).order('created_at', desc)` (falls back to `.select('*')` if the embed is unavailable) |
 | INSERT | `src/lib/bookings.js` `createBooking` (called by `LessonsPage.jsx`) | booking object — see shape below |
 
-**`booking_slots` view (migration `0006`, 2026-08-10):** exposes only `booking_date, start_time, end_time, payment_status` — no `client_email`/`client_phone`/`notes`/`user_id`. Granted to `anon` + `authenticated`; runs with view-owner rights (deliberately bypasses `bookings` RLS for this non-PII projection). It is the public availability surface.
+**`booking_slots` view (migration `0006`, 2026-08-10):** exposes only `booking_date, start_time, end_time, payment_status` — no `client_email`/`client_phone`/`notes`/`user_id`. Granted to `anon` + `authenticated`; runs with view-owner rights (deliberately bypasses `bookings` RLS for this non-PII projection). `/lessons` no longer renders a public availability grid (2026-09-02).
 
 **Booking INSERT payload (LessonsPage):**
 ```json
@@ -244,7 +244,7 @@ Profile read/write goes through `src/lib/profileService.js` (single owner of que
 }
 ```
 
-> ✅ RESOLVED 2026-08-10 (migration `0006`): the public-read `bookings` SELECT policy was dropped and replaced by `Users can view own bookings` (`auth.uid() = user_id`) and `Admins can view all bookings` (`is_admin()`). Public availability now flows through the non-PII `booking_slots` view, so the grid keeps working for anonymous visitors without exposing PII.
+> ✅ RESOLVED 2026-08-10 (migration `0006`): the public-read `bookings` SELECT policy was dropped and replaced by `Users can view own bookings` (`auth.uid() = user_id`) and `Admins can view all bookings` (`is_admin()`). The non-PII `booking_slots` view remains. The `/lessons` occupancy grid that used it was removed 2026-09-02.
 
 ### 2.4 `payment_proofs` — unused by the product UI (Decision 2026-08-24)
 
@@ -373,7 +373,7 @@ RLS is **already enabled on all 10 business tables** plus `invoice_counters`. Li
 
 **What would break in production if policies are tightened naively:**
 
-- ~~**`bookings` public SELECT → own-only:**~~ **DONE 2026-08-10 (migration `0006`)** exactly per the safe path described here: the `booking_slots` non-PII view was created, the availability query (`src/lib/bookings.js` → `fetchDayBookings`) switched to it, and the table policy was tightened to own-or-admin. Verified: anonymous visitors still see the grid; owners see their bookings in `/payments`; the admin panel join keeps working.
+- ~~**`bookings` public SELECT → own-only:**~~ **DONE 2026-08-10 (migration `0006`)** exactly per the safe path described here: the `booking_slots` non-PII view was created, the availability query (`src/lib/bookings.js` → `fetchDayBookings`) switched to it, and the table policy was tightened to own-or-admin. **2026-09-02:** `/lessons` no longer shows the grid; owners still see bookings in `/payments`.
 - **`profiles` public SELECT → own/admin:** `PaymentVerificationPanel` joins `profiles(full_name, email)` through `payment_proofs → bookings` — this runs under the *admin's* JWT, so an admin-readable policy keeps it working. But any public read of profiles elsewhere would break. Also note the join path exposes customer PII to the admin panel only — acceptable.
 - **Adding an `invoices` SELECT policy** (users read own via booking): no breakage — currently nothing client-side reads it. Additive only.
 - **Edge Functions are unaffected** by any RLS change — they use the service role, which bypasses RLS. The contact form, invoice generation, and notification flows keep working throughout.

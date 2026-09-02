@@ -382,7 +382,7 @@ Vault secret **names** live on `billing_integrations`; values are in `vault.secr
 ### Views — `public` schema
 
 #### `booking_slots` — **ADDED 2026-08-10 (migration `0006`)**
-Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `end_time`, `payment_status` only (no `client_email` / `client_phone` / `notes` / `user_id`). Granted SELECT to `anon` + `authenticated`; SECURITY INVOKER barrier over unexposed `private.booking_slots_rows()` so the public availability grid keeps working while direct `bookings` remains owner/admin. Sole consumer: `src/lib/bookings.js` (`fetchDayBookings`).
+Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `end_time`, `payment_status` only (no `client_email` / `client_phone` / `notes` / `user_id`). Granted SELECT to `anon` + `authenticated`; SECURITY INVOKER barrier over unexposed `private.booking_slots_rows()` so the projection stays available while direct `bookings` remains owner/admin. Implemented consumer: `src/lib/bookings.js` (`fetchDayBookings`). **`/lessons` no longer queries this view** (calendar/grid removed 2026-09-02).
 
 #### `session_roster` — **ADDED (migration `0008`, F1.02)**
 Operational roster projection over `bookings` ⨝ `profiles`: `booking_id`, `booking_date`, `start_time`, `end_time`, `lesson_name`, `participant_full_name`, `coach_id` (no price, payment, email, or proof columns). SECURITY INVOKER barrier over unexposed `private.session_roster_rows()`; rows where `is_admin()` or (`is_coach()` and `coach_id = auth.uid()`). GRANT SELECT to `authenticated`; REVOKE `anon`. Consumers: `src/lib/sessionRoster.js`, `/coach/roster`.
@@ -470,7 +470,7 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`).
 
 > Dropped 2026-08-07 (migration `0004`): `profiles` policies "Users can update own stripe_customer_id" / "Users can view their own stripe_customer_id" (Stripe-era duplicates).
 >
-> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view now serves the `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only.
+> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view was created for the former `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only. The grid was removed from `/lessons` on 2026-09-02; the view remains.
 >
 > Hardening executed 2026-08-25 (migration `0008`, F1.02): public `profiles` SELECT dropped; PostgREST cannot change `profiles.role`; `payment-proofs` storage is owner-path-or-admin; coaches read `session_roster` only. Remaining: `invoices` read policy (`api-contracts.md §7.1`).
 

@@ -78,7 +78,7 @@ export async function requestInvoice({ booking, lesson, profile, userId }) {
     body: {
       booking_id: booking.id,
       amount: lesson.price_amount,
-      invoice_date: booking.booking_date,
+      invoice_date: booking.booking_date || format(new Date(), 'yyyy-MM-dd'),
       customer_fullname: profile.full_name,
       customer_address: profile.address,
       customer_postal_city: `${profile.postal_code} ${profile.city}`,

@@ -17,7 +17,7 @@ This file describes **what the live system already does**: existing features, ac
 
 | Actor | Identity | Access today |
 |---|---|---|
-| **Visitor** | Unauthenticated browser | Public marketing pages, lesson catalogue, availability grid, contact form, login/signup, terms |
+| **Visitor** | Unauthenticated browser | Public marketing pages, lesson catalogue, contact form, login/signup, terms |
 | **Student** | Authenticated user whose `profiles.role` is `student` (default) | Own profile, own bookings/payments, lesson booking, invoice download |
 | **Admin** | Authenticated user whose `profiles.role` is `admin` | Everything a student can do, plus `/admin/integrations` (Bexio connection and reconciliation) |
 | **Coach** | Role value allowed by `profiles.role` CHECK | ⏸️ No dedicated UI, no dedicated workflows. Schema only (`availability.trainer_id`). |
@@ -46,7 +46,7 @@ This file describes **what the live system already does**: existing features, ac
 | **BC-01** Discover academy offerings | Public home, lessons, trips (marketing), tournaments (gallery), contact, terms | ✅ live |
 | **BC-02** Register and authenticate | Email/password signup, confirmation, sign-in, sign-out, password recovery | ✅ live |
 | **BC-03** Maintain a billing profile | Create/update name, phone, address; email is Auth-owned | ✅ live |
-| **BC-04** Book a lesson | Authenticated booking of an active catalogue lesson against a date (time slot optional — **Decision 2026-08-19**) | ✅ live |
+| **BC-04** Book a lesson | Authenticated booking of an active catalogue lesson (no self-serve date/slot — **Decision 2026-09-02**) | ✅ live |
 | **BC-05** Issue an invoice | Server-generated branded PDF with Swiss QR page; unique sequential number | ✅ live |
 | **BC-06** Collect payment by bank transfer | Customer pays offline using invoice instructions; no card processor | ✅ live |
 | **BC-07** Submit payment evidence | Retired 2026-08-24 — proof-of-payment removed; Bexio reconciliation confirms payment | ❌ retired |
@@ -71,20 +71,16 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-PUB-005**: `/admin` MUST redirect to `/admin/payment-verification`.
 - **FEAT-PUB-006**: The footer newsletter form MUST NOT persist a subscription. ⏸️ It currently shows a “not implemented” toast.
 
-### 4.2 Lesson catalogue and availability
+### 4.2 Lesson catalogue
 
 - **FEAT-LES-001**: The system MUST list every `lessons` row where `is_active = true`, ordered by `price_amount` ascending.
 - **FEAT-LES-002**: The system MUST group catalogue cards into **Adult Memberships** (`is_subscription = true`) and **Individual Sessions** (`is_subscription = false`).
 - **FEAT-LES-003**: Each lesson card MUST show name, price in CHF, description, and a 48-hour cancellation notice.
-- **FEAT-LES-004**: Visitors (including anonymous) MUST be able to pick a calendar date that is today or in the future.
-- **FEAT-LES-005**: For the selected date, the system MUST show 30-minute slots from 08:00 through 20:30.
-- **FEAT-LES-006**: The 14:00 slot MUST be blocked (not bookable).
-- **FEAT-LES-007**: A slot MUST be shown as booked when it overlaps any `booking_slots` row for that date whose `payment_status` is `pending` or `confirmed`.
-- **FEAT-LES-008**: Availability MUST be readable without authentication (via the non-PII `booking_slots` view). Occupied slots MUST NOT expose who booked them.
+- **FEAT-LES-004** through **FEAT-LES-008**: **Retired 2026-09-02.** The `/lessons` calendar, 30-minute slot grid, 14:00 block, and public occupancy display are removed. Visitors book a catalogue product; the academy assigns the class.
 
 > ⚠️ **FEAT-LES-003** states a 48-hour cancellation policy in copy. The application does **not** enforce cancellation or refunds. There is no customer-facing cancel action.
 >
-> **Decision 2026-08-19:** A time slot is **not** required before “Book Now”. `start_time` / `end_time` may be null. Do **not** add a mandatory-slot fix. Self-serve calendar occupancy is transitional: memberships will use tokens (weeks in the month, academy open or not) that the academy redeems into classes; students will be placed into existing groups by skill rank. Calendar / slot booking is scheduled for removal in those future specs.
+> **Decision 2026-09-02:** `/lessons` MUST NOT present a calendar or time-slot grid. New bookings MAY have null `booking_date` / `start_time` / `end_time`. Skill-rank placement into existing groups remains a future `class-assignment` spec.
 
 ### 4.3 Authentication
 
@@ -120,13 +116,13 @@ This file describes **what the live system already does**: existing features, ac
 - **FEAT-BKG-001**: Only an authenticated user MAY create a booking.
 - **FEAT-BKG-002**: An unauthenticated “Book Now” MUST redirect to `/login?return_to=/lessons?product=<lesson_code>`.
 - **FEAT-BKG-003**: Before creating a booking, the student MUST accept the terms and cancellation policy in the confirmation dialog.
-- **FEAT-BKG-004**: A new booking MUST snapshot `lesson_code`, `lesson_name`, `price` (`"<amount> CHF"`), `duration_minutes`, `client_email`, `client_phone`, optional `notes`, and the selected date/time.
+- **FEAT-BKG-004**: A new booking MUST snapshot `lesson_code`, `lesson_name`, `price` (`"<amount> CHF"`), `duration_minutes`, `client_email`, `client_phone`, and optional `notes`. `booking_date`, `start_time`, and `end_time` MUST be null (no self-serve slot).
 - **FEAT-BKG-005**: A new booking MUST start as `status = pending_payment` and `payment_status = pending`.
 - **FEAT-BKG-006**: `bookings.lesson_code` MUST reference an existing `lessons.lesson_code` (FK).
 - **FEAT-BKG-007**: After a successful insert, the system MUST request invoice generation for that booking.
 - **FEAT-BKG-008**: On invoice success, the system MUST show the PDF in `InvoicePreviewModal` (invoice page + QR page) and offer a download.
 - **FEAT-BKG-009**: Closing the invoice modal MUST navigate the student to `/payments`.
-- **FEAT-BKG-010**: A pending or confirmed booking MUST occupy its time range on the public availability grid.
+- **FEAT-BKG-010**: **Retired 2026-09-02.** There is no public availability grid to occupy.
 
 > ⚠️ There is **no** customer-facing cancel-booking action. Cancellation is an explicit future action (customer, admin, or coach) per domain-model D1/API-contracts TODO 1 — not live.
 >
@@ -246,7 +242,7 @@ flowchart TD
 ```
 
 - **WF-007**: Payment MUST be offline (bank transfer using the invoice / QR). The application MUST NOT charge a card.
-- **WF-008**: A booking MUST stay `pending` until Bexio records full payment and reconciliation confirms it. Occupied slots remain reserved while `payment_status` is `pending` or `confirmed`.
+- **WF-008**: A booking MUST stay `pending` until Bexio records full payment and reconciliation confirms it.
 - **WF-009**: **Retired 2026-08-24.** Proof rejection/re-upload no longer exists.
 - **WF-010**: Approval MUST mark the booking paid/confirmed from the student’s point of view (“Paid” badge).
 
@@ -276,7 +272,7 @@ stateDiagram-v2
 - **XR-001**: Monetary amounts shown to customers MUST be in CHF.
 - **XR-002**: The application is single-tenant: one academy, one brand. No multi-academy switching.
 - **XR-003**: Authorization for data writes MUST be enforced by RLS and Edge Function checks, not only by `ProtectedRoute`.
-- **XR-004**: PII on bookings (owner identity) MUST NOT be readable by anonymous visitors. Public availability is limited to date, start, end, and payment_status.
+- **XR-004**: PII on bookings (owner identity) MUST NOT be readable by anonymous visitors. The `booking_slots` view remains a non-PII projection; `/lessons` does not display occupancy.
 - **XR-005**: Stripe MUST NOT be part of any live payment path.
 - **XR-006**: English is the live UI language. A Spanish copy exists inside `LessonsPage` but is not user-selectable. ⏸️ i18n is not a live capability.
 
@@ -305,9 +301,9 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 
 > **Assumption:** Bank transfer details live on the invoice PDF / QR page; the web UI does not duplicate IBAN copy on My Payments.
 >
-> **Assumption:** Occupying a slot while `payment_status = pending` is intentional **while the calendar exists** (hold the court until paid or cancelled). There is no automatic expiry of unpaid holds. The calendar itself is scheduled for removal (Decision 2026-08-19).
+> **Assumption:** There is no automatic expiry of unpaid bookings. Cancellation is an explicit future action.
 >
-> **Decision 2026-08-19:** Do not require a selected time slot before booking. Do not harden grid occupancy (`duration_minutes`). See §4.2.
+> **Decision 2026-09-02:** Self-serve calendar/slots are removed from `/lessons`. See §4.2.
 >
 > **Decision 2026-08-19:** `coach` / `accounting` stay schema-only; no admin-equivalent access until `coach-accounting-matrix` (after class-assignment / memberships-credits). Live actors: student, admin.
 >
@@ -320,7 +316,7 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 > TODO: Enforce 48-hour cancellation (or replace the copy) in a cancellation feature spec.
 > TODO: Trip and tournament product tables + booking extension.
 > TODO: Membership/credits — tokens from weeks-in-month and academy-open; academy redeems into classes (`memberships-credits`).
-> TODO: Replace self-serve calendar/slots with skill-rank placement into existing groups (`class-assignment`).
+> TODO: Skill-rank placement into existing groups (`class-assignment`). Self-serve calendar/slots were removed 2026-09-02.
 > TODO: OAuth provider enablement.
 > TODO: i18n (DeepL) — `specs/features/i18n.md`.
 

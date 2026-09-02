@@ -22,7 +22,7 @@
 | Module | Lines | Responsibility | Depends on | Tests |
 |---|---|---|---|---|
 | `pages/HomePage.jsx` | ~90 | Marketing landing (centered hero copy, no image); services overview | `framer-motion`, `react-router-dom` | ❌ |
-| `pages/LessonsPage.jsx` | 362 | Lesson catalogue (from `lessons` table), availability grid (08:00–20:30, 30-min steps, 14:00 blocked), booking dialog, T&C acceptance, booking insert + invoice request, profile-completion gate | `lib/bookings.js`, `lib/profileService.js`, `lib/profileValidation.js`, `ui/calendar`, modals | ❌ (logic delegated to tested `lib/bookings.js`) |
+| `pages/LessonsPage.jsx` | — | Lesson catalogue (from `lessons` table), booking dialog, T&C acceptance, booking insert + invoice request, profile-completion gate. No calendar or slot grid. | `lib/bookings.js`, `lib/profileService.js`, `lib/profileValidation.js`, modals | ❌ (logic delegated to tested `lib/bookings.js`) |
 | `pages/TripsPage.jsx` | 93 | Static trips marketing (Ebro Delta campus); CTA → `/contact` | `framer-motion` | ❌ |
 | `pages/TournamentsPage.jsx` | 73 | Static tournaments marketing + photo gallery | `framer-motion` | ❌ |
 | `pages/ContactPage.jsx` | 171 | Contact form → `submit-contact-form` Edge Function | `supabase.functions.invoke` | ❌ |

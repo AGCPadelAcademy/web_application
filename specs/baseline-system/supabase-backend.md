@@ -410,7 +410,7 @@ One boolean: `integration_enabled` (true when a `billing_integrations` row for `
 | `billing-issue-invoice` | in-repo | Contact sync + issue one Bexio invoice per booking | **Active** (`src/lib/bookings.js` when integration enabled). `verify_jwt` on. |
 | `billing-invoice-document` | in-repo | Stream Bexio PDF for owner/admin | **Active** (`InvoicePreviewModal` / `billing.js`). `verify_jwt` on. |
 | `billing-cancel-invoice` | in-repo | Cancel unpaid issued invoice + booking | **Active** (`PaymentsPage.jsx`). `verify_jwt` on. |
-| `bexio-reconcile` | in-repo | Payment sync + retry queue | **Active** (`pg_cron` every 15 min + admin Run now). `verify_jwt` off; scheduler secret or admin JWT. |
+| `bexio-reconcile` | in-repo | Payment sync + retry queue | **Active** (`pg_cron` every six hours + admin Run now). `verify_jwt` off; scheduler secret or admin JWT. |
 
 > **Deleted 2026-08-10** (by owner, via dashboard/CLI): `create-booking` (Stripe), `handle-stripe-webhook` (Stripe), `verify-booking-saved` (validated the dropped Stripe column), `generate-booking-receipt` and `assign-booking-time` (verified unused — no callers, no invocations, broken source bundles). Earlier snapshots also listed `create-booking-with-invoice` and `generate-invoice-pdf-v2`, which no longer exist.
 >

@@ -1,0 +1,66 @@
+---
+alwaysApply: true
+---
+
+# AGC SDD Workflow
+
+Every F1.xx feature follows:
+
+GitHub Issue
+→ Specify
+→ Spec Review
+→ Plan
+→ Plan Review
+→ Tasks
+→ Analyze
+→ Implement
+→ Verify
+→ PR
+→ PRE
+→ Testing
+→ PRO
+→ Done
+
+## Stage Boundaries
+
+### Specify
+
+Produces:
+
+spec.md
+
+Must stop after specification generation and
+configured post-specification hooks.
+
+### Plan
+
+Produces:
+
+plan.md
+
+Must not begin until spec.md has been approved.
+
+### Tasks
+
+Produces:
+
+tasks.md
+
+Must not begin until plan.md has been approved.
+
+### Implement
+
+May only begin when:
+
+- spec.md exists
+- plan.md exists
+- tasks.md exists
+- required dependencies are satisfied
+
+### Completion
+
+Implementation is not complete merely because
+all tasks are checked.
+
+Verification must pass before the feature can
+move to Review/Testing.

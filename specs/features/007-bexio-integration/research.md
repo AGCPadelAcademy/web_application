@@ -16,7 +16,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
   - *Storing tokens in Edge Function environment secrets* — rejected: refresh tokens rotate and would require redeployment on every rotation; violates FR-007.
   - *Storing tokens as plaintext columns in a config table* — rejected: violates FR-001 (credentials must not be retrievable via API responses or appear in plaintext).
   - *Implicit/JWT bearer flow* — rejected: Bexio documents the JWT bearer flow only as a niche enterprise option; Authorization Code is the supported standard.
-- **Verified details**: `https://idp.bexio.com/authorize` (authorize), `https://idp.bexio.com/token` (token exchange/refresh), `https://idp.bexio.com/connect/endsession` (logout), `https://idp.bexio.com/.well-known/openid-configuration` (discovery). App registration (client id/secret, up to 10 redirect URLs) is a one-time manual step at developer.bexio.com.
+- **Verified details**: `https://auth.bexio.com/realms/bexio/protocol/openid-connect/auth` (authorize), `https://auth.bexio.com/realms/bexio/protocol/openid-connect/token` (token exchange/refresh), `https://auth.bexio.com/realms/bexio/protocol/openid-connect/logout` (logout), `https://auth.bexio.com/realms/bexio/.well-known/openid-configuration` (discovery). **Update 2026-08-21**: the original research targeted `idp.bexio.com`, which was decommissioned on 2025-03-31; the implementation uses the new IdP (Keycloak realm `auth.bexio.com/realms/bexio`), verified against its live OIDC discovery document. App registration (client id/secret, up to 10 redirect URLs) is a one-time manual step at developer.bexio.com. New-IdP notes: offline sessions idle-timeout after 1 year (refresh tokens must be used within a year — our scheduled reconciliation guarantees this); token endpoint parameters must be sent in the request body (our implementation already does).
 
 ## R-02. Where to store tokens and connection configuration
 
@@ -36,7 +36,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-04. Contact synchronization strategy
 
-- **Decision**: Per-student (person) contacts. On first billable transaction for a user: search Bexio contacts by email (`POST /2.0/contact/search`, field `mail`); if exactly one match → adopt it; if zero → create (`contact_type_id = 2` person, `name_1` = last name, `name_2` = first name, `mail`, address fields when known); if multiple → do not guess, create a new contact and log an observability warning for manual merge in Bexio. Persist the Bexio `contact_id` in `billing_contacts`. Subsequent transactions reuse the stored ID; contact field updates are pushed best-effort when the AGC profile changes (V1: on next invoice creation only, no background propagation).
+- **Decision**: Per-student (person) contacts. On first billable transaction for a user: search Bexio contacts by email (`POST /2.0/contact/search`, field `mail`); if exactly one match → adopt it; if zero → create (`contact_type_id = 2` person, `name_1` = last name, `name_2` = first name, `mail`, `phone_mobile`, `street_name`/`postcode`/`city`, `country_id` resolved from the profile ISO country code via `GET /2.0/country` `iso3166_alpha2`, plus required `user_id`/`owner_id`); if multiple → do not guess, create a new contact and log an observability warning for manual merge in Bexio. Persist the Bexio `contact_id` in `billing_contacts`. Subsequent transactions reuse the stored ID and **update** the mapped contact from the current profile (FR-011). Country is never forced to Switzerland.
 - **Rationale**: Verified that `mail` is a supported contact search field and `contact_type_id` semantics (1 = company, 2 = person; `name_1` doubles as last name for persons) from the official schema. Email-first matching is the only reliable heuristic available; persisting the mapping (FR-011) makes the heuristic a one-time risk.
 - **Alternatives considered**:
   - *Company-type contacts per membership* — rejected: AGC bills individuals; company billing is out of scope (spec Scope/V1).
@@ -54,7 +54,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-06. First-run configuration discovery (Bexio-internal IDs)
 
-- **Decision**: Invoice creation requires Bexio-internal IDs: `user_id`, `currency_id`, `bank_account_id`, `payment_type_id`, per-position `account_id`, `tax_id`, `unit_id`, plus `language_id`, `country_id`, and optional `template_slug`. These are resolved once during a guided "Verify connection / initialize" step and persisted in `billing_integrations.config` (JSONB). Discovery order: (a) `GET /3.0/users/me` → user; (b) list endpoints for currencies (CHF), banking accounts (QR-capable), payment types, active sales taxes (`/3.0/taxes?types=sales_tax&scope=active`), units, languages, countries (Switzerland), document templates; (c) any ID that cannot be discovered with the granted scopes is entered manually by the admin in the integration settings UI, then validated by a test call.
+- **Decision**: Invoice creation requires Bexio-internal IDs: `user_id`, `currency_id`, `bank_account_id`, `payment_type_id`, per-position `account_id`, `tax_id`, `unit_id`, plus `language_id`, `country_id`, and optional `template_slug`. These are resolved once during a guided "Verify connection / initialize" step and persisted in `billing_integrations.config` (JSONB). Discovery order: (a) `GET /3.0/users/me` → user; (b) list endpoints for currencies (CHF), banking accounts (QR-capable), payment types, active sales taxes (`/3.0/taxes?types=sales_tax&scope=active`) **selecting the tax with `value === 0`**, units, languages, countries (Switzerland), document templates; (c) any ID that cannot be discovered with the granted scopes is entered manually by the admin in the integration settings UI, then validated by a test call. Field-shape gotcha verified against live API (2026-08-21): `/3.0/currencies` exposes the ISO 4217 code in the `name` field — there is no `code` field — so CHF matching must use `name === 'CHF'`.
 - **Rationale**: The create-invoice schema marks `user_id` required and positions require `account_id`/`tax_id`/`unit_id`; these IDs are account-specific integers that cannot be hardcoded. Persisting them avoids per-request discovery calls (rate-limit friendly, R-10).
 - **Alternatives considered**: *Hardcoding IDs in environment variables* — rejected: opaque to admins, no validation path, rotation requires redeploy.
 
@@ -70,14 +70,14 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-08. Payment confirmation authority (Q2-A implementation mechanics)
 
-- **Decision**: Reconciliation writes are performed exclusively by the `bexio-reconcile` function (service role) in a guarded transaction that **mirrors the live admin-approval writes exactly** (verified against `src/components/admin/PaymentVerificationPanel.jsx` and the DB CHECK constraint in `specs/baseline-system/supabase-backend.md`): `UPDATE bookings SET status = 'confirmed', payment_status = 'confirmed', verification_status = 'approved', payment_confirmation_source = 'bexio_reconciliation', payment_confirmed_at = now() WHERE id = ? AND payment_status <> 'confirmed'`. (`bookings.payment_status` is `pending | confirmed | cancelled` — there is no `paid` value; document-level `paid` lives on `billing_documents.status`.) In the same transaction, unresolved payment proofs for that booking are marked superseded (FR-036). The manual path is the existing **client-side PostgREST update** in `PaymentVerificationPanel.jsx` (no `verify-payment-proof` Edge Function exists) — it is extended to set `payment_confirmation_source = 'manual_proof'` + `payment_confirmed_at` and to skip the booking update when already `confirmed` (FR-037); proofs on already-reconciled transactions are flagged `superseded` for audit (FR-038).
-- **Rationale**: Guarded updates (optimistic state check) prevent race conditions between manual verification and the polling worker without locks; source attribution satisfies FR-033.
-- **Alternatives considered**: *Blocking manual verification once integration is live* — rejected: admins still need it as a break-glass path when reconciliation stalls (FR-028 degraded mode).
+- **Decision**: Reconciliation writes are performed exclusively by the `bexio-reconcile` function (service role) with a guarded booking update: `UPDATE bookings SET status = 'confirmed', payment_status = 'confirmed', verification_status = 'approved', payment_confirmation_source = 'bexio_reconciliation', payment_confirmed_at = now() WHERE id = ? AND payment_status <> 'confirmed'`. (`bookings.payment_status` is `pending | confirmed | cancelled` — there is no `paid` value; document-level `paid` lives on `billing_documents.status`.) There is no AGC proof-upload or admin proof-verify path (Decision 2026-08-24).
+- **Rationale**: Guarded updates prevent double-confirm; source attribution satisfies FR-033.
+- **Alternatives considered**: *Keeping manual proof verification as break-glass* — rejected 2026-08-24: payments are confirmed only through Bexio.
 
 ## R-09. Scheduling mechanism for the polling worker
 
-- **Decision**: Enable `pg_cron` + `pg_net` (both available, not yet installed, per baseline §2) and register a cron job (every 15 minutes) that invokes the `bexio-reconcile` Edge Function via `pg_net.http_post` with a scheduler shared-secret header. The job definition ships in the feature's SQL migration.
-- **Rationale**: This is the Supabase-documented pattern for scheduled Edge Functions, keeps all backend behavior inside the fixed stack (constitution: no custom Node server), and the 15-minute cadence meets SC-003 (< 30 min worst case) with 3× headroom while staying far below Bexio rate limits.
+- **Decision**: Enable `pg_cron` + `pg_net` (both available, not yet installed, per baseline §2) and register a cron job (every six hours) that invokes the `bexio-reconcile` Edge Function via `pg_net.http_post` with a scheduler shared-secret header. The job definition ships in the feature's SQL migration.
+- **Rationale**: This is the Supabase-documented pattern for scheduled Edge Functions and keeps backend behavior inside the fixed stack (constitution: no custom Node server). Bank transfers take 2–3 days to arrive; a six-hour cadence reduces Bexio polling while keeping the additional confirmation delay bounded. An admin can still run reconciliation on demand.
 - **Alternatives considered**:
   - *Vercel Cron hitting the function URL* — viable without new extensions, but adds a public unauthenticated-by-default surface and couples backend behavior to the hosting layer; rejected in favor of the in-stack pattern.
   - *Admin-triggered manual polling only* — rejected: fails SC-002 (automatic confirmation without admin action).
@@ -89,9 +89,15 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-11. Invoice PDF access pattern
 
-- **Decision**: On-demand retrieval. `billing-invoice-document` Edge Function: validates caller (owner of the booking or admin, via existing JWT + profiles pattern), resolves the `billing_documents` row, calls `GET /2.0/kb_invoice/{id}/pdf` (base64 payload with `name` field), decodes and streams bytes with `Content-Type: application/pdf` and `Content-Disposition: inline; filename="<document_nr>.pdf"`. No PDF bytes are persisted in AGC Storage.
+- **Decision**: On-demand retrieval. `billing-invoice-document` Edge Function: validates caller (owner of the booking or admin, via existing JWT + profiles pattern), resolves the `billing_documents` row, calls `GET /2.0/kb_invoice/{id}/pdf` (JSON `{ name, size, mime, content }` — `content` is base64), decodes and streams bytes with `Content-Type: application/pdf` and `Content-Disposition: inline; filename="<document_nr>.pdf"`. No PDF bytes are persisted in AGC Storage.
 - **Rationale**: Bexio is the document of record (Q1-A); storing copies adds storage-policy surface (known debt TD-016) and drift risk for zero UX benefit. The endpoint requires an issued invoice, which R-05 guarantees before any user sees a download affordance.
 - **Alternatives considered**: *Mirroring PDFs into `invoices` bucket* — rejected (above). *Direct user-to-Bexio links* — impossible: no public customer-facing URLs exist.
+
+## R-16. Invoice email delivery (revised 2026-08-24 night)
+
+- **Decision**: After issuance, AGC fetches `GET /2.0/kb_invoice/{id}/pdf` and emails the PDF via Resend HTTP API (`RESEND_API_KEY`) from `no-reply@agcpadelacademy.com`. In-app preview is unchanged. Idempotent via `notifications_log` (`status=sent` + subject `Your AGC invoice {document_nr}`). Mail failure is audited and does not fail the booking (FR-030 / FR-029a). Invoice sends always use Resend (not SendGrid), matching the verified academy domain. Auth mail stays on Supabase Custom SMTP.
+- **Rationale**: The domain is already verified in Resend, so From branding needs no mailbox or Bexio SPF. Bexio send-by-email requires confirming `no-reply@…`, which has no inbox.
+- **Alternatives considered**: *Bexio `POST .../send`* — tried 2026-08-24 evening, abandoned the same night: no academy mailbox for sender confirmation, and Gmail cannot be the From address. *Plug Resend SMTP into Bexio* — not supported.
 
 ## R-12. Cutover and legacy coexistence (Q1-A implementation mechanics)
 
@@ -106,9 +112,9 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-14. VAT / tax handling
 
-- **Decision**: Positions carry `tax_id` discovered from the Bexio account's **active sales taxes** at setup; invoice-level `mwst_type` and `mwst_is_net=false` (gross prices, matching AGC's CHF lesson pricing). The chosen tax ID and VAT mode live in `billing_integrations.config` and are confirmed with the academy's accountant during go-live (spec FR-018 checklist). Price amounts come exclusively from AGC's `lesson_types.price` (single source of truth).
-- **Rationale**: Swiss VAT rates and the academy's VAT liability are business facts, not code constants; configuration + documented assumption is the honest design (constitution: document assumptions explicitly).
-- **Alternatives considered**: *Hardcoding 8.1 %* — rejected: rate applicability depends on the academy's VAT registration; wrong tax data on legal invoices is a high-severity error.
+- **Decision**: Positions carry `tax_id` of the Bexio **active sales tax with value 0** (go-live 2026-08-29). Invoice-level `mwst_type` 0 and `mwst_is_net=false` (advertised lesson price is the invoice total). Discovery stores the full tax list and selects 0%; issuance prefers 0% from that list even if a previous initialize stored the demo 8.1% id. If no 0% tax exists, `tax_id_sales` is missing and configuration is incomplete. Price amounts come exclusively from AGC's `lesson_types.price`.
+- **Rationale**: The academy's production invoices must not show 8.1% VAT. Selecting by rate (0) rather than `taxes[0]` avoids the demo-company ordering trap; the id is still discovered from Bexio, not hardcoded.
+- **Alternatives considered**: *Using taxes[0]* — rejected 2026-08-29: that was 8.1% on the demo company. *Hardcoding a tax id* — rejected: production ids differ from demo.
 
 ## R-15. Admin UI surface
 
@@ -125,7 +131,7 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 | Open question: QR-IBAN/QR invoices confirmation | Setup checklist + connection health check verifies `qr_invoice_id` presence on issued invoices | R-06, plan §quickstart |
 | NEEDS CLARIFICATION: scheduling | `pg_cron` + `pg_net` | R-09 |
 | NEEDS CLARIFICATION: token storage | Supabase Vault | R-02 |
-| NEEDS CLARIFICATION: VAT | Config-discovered `tax_id`, accountant-confirmed | R-14 |
-| NEEDS CLARIFICATION: reconciliation cadence | 15 min via cron; manual trigger available | R-09 |
+| NEEDS CLARIFICATION: VAT | 0% active sales tax discovered from Bexio (2026-08-29) | R-14 |
+| NEEDS CLARIFICATION: reconciliation cadence | Every six hours via cron; manual trigger available (2026-09-02) | R-09 |
 
 All Technical Context unknowns are resolved. No remaining `NEEDS CLARIFICATION` items.

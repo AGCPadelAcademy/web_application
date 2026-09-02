@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,31 +9,87 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X, Loader2, Info } from 'lucide-react';
+import { fetchInvoicePdfBlob } from '@/lib/billing';
 
 export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoiceUrl }) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const blobUrlRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPreviewUrl(null);
+      setLoadError(null);
+      setIsLoading(false);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      return;
+    }
+
+    if (invoiceUrl) {
+      setPreviewUrl(invoiceUrl);
+      setLoadError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!bookingId) {
+      setLoadError('Invoice is not available yet.');
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
+    setPreviewUrl(null);
+
+    (async () => {
+      try {
+        const blobUrl = await fetchInvoicePdfBlob(bookingId);
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
+        blobUrlRef.current = blobUrl;
+        setPreviewUrl(blobUrl);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message || 'Could not load the invoice PDF.');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, invoiceUrl, bookingId]);
 
   const handleDownload = async () => {
-    if (!invoiceUrl) return;
+    if (!previewUrl) return;
     setIsDownloading(true);
-    
+
     try {
-      // Fetch the file to trigger an actual download instead of opening a new tab
-      const response = await fetch(invoiceUrl);
+      const response = await fetch(previewUrl);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = `Invoice_${bookingId || 'receipt'}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
       window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
       console.error('Download failed, opening in new tab', error);
-      window.open(invoiceUrl, '_blank');
+      window.open(previewUrl, '_blank');
     } finally {
       setIsDownloading(false);
     }
@@ -49,42 +105,48 @@ export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoic
               <Info className="w-3 h-3 mr-1" /> Scroll down to view the QR Code page
             </span>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onClose} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
             className="text-gray-400 hover:text-white hover:bg-gray-900 rounded-full"
           >
             <X className="w-5 h-5" />
           </Button>
         </DialogHeader>
-        
+
         <div className="flex-1 w-full bg-gray-900 relative">
-          {invoiceUrl ? (
+          {previewUrl ? (
             <iframe
-              src={`${invoiceUrl}#toolbar=0&view=FitH`}
+              src={`${previewUrl}#toolbar=0&view=FitH`}
               className="w-full h-full absolute inset-0 border-0"
               title="Invoice and QR Code Preview"
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
-              <Loader2 className="w-8 h-8 animate-spin mb-4 text-gray-600" />
-              <p>Preparing document...</p>
+            <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 px-6 text-center">
+              {isLoading || !loadError ? (
+                <>
+                  <Loader2 className="w-8 h-8 animate-spin mb-4 text-gray-600" />
+                  <p>Preparing document...</p>
+                </>
+              ) : (
+                <p>{loadError}</p>
+              )}
             </div>
           )}
         </div>
 
         <DialogFooter className="p-4 border-t border-gray-900 bg-gray-950 flex sm:justify-end gap-3">
-          <Button 
-            variant="outline" 
-            onClick={onClose} 
+          <Button
+            variant="outline"
+            onClick={onClose}
             className="border-gray-800 text-gray-300 hover:text-white hover:bg-gray-900"
           >
             Close & Proceed
           </Button>
-          <Button 
-            onClick={handleDownload} 
-            disabled={isDownloading || !invoiceUrl} 
+          <Button
+            onClick={handleDownload}
+            disabled={isDownloading || !previewUrl}
             className="bg-green-500 hover:bg-green-600 text-black font-semibold"
           >
             {isDownloading ? (
@@ -92,7 +154,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoic
             ) : (
               <Download className="w-4 h-4 mr-2" />
             )}
-            Download Merged PDF
+            Download PDF
           </Button>
         </DialogFooter>
       </DialogContent>

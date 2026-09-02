@@ -6,6 +6,10 @@
 > Refreshed 2026-08-10: five unused/legacy Edge Functions (`create-booking`, `handle-stripe-webhook`, `verify-booking-saved`, `generate-booking-receipt`, `assign-booking-time`) and the `receipts` bucket deleted by the owner. 8 functions remain.
 > Refreshed 2026-08-10 (PM): RLS hardening (migration `0006`) — `booking_slots` non-PII view created; `bookings` public-read policy replaced by owner/admin SELECT policies. Edge Function auth hardened — `generate-invoice-pdf` v21 and `notify-payment-verification` v5 run with `verify_jwt: true` + in-function JWT/authorization checks.
 > Refreshed 2026-08-19: live Edge Function versions are `generate-invoice-pdf` **v22** and `notify-payment-verification` **v6** (explicit JWT); payment-proof storage path is `{booking_id}/attempt-{n}.{ext}`.
+> Refreshed 2026-08-25 (007 Bexio): migrations `0003_bexio_integration`, `0004_bexio_reconcile_cron`, `0005_profile_billing_fields` add billing tables, `pg_cron`/`pg_net`, profile name/country_code columns, and five billing Edge Functions. Proof UI removed; Bexio is the paid signal. Full schema: `specs/features/007-bexio-integration/data-model.md`.
+> Refreshed 2026-08-31 (008 F1.02): `bookings.coach_id`, `is_coach()`, role/assignment triggers, `session_roster`, dropped public `profiles` SELECT, and owner-path `payment-proofs` storage policies are live. Exact policy-name hardening is tracked as `f102_drop_public_profiles_policy_exact_name`.
+> Refreshed 2026-08-31 (Security Advisor): migration `0009_security_advisor_hardening` removes API execution of trigger-only functions, narrows definer views to explicit read-only grants, and revokes API privileges from service-role-only tables.
+> Refreshed 2026-08-31 (Security Advisor): migration `0010_private_projection_readers` makes all public views SECURITY INVOKER. Fixed-output privileged readers live in unexposed `private`; explicit deny policies document service-role-only tables.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -34,8 +38,10 @@
 | `uuid-ossp` | `extensions` | 1.1 |
 | `pgcrypto` | `extensions` | 1.3 |
 | `supabase_vault` | `vault` | 0.3.1 |
+| `pg_cron` | *(installed 007)* | used by `0004_bexio_reconcile_cron` |
+| `pg_net` | *(installed 007)* | HTTP from cron to `bexio-reconcile` |
 
-All other extensions (PostGIS, vector, pg_cron, pg_net, etc.) are available but **not installed**.
+`pg_cron` and `pg_net` were enabled by migration `0003_bexio_integration` (007). `supabase_vault` was already installed and is used for Bexio token names.
 
 ---
 
@@ -55,6 +61,8 @@ Primary user profile. Linked 1:1 to `auth.users`. Holds the canonical `role` fie
 | `city` | `text` | nullable (26 incomplete profiles) |
 | `country` | `text` | nullable (26 incomplete profiles) |
 | `role` | `text` NOT NULL | default `'student'`, CHECK constraint: `student`, `coach`, `accounting`, `admin`. Current values: `student` (43), `admin` (1). |
+| `first_name` / `last_name` | `text` | nullable — added 007 migration `0005_profile_billing_fields`; mapped to Bexio person `name_2` / `name_1` |
+| `country_code` | `text` | nullable ISO 3166-1 alpha-2 (CHECK `^[A-Z]{2}$`); mapped to Bexio `country_id` |
 | `updated_at` | `timestamptz` NOT NULL | default `now()` |
 
 Referenced by: `bookings`, `availability`, `memberships`, `credits`.
@@ -99,9 +107,12 @@ The legacy `public.users` table (pre-`profiles`, 1 mock row) has been dropped. `
 | `terms_version` | `text` | nullable |
 | `proof_uploaded_at` | `timestamptz` | nullable |
 | `payment_date` | `timestamptz` | nullable |
+| `payment_confirmation_source` | `text` | nullable CHECK `'bexio_reconciliation'` \| `'manual_proof'` — 007 additive |
+| `payment_confirmed_at` | `timestamptz` | nullable — 007 additive |
 | `created_at` / `updated_at` | `timestamptz` NOT NULL | default `now()` |
+| `coach_id` | `uuid` NULL | FK → `profiles.id` ON DELETE SET NULL — F1.02 coach assignment (migration `0008`). Not `availability.trainer_id`. |
 
-Referenced by: `payment_proofs`, `invoices`, `notifications_log`.
+Referenced by: `payment_proofs`, `invoices`, `notifications_log`, `billing_documents`, `billing_operations`.
 
 > **Schema debt:**
 > - `price` is `text` instead of `numeric` — inconsistent with `amount_paid` which is `numeric`.
@@ -339,37 +350,67 @@ erDiagram
 
     auth_users ||--|| profiles : "id"
     profiles ||--o{ bookings : "user_id"
+    profiles ||--o{ bookings : "coach_id"
     profiles ||--o{ availability : "trainer_id"
     profiles ||--o{ credits : "user_id"
     profiles ||--o{ memberships : "user_id"
     bookings ||--o{ payment_proofs : "booking_id"
     bookings ||--o{ invoices : "booking_id"
     bookings ||--o{ notifications_log : "booking_id"
+    bookings ||--o| billing_documents : "booking_id"
+    profiles ||--o| billing_contacts : "user_id"
 ```
+
+---
+
+#### Billing tables — **ADDED 2026-08-25 (007 migrations `0003`/`0004`)**
+
+Provider-neutral financial mapping. Writes are service-role only (Edge Functions). Full columns and state machines: `specs/features/007-bexio-integration/data-model.md`.
+
+| Table | RLS | SELECT | Writes |
+|---|---|---|---|
+| `billing_integrations` | enabled | admin (`is_admin()`) | service role |
+| `billing_contacts` | enabled | admin | service role |
+| `billing_documents` | enabled | admin **or** booking owner | service role |
+| `billing_operations` | enabled | admin | service role |
+| `billing_events` | enabled | admin | service role |
+
+Vault secret **names** live on `billing_integrations`; values are in `vault.secrets` (`bexio_refresh_token`, `bexio_access_token_cache`, `bexio_scheduler_secret`).
 
 ---
 
 ### Views — `public` schema
 
 #### `booking_slots` — **ADDED 2026-08-10 (migration `0006`)**
-Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `end_time`, `payment_status` only (no `client_email` / `client_phone` / `notes` / `user_id`). Granted SELECT to `anon` + `authenticated`; runs with view-owner rights so the public availability grid on `/lessons` keeps working after the `bookings` SELECT policy was tightened to owner/admin. Sole consumer: `src/lib/bookings.js` (`fetchDayBookings`).
+Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `end_time`, `payment_status` only (no `client_email` / `client_phone` / `notes` / `user_id`). Granted SELECT to `anon` + `authenticated`; SECURITY INVOKER barrier over unexposed `private.booking_slots_rows()` so the public availability grid keeps working while direct `bookings` remains owner/admin. Sole consumer: `src/lib/bookings.js` (`fetchDayBookings`).
+
+#### `session_roster` — **ADDED (migration `0008`, F1.02)**
+Operational roster projection over `bookings` ⨝ `profiles`: `booking_id`, `booking_date`, `start_time`, `end_time`, `lesson_name`, `participant_full_name`, `coach_id` (no price, payment, email, or proof columns). SECURITY INVOKER barrier over unexposed `private.session_roster_rows()`; rows where `is_admin()` or (`is_coach()` and `coach_id = auth.uid()`). GRANT SELECT to `authenticated`; REVOKE `anon`. Consumers: `src/lib/sessionRoster.js`, `/coach/roster`.
+
+#### `billing_public_config` — **ADDED 2026-08-25 (007 migration `0003`)**
+One boolean: `integration_enabled` (true when a `billing_integrations` row for `bexio` is `connected` or `degraded`). SECURITY INVOKER barrier over unexposed `private.billing_public_config_row()`; granted SELECT to `authenticated`. Powers the frontend invoice cutover. Does not expose tokens, config IDs, or status strings.
 
 ---
 
 ## 3. Edge Functions
 
-8 functions are **ACTIVE** (reconciled with the live project 2026-08-10). Since 2026-08-10 (PM), `generate-invoice-pdf` and `notify-payment-verification` run with **`verify_jwt: true`** at the gateway plus in-function JWT verification and authorization checks; the other 6 still run with `verify_jwt: false` (trust enforced inside each function, or not at all). Full request/response contracts: `specs/project-context/api-contracts.md §1`.
+13 functions are **ACTIVE** (8 pre-007 helpers + 5 Bexio billing functions, 2026-08-25). JWT at the gateway: `generate-invoice-pdf`, `notify-payment-verification`, `billing-issue-invoice`, `billing-invoice-document`, `billing-cancel-invoice` use `verify_jwt: true`. `bexio-oauth` and `bexio-reconcile` use `verify_jwt: false` with in-function auth (admin JWT / signed OAuth `state` / `x-scheduler-secret`). Full billing contracts: `specs/features/007-bexio-integration/contracts/edge-functions.md`.
 
 | Function | Version | Purpose | Status |
 |---|---|---|---|
-| `generate-invoice-pdf` | v22 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — main invoice generator** (called via `src/lib/bookings.js` from `LessonsPage.jsx` and `PaymentsPage.jsx`). Auth: caller JWT + booking ownership (or admin). |
+| `generate-invoice-pdf` | v22 | Generate invoice PDF (atomic `INV-YYYY/MM/DD-XX` numbering via `next_invoice_number` RPC) | **Active — legacy generator** when Bexio is disconnected. Auth: caller JWT + booking ownership (or admin). |
 | `submit-contact-form` | v13+ | Persist contact message + trainer/customer emails | **Active** (called by `ContactPage.jsx`) |
-| `notify-payment-verification` | v6 | Email customer on proof approval/rejection; audits to `notifications_log` | **Active** (called by `PaymentVerificationPanel.jsx`). Auth: caller JWT + admin role. |
-| `cleanup-pending-bookings` | v15+ | Time-based auto-cancel of pending bookings | **Dormant — do NOT schedule.** Rejected approach; to be replaced by an explicit cancel-reservation flow (decision 2026-08-07). |
+| `notify-payment-verification` | v6 | Email customer on proof approval/rejection; audits to `notifications_log` | **Dormant** — proof UI removed 2026-08-24; no `src/` caller. Auth: caller JWT + admin role. |
+| `cleanup-pending-bookings` | v15+ | Time-based auto-cancel of pending bookings | **Dormant — do NOT schedule.** Rejected approach; unpaid cancel is explicit on My Payments (007 US5). |
 | `upload-invoice-to-storage` | v2+ | Verify invoice PDF in storage, set status | Active, no frontend caller. To become the flag-driven invoice status-transition helper (future spec). |
 | `merge-invoice-qr` | v1+ | Merge QR page into a base64 invoice PDF | Active, no frontend caller (QR merge now inline in `generate-invoice-pdf`) |
 | `verify-invoice-generation` | v1+ | Scan generated PDF for unresolved placeholders | Active — QA/debug utility |
 | `upload-logo-once` | v1+ | One-off upload of `assets/logo.png` to `invoices` bucket | Active — setup helper |
+| `bexio-oauth` | in-repo | Bexio OAuth connect / status / disconnect / initialize | **Active** (`IntegrationsPanel.jsx`). `verify_jwt` off; admin JWT or signed callback `state`. |
+| `billing-issue-invoice` | in-repo | Contact sync + issue one Bexio invoice per booking | **Active** (`src/lib/bookings.js` when integration enabled). `verify_jwt` on. |
+| `billing-invoice-document` | in-repo | Stream Bexio PDF for owner/admin | **Active** (`InvoicePreviewModal` / `billing.js`). `verify_jwt` on. |
+| `billing-cancel-invoice` | in-repo | Cancel unpaid issued invoice + booking | **Active** (`PaymentsPage.jsx`). `verify_jwt` on. |
+| `bexio-reconcile` | in-repo | Payment sync + retry queue | **Active** (`pg_cron` every six hours + admin Run now). `verify_jwt` off; scheduler secret or admin JWT. |
 
 > **Deleted 2026-08-10** (by owner, via dashboard/CLI): `create-booking` (Stripe), `handle-stripe-webhook` (Stripe), `verify-booking-saved` (validated the dropped Stripe column), `generate-booking-receipt` and `assign-booking-time` (verified unused — no callers, no invocations, broken source bundles). Earlier snapshots also listed `create-booking-with-invoice` and `generate-invoice-pdf-v2`, which no longer exist.
 >
@@ -383,7 +424,7 @@ Non-PII availability projection over `bookings`: `booking_date`, `start_time`, `
 |---|---|---|---|---|
 | `invoices` | Yes | Generated invoice PDFs (`Pending/YYYY/MM/DD/` prefix; planned: `Paid/`, `Refused/` on finance verification) + `assets/logo.png` | None | None |
 | `qr-codes` | Yes | Swiss QR payment slips embedded in invoices (`QR_<amount>.pdf`) | None | None |
-| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/attempt-<n>.<ext>`; legacy `<booking_id>/<booking_id>_<ts>.<ext>` files remain valid), accessed via 24h signed URLs | None | None |
+| `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/attempt-<n>.<ext>`; legacy `<booking_id>/<booking_id>_<ts>.<ext>` files remain valid), accessed via 24h signed URLs. F1.02 (`0008`): SELECT/INSERT allowed when the first path segment equals an owned `bookings.id` or `is_admin()` | None | None |
 
 > ~~`receipts`~~ bucket **deleted 2026-08-10** (legacy Stripe-era invoice PDFs; verified unreferenced before deletion).
 >
@@ -397,17 +438,18 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`).
 
 | Table | Policy | Role | Command | Condition |
 |---|---|---|---|---|
-| `profiles` | Public profiles are viewable by everyone | public | SELECT | `true` ⚠️ |
+| `profiles` | ~~Public profiles are viewable by everyone~~ | — | — | **DROPPED (migration `0008`)** — was `true`, exposed email/role to anon |
 | `profiles` | Users can insert their own profile | public | INSERT | (check via trigger) |
 | `profiles` | Users can read own profile role | authenticated | SELECT | `id = auth.uid()` OR `is_admin()` |
-| `profiles` | Users can update own profile | public | UPDATE | `auth.uid() = id` |
+| `profiles` | Users can update own profile | public | UPDATE | `auth.uid() = id` — `role` changes rejected by `prevent_role_self_service` when `auth.role()` is `authenticated`/`anon` |
 | `bookings` | ~~Public read bookings~~ | — | — | **DROPPED 2026-08-10 (migration `0006`)** — was `true`, exposed PII to anonymous callers |
 | `bookings` | Users can view own bookings | authenticated | SELECT | `auth.uid() = user_id` (added 2026-08-10) |
 | `bookings` | Admins can view all bookings | authenticated | SELECT | `is_admin()` (added 2026-08-10) |
 | `bookings` | Users insert own bookings | public | INSERT | `auth.uid() = user_id` |
 | `bookings` | Users update own bookings | public | UPDATE | `auth.uid() = user_id` |
-| `bookings` | Admins can update any booking | authenticated | UPDATE | `is_admin()` |
+| `bookings` | Admins can update any booking | authenticated | UPDATE | `is_admin()` — `coach_id` changes also require `prevent_non_admin_coach_assignment` (admin-only; target must be `role = coach`) |
 | `booking_slots` (view) | *(view grant)* | anon, authenticated | SELECT | view-owner rights over a non-PII projection (added 2026-08-10, migration `0006`) |
+| `session_roster` (view) | *(view grant)* | authenticated | SELECT | admin all operational rows; coach assigned rows only (migration `0008`) |
 | `lessons` | lessons_public_read | public | SELECT | `true` (intentional — public catalogue) |
 | `availability` | Public can view availability | public | SELECT | `true` |
 | `credits` | Users can view own credits | public | SELECT | `auth.uid() = user_id` |
@@ -419,10 +461,18 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`).
 | `notifications_log` | Service Role Full Access | service_role | ALL | `true` |
 | `invoices` | *(none)* | — | — | **No policies — client reads blocked; writes are service-role only** |
 | `invoice_counters` | *(none)* | — | — | **No policies — service-role only (intended)** |
+| `billing_integrations` | Admins can read billing integrations | authenticated | SELECT | `is_admin()` (007) |
+| `billing_contacts` | Admins can read billing contacts | authenticated | SELECT | `is_admin()` (007) |
+| `billing_documents` | Admins and owners can read billing documents | authenticated | SELECT | `is_admin()` OR owner via `bookings.user_id` (007) |
+| `billing_operations` | Admins can read billing operations | authenticated | SELECT | `is_admin()` (007) |
+| `billing_events` | Admins can read billing events | authenticated | SELECT | `is_admin()` (007) |
+| `billing_public_config` (view) | *(view grant)* | authenticated | SELECT | boolean `integration_enabled` only (007) |
 
 > Dropped 2026-08-07 (migration `0004`): `profiles` policies "Users can update own stripe_customer_id" / "Users can view their own stripe_customer_id" (Stripe-era duplicates).
 >
-> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view now serves the `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only. Remaining hardening (`profiles` public SELECT, `invoices` read policy): `api-contracts.md §7.1`.
+> Hardening executed 2026-08-10 (migration `0006`): the `booking_slots` non-PII view now serves the `LessonsPage` availability grid, and `bookings` SELECT is owner/admin only.
+>
+> Hardening executed 2026-08-25 (migration `0008`, F1.02): public `profiles` SELECT dropped; PostgREST cannot change `profiles.role`; `payment-proofs` storage is owner-path-or-admin; coaches read `session_roster` only. Remaining: `invoices` read policy (`api-contracts.md §7.1`).
 
 ---
 
@@ -432,15 +482,18 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 
 | Severity | Finding | Affected object | Remediation |
 |---|---|---|---|
-| ⚠️ WARN | `payment_proofs` has a service-role ALL policy targeting `public` role — effectively bypasses RLS for everyone | `payment_proofs` | Remove the "Service Role Full Access Payment Proofs" policy from the `public` role; service_role bypasses RLS by default anyway. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0024_permissive_rls_policy) |
-| ⚠️ WARN | `payment_proofs` has conflicting policies causing multiple permissive policy overhead | `payment_proofs` | Consolidate into a single SELECT and single INSERT policy. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies) |
+| ⚠️ WARN | ~~`payment_proofs` had broad/conflicting policies~~ | `payment_proofs` | **Resolved by `0008`**: owner-or-admin storage SELECT and owner/admin INSERT; discarded proof UI remains discarded. |
 | ⚠️ WARN | ~~`profiles` has duplicate SELECT and UPDATE policies (stripe_customer_id ones vs general)~~ | `profiles` | **Resolved 2026-08-07** (migration `0004`): Stripe-named policies dropped. |
-| ℹ️ INFO | `invoices` — RLS enabled, zero policies | `invoices` | Add appropriate client-side read policy (e.g. users can read invoices for their own bookings). |
+| ℹ️ INFO | ~~`bookings_duplicate`, `invoice_counters`, `invoices` had RLS enabled and zero policies~~ | Three service-only/legacy tables | **Resolved by `0009` + `0010`**: API table privileges revoked and explicit restrictive false policies document deny-by-default without granting access. |
 | ℹ️ INFO | ~~`lessons` — RLS enabled, zero policies~~ | `lessons` | **Resolved** — live policy `lessons_public_read` (SELECT, `true`) verified 2026-08-07. |
-| ⚠️ WARN | `handle_new_user()` function has a mutable `search_path` | `public.handle_new_user` | Set `search_path = ''` and qualify all object names. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable) |
-| ⚠️ WARN | `handle_new_user()` is callable by `anon` and `authenticated` as `SECURITY DEFINER` | `public.handle_new_user` | Revoke `EXECUTE` from `anon`/`authenticated`, or switch to `SECURITY INVOKER`. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) |
+| ⚠️ WARN | ~~`handle_new_user()` had mutable `search_path` and API EXECUTE~~ | `public.handle_new_user` | **Resolved by `0009`**: empty search path, qualified table, and EXECUTE revoked from API/service roles. Trigger execution remains available. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable) |
+| ⚠️ WARN | ~~`rls_auto_enable()` was exposed as an RPC~~ | `public.rls_auto_enable` | **Resolved by `0009`**: EXECUTE revoked from API/service roles; event-trigger execution remains available. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) |
+| ❗ ERROR | ~~`booking_slots`, `billing_public_config`, `session_roster` were SECURITY DEFINER views~~ | Three narrow projection views | **Resolved by `0010`**: public views are SECURITY INVOKER barriers over fixed-output SECURITY DEFINER functions in unexposed `private`; API roles retain only the intended SELECT. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0010_security_definer_view) |
+| ⚠️ WARN | `pg_net` is installed in `public` | `pg_net` extension | **Accepted 007 dependency.** Moving the extension may break the live reconciliation cron and requires a separately tested scheduler migration. [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public) |
+| ❗ ERROR | ~~Default privileges gave API roles write privileges on definer views~~ | `booking_slots`, `billing_public_config`, `session_roster` | **Resolved by `0009`**: revoke all, then grant only the intended SELECT privilege. |
 | ⚠️ WARN | `invoices` and `receipts` Storage buckets are public and allow directory listing | `storage.invoices`, `storage.receipts` | Remove broad SELECT storage policies; object URLs still work without listing. `receipts` is pending deletion (2026-08-07). [Docs](https://supabase.com/docs/guides/database/database-linter?lint=0025_public_bucket_allows_listing) |
 | ⚠️ WARN | ~~`bookings` SELECT policy is `true` — all bookings are readable by anyone (including unauthenticated)~~ | `bookings` | **Resolved 2026-08-10** (migration `0006`): public-read policy dropped; owner (`auth.uid() = user_id`) + admin (`is_admin()`) SELECT policies added; public availability served by the non-PII `booking_slots` view. |
+| ⚠️ WARN | ~~`profiles` SELECT policy is `true` — anyone can read email/role~~ | `profiles` | **Resolved 2026-08-25** (migration `0008`): public SELECT dropped; own-or-admin SELECT remains. |
 | ⚠️ WARN | Leaked password protection is disabled in Supabase Auth | Auth settings | Enable HaveIBeenPwned.org check in Supabase Auth dashboard → Settings → Auth → Password. |
 
 ---
@@ -463,9 +516,10 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 
 ## 8. Open Items / Deferred Decisions
 
-- **Role system:** Implemented as a `role` column on `public.profiles` (`student`, `coach`, `accounting`, `admin`; default `student`). Applied to remote on 2026-07-07 as migration `0001_add_roles_and_admin_rls` (tracked in `supabase_migrations`). A helper `public.is_admin()` is used by RLS policies on `payment_proofs` and `bookings` to enforce admin-only writes server-side. The frontend reads `profile.role` via `useAuth().role`. JWT custom claims and a separate `user_roles` join table were considered and rejected (claims require session refresh on role change; the join table adds complexity for a single-role-per-user model). The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
+- **Role system:** Canonical store is `public.profiles.role` (`student`, `coach`, `accounting`, `admin`; default `student`). Helpers: `is_admin()`, `is_coach()` (GRANT EXECUTE to `authenticated`). Live actors after F1.02: student, admin, coach (assigned-session roster). `accounting` remains unused (non-admin, no roster). Role promotion stays out-of-band SQL (`prevent_role_self_service`). JWT custom claims and a `user_roles` table remain rejected. Apply migration `0008` on the target project before treating this as the remote as-is. The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
 - ~~**`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:**~~ **Resolved 2026-08-07** — the `-v2` function no longer exists in the live project; `generate-invoice-pdf` (v18) is the sole canonical generator.
 - ~~**`cleanup-pending-bookings`:**~~ **Resolved 2026-08-07** — no scheduler exists and none should be added; time-based auto-cancellation is rejected. To be replaced by an explicit cancel-reservation flow (customer/admin/coach), spec'd as a future feature.
-- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10.
+- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10. 007 added `0003_bexio_integration`, `0004_bexio_reconcile_cron`, `0005_profile_billing_fields` (feature numbering is independent of the earlier 0003–0006 brownfield files in git history — confirm applied names in the live `supabase_migrations` table).
+- **Bexio production cutover (T053):** Preview/test branch is live. Production redirect URL, production secrets, production migrations, and enabling the cutover flag still require an explicit production rollout.
 - **No-file-size or MIME-type restrictions on any Storage bucket:** Any file size / type can be uploaded to `payment-proofs`. Add limits when implementing the payment-proof upload feature spec.
 - **Stripe cleanup:** Edge Functions deleted 2026-08-10; DB artifacts dropped (migration `0004`); Stripe secrets removed from Edge Function secrets 2026-08-10. Last leftover: the webhook endpoint in the Stripe dashboard (Developers → Webhooks, pointing to `…/functions/v1/handle-stripe-webhook`) — delete it there; harmless while it exists (deliveries just fail).

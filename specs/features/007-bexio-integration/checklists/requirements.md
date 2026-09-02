@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain — **resolved 2026-08-20: Q1 → option A (Bexio PDF is document of record for new transactions), Q2 → option A (Bexio reconciliation authoritative for "paid"; proof flow = dispute/manual path)**
+- [x] No [NEEDS CLARIFICATION] markers remain — **resolved 2026-08-20: Q1 → option A (Bexio PDF is document of record for new transactions), Q2 → option A (Bexio reconciliation authoritative for "paid"); revised 2026-08-24: proof-of-payment removed**
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -33,6 +33,6 @@
 
 - **NEEDS CLARIFICATION markers — resolved 2026-08-20** (user decisions):
   - Q1 → **A**: the Bexio-generated invoice PDF is the document of record for all new integrated transactions; the legacy AGC generator is no longer invoked for new bookings after go-live; historical documents unchanged (FR-018/FR-019/FR-028/FR-029, Brownfield Impact).
-  - Q2 → **A**: Bexio-recorded payment is the authoritative paid signal and auto-confirms the transaction (new FR-035); proof upload/admin verification retained as the dispute/manual path (FR-036–FR-038).
+  - Q2 → **A**: Bexio-recorded payment is the authoritative paid signal and auto-confirms the transaction (FR-035). **Revised 2026-08-24:** proof upload/admin verification is removed (FR-036).
 - External-capability claims are explicitly separated ("Verified Bexio capability" vs "Desired AGC behavior") with retrieval date; the webhook gap and credit-note gap are documented as verified limitations, not assumptions.
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.

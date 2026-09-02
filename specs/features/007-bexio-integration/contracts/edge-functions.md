@@ -4,7 +4,7 @@
 
 All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` and follow the existing project conventions (see `specs/project-context/api-contracts.md`): `Content-Type: application/json`, caller JWT in `Authorization: Bearer <user-jwt>` for user-facing functions. Error responses are always `{ "error": "<machine-code>", "message": "<human-readable, sanitized>" }` with a non-2xx status. Secrets, tokens, and upstream payload bodies never appear in responses or logs (FR-034).
 
-New source locations (in-repo, research R-13): `supabase/functions/bexio-oauth/index.ts`, `supabase/functions/billing-issue-invoice/index.ts`, `supabase/functions/billing-invoice-document/index.ts`, `supabase/functions/bexio-reconcile/index.ts`, shared code under `supabase/functions/_shared/`.
+New source locations (in-repo, research R-13): `supabase/functions/bexio-oauth/index.ts`, `supabase/functions/billing-issue-invoice/index.ts`, `supabase/functions/billing-invoice-document/index.ts`, `supabase/functions/billing-cancel-invoice/index.ts`, `supabase/functions/bexio-reconcile/index.ts`, shared code under `supabase/functions/_shared/`.
 
 ---
 
@@ -13,11 +13,11 @@ New source locations (in-repo, research R-13): `supabase/functions/bexio-oauth/i
 **Auth**: caller JWT required for `start`, `status`, `disconnect`; caller must be admin (`is_admin` pattern from existing functions). `callback` is invoked by the browser redirect from Bexio and authenticates via the signed `state` parameter instead of a JWT.
 
 ### `POST /bexio-oauth` `{ "action": "start" }`
-→ `200 { "authorize_url": "https://idp.bexio.com/authorize?..." }`
+→ `200 { "authorize_url": "https://auth.bexio.com/realms/bexio/protocol/openid-connect/auth?..." }`
 Builds the authorize URL with scopes `contact_show contact_edit kb_invoice_show kb_invoice_edit offline_access` and a signed, single-use `state` nonce (HMAC with server secret, 10-min TTL). No session? → `401`. Not admin? → `403`.
 
-### `GET /bexio-oauth?action=callback&code=…&state=…` (browser redirect target, registered at developer.bexio.com)
-Validates `state`, exchanges `code` at `https://idp.bexio.com/token`, stores refresh token + access-token cache in Vault, upserts `billing_integrations` (`status='connected'`, scopes, `connected_at/by`), writes `integration.connected` audit event, then `302` redirects to the admin integrations page (`/admin/integrations?bexio=connected` or `?bexio=error=<code>`). Never renders tokens.
+### `GET /bexio-oauth/callback?code=…&state=…` (browser redirect target, registered at developer.bexio.com — path-based, no query string in the registered URL)
+Validates `state`, exchanges `code` at `https://auth.bexio.com/realms/bexio/protocol/openid-connect/token`, stores refresh token + access-token cache in Vault, upserts `billing_integrations` (`status='connected'`, scopes, `connected_at/by`), writes `integration.connected` audit event, then `302` redirects to the admin integrations page (`/admin/integrations?bexio=connected` or `?bexio=error=<code>`). Never renders tokens.
 
 ### `POST /bexio-oauth` `{ "action": "status" }`
 → `200 { "status": "not_connected|connected|degraded|requires_reauth", "connected_at": "…", "scopes": [...], "last_successful_call_at": "…", "last_error": "…", "config_complete": true|false }` — powers the admin integration card (FR-006).
@@ -43,7 +43,8 @@ Deletes Vault secrets, sets `status='disconnected'`, keeps config for audit. Exi
 1. Verify caller owns the booking (or is admin) and booking is in a billable state.
 2. Idempotency: return existing result if `billing_operations.idempotency_key` already `succeeded`, or `billing_documents.booking_id` exists.
 3. Ensure contact (research R-04) → create draft invoice (research R-05 payload, `api_reference` set) → issue → upsert `billing_documents` → write `invoice.issued` audit event.
-4. Booking payment state is untouched at issuance (`payment_status='pending'`); confirmation arrives only via reconciliation or the manual proof path (Q2-A).
+4. Email the official Bexio PDF via Resend from `no-reply@agcpadelacademy.com` (research R-16 / FR-029a). Mail failure is audited in `notifications_log` and MUST NOT fail issuance (FR-030). Idempotent: skip when a `status=sent` row already exists for subject `Your AGC invoice {document_nr}`.
+5. Booking payment state is untouched at issuance (`payment_status='pending'`); confirmation arrives only via Bexio reconciliation.
 
 ### Responses
 - `200 { "document": { "id", "document_nr", "status": "issued", "total", "currency" }, "reused": false }`
@@ -54,7 +55,7 @@ Deletes Vault secrets, sets `status='disconnected'`, keeps config for audit. Exi
 
 ## 3. `billing-invoice-document` — PDF access (US5, FR-026)
 
-**Auth**: caller JWT; booking owner **or** admin (same dual-check pattern as existing proof access).
+**Auth**: caller JWT; booking owner **or** admin.
 
 ### `GET /billing-invoice-document?booking_id=<uuid>` (or `POST { "booking_id" }`)
 Resolves `billing_documents` for the booking → `404 { "error": "no_document" }` if none (legacy bookings use the existing `invoices` path instead) → fetches `GET /2.0/kb_invoice/{id}/pdf` → streams decoded bytes:
@@ -70,7 +71,7 @@ Errors: `401/403`, `502 provider_unavailable`. Nothing is written to Storage (re
 ### `POST /bexio-reconcile` `{ }`
 1. Token refresh if cache expired (single-flight; on `invalid_grant` → `status='requires_reauth'`, event `integration.token_refresh_failed`, stop).
 2. For each `billing_documents` in (`issued`,`partially_paid`): fetch invoice, apply numeric-totals rule (research R-07):
-   - fully paid → guarded booking update mirroring the live admin-approval writes: `status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`, `payment_confirmation_source='bexio_reconciliation'`, `payment_confirmed_at=now()`, guarded by `WHERE payment_status <> 'confirmed'` (research R-08; no `paid` value exists on `bookings`) → supersede unresolved proofs (FR-036), events `payment.reconciled` (+ `proof.superseded`);
+   - fully paid → guarded booking update: `status='confirmed'`, `payment_status='confirmed'`, `verification_status='approved'`, `payment_confirmation_source='bexio_reconciliation'`, `payment_confirmed_at=now()`, guarded by `WHERE payment_status <> 'confirmed'` (research R-08; no `paid` value exists on `bookings`) → event `payment.reconciled`;
    - partial → document status `partially_paid` (admin-visible);
    - cancelled in Bexio → document `cancelled` + discrepancy event for admin follow-up (spec Edge Cases).
 3. Process due `billing_operations` retries (backoff, `max_attempts`, then `failed` + `operation.retry_exhausted` event → admin alert per FR-031).
@@ -78,6 +79,28 @@ Errors: `401/403`, `502 provider_unavailable`. Nothing is written to Storage (re
 
 ### Responses
 `200 { "checked": n, "confirmed": n, "retried": n, "failed_operations": n }` • `401` • `503 { "error": "requires_reauth" }`
+
+---
+
+## 5. `billing-cancel-invoice` — unpaid lesson cancel (US5, FR-030–FR-032)
+
+**Auth**: caller JWT; booking **owner** (student). Admin JWT is allowed for support but there is no admin cancel UI.
+
+### Request
+```json
+{ "booking_id": "uuid", "idempotency_key": "booking:<uuid>:invoice_cancel:v1" }
+```
+
+### Behavior
+1. Resolve `billing_documents` for the booking. No document: still cancel the AGC booking.
+2. **Unpaid `issued`**: `POST /2.0/kb_invoice/{id}/cancel`, persist `billing_documents.status='cancelled'`, event `invoice.cancelled`, then cancel the AGC booking.
+3. **Paid / partially paid**: `409 refund_agreement_required` — paid-lesson and membership cancel rules are future specs; this function MUST NOT move money.
+4. Bexio outage: enqueue `invoice_cancel` (retried by `bexio-reconcile`) and still cancel the AGC booking (`502 provider_unavailable`).
+5. Bexio refuses: event `invoice.cancel_refused`, `409 cancel_refused`, AGC invoice state unchanged.
+
+### Responses
+- `200 { "outcome": "cancelled", "reused": bool, "document": { "id", "document_nr", "status", "total", "currency" } | null }`
+- `404 { "error": "not_found" }` • `409 { "error": "refund_agreement_required"|"cancel_refused" }` • `401/403` • `502 { "error": "provider_unavailable" }`
 
 ---
 

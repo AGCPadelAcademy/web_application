@@ -5,19 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, User, Mail, Phone, MapPin, Map, Globe, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, User, Mail, Phone, MapPin, Map, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useProfile } from '@/hooks/useProfile';
 import { profileToFormData } from '@/lib/profileService';
+import CountrySelect from '@/components/profile/CountrySelect';
 
 const EMPTY_FORM = {
-  full_name: '',
+  first_name: '',
+  last_name: '',
   email: '',
   phone: '',
   address: '',
   postal_code: '',
   city: '',
-  country: ''
+  country_code: ''
 };
 
 const ProfileManagementPage = () => {
@@ -108,18 +110,33 @@ const ProfileManagementPage = () => {
           </CardHeader>
           <CardContent className="space-y-8 pt-8">
             <div className="grid md:grid-cols-2 gap-8">
-              {/* Full Name Field */}
               <div className="space-y-3">
-                <Label htmlFor="full_name" className="flex items-center gap-2 text-gray-200 text-base font-semibold">
-                  <User className="w-4 h-4 text-green-500" /> Full Name
+                <Label htmlFor="first_name" className="flex items-center gap-2 text-gray-200 text-base font-semibold">
+                  <User className="w-4 h-4 text-green-500" /> First name
                 </Label>
-                <Input 
-                  id="full_name" 
-                  name="full_name" 
-                  value={formData.full_name} 
-                  onChange={handleChange} 
-                  placeholder="e.g. John Doe"
-                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-500 focus-visible:ring-green-500 text-base py-6" 
+                <Input
+                  id="first_name"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleChange}
+                  placeholder="e.g. Josep"
+                  required
+                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-500 focus-visible:ring-green-500 text-base py-6"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="last_name" className="flex items-center gap-2 text-gray-200 text-base font-semibold">
+                  Last name
+                </Label>
+                <Input
+                  id="last_name"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleChange}
+                  placeholder="e.g. Barberà Reverté"
+                  required
+                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-500 focus-visible:ring-green-500 text-base py-6"
                 />
               </div>
               
@@ -201,19 +218,8 @@ const ProfileManagementPage = () => {
                 />
               </div>
 
-              {/* Country Field */}
               <div className="space-y-3 md:col-span-2">
-                <Label htmlFor="country" className="flex items-center gap-2 text-gray-200 text-base font-semibold">
-                  <Globe className="w-4 h-4 text-green-500" /> Country
-                </Label>
-                <Input 
-                  id="country" 
-                  name="country" 
-                  value={formData.country} 
-                  onChange={handleChange} 
-                  placeholder="e.g. Switzerland"
-                  className="bg-gray-900 border-gray-600 text-white placeholder:text-gray-500 focus-visible:ring-green-500 text-base py-6" 
-                />
+                <CountrySelect value={formData.country_code} onChange={handleChange} required />
               </div>
             </div>
           </CardContent>

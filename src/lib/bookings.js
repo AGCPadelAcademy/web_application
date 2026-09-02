@@ -1,5 +1,6 @@
 import { addMinutes, format } from 'date-fns';
 import { supabase } from '@/lib/customSupabaseClient';
+import { isBexioBillingEnabled, issueBexioInvoice, cancelBexioInvoice } from '@/lib/billing';
 
 // Payment statuses that reserve a slot on the availability grid.
 export const ACTIVE_BOOKING_STATUSES = ['confirmed', 'pending'];
@@ -47,7 +48,23 @@ export async function createBooking(payload) {
 
 // The Edge Function allocates the invoice number atomically (INV-YYYY/MM/DD-XX)
 // and returns the public PDF URL.
+// Cutover branch (research R-12): when the Bexio integration is connected, new
+// bookings are invoiced in Bexio instead. There is no automatic fallback to the
+// legacy generator on Bexio failure (Q1-A) — the function enqueues a retry and
+// the error surfaces to the caller. The Bexio path returns no `url`: the PDF is
+// served on demand by billing-invoice-document (US3).
 export async function requestInvoice({ booking, lesson, profile, userId }) {
+  if (await isBexioBillingEnabled()) {
+    const data = await issueBexioInvoice(booking.id);
+    return {
+      success: true,
+      url: null,
+      invoice_id: null,
+      document: data.document,
+      reused: data.reused,
+    };
+  }
+
   // The function runs with verify_jwt: true — attach the session token
   // explicitly; functions.invoke does not reliably refresh its captured
   // Authorization header when sign-in happens after client construction.
@@ -87,4 +104,20 @@ export async function requestInvoice({ booking, lesson, profile, userId }) {
     throw new Error(detail || data?.error || 'Invoice generation failed');
   }
   return data;
+}
+
+// Client cancel of an unpaid lesson booking (US5, Decision 2026-08-25).
+// Membership subscriptions and paid-lesson / token rules are future specs.
+// If Bexio is down, the AGC booking still cancels and invoice_cancel is queued.
+export async function cancelBooking(bookingId) {
+  if (await isBexioBillingEnabled()) {
+    return cancelBexioInvoice(bookingId);
+  }
+  const { error } = await supabase
+    .from('bookings')
+    .update({ status: 'cancelled', payment_status: 'cancelled' })
+    .eq('id', bookingId)
+    .neq('payment_status', 'cancelled');
+  if (error) throw error;
+  return { outcome: 'cancelled', reused: false, document: null };
 }

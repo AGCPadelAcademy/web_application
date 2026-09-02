@@ -8,19 +8,21 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { fetchProfile, updateProfile, profileToFormData } from '@/lib/profileService';
+import CountrySelect from '@/components/profile/CountrySelect';
 
 const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: '',
+    first_name: '',
+    last_name: '',
     email: '',
     phone: '',
     address: '',
     postal_code: '',
     city: '',
-    country: ''
+    country_code: ''
   });
 
   useEffect(() => {
@@ -37,6 +39,14 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
 
   const handleSave = async () => {
     // Validation
+    if (!formData.first_name.trim() || !formData.last_name.trim()) {
+      toast({ title: 'Validation Error', description: 'First and last name are required for the invoice.', variant: 'destructive' });
+      return;
+    }
+    if (!formData.country_code) {
+      toast({ title: 'Validation Error', description: 'Please select your country.', variant: 'destructive' });
+      return;
+    }
     if (formData.phone.length < 10) {
       toast({ title: 'Validation Error', description: 'Phone number must be at least 10 digits.', variant: 'destructive' });
       return;
@@ -81,9 +91,15 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="full_name">Full Name</Label>
-            <Input id="full_name" name="full_name" value={formData.full_name} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="first_name">First name</Label>
+              <Input id="first_name" name="first_name" value={formData.first_name} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="last_name">Last name</Label>
+              <Input id="last_name" name="last_name" value={formData.last_name} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
+            </div>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
@@ -94,7 +110,7 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
             <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="address">Address</Label>
+            <Label htmlFor="address">Street address</Label>
             <Input id="address" name="address" value={formData.address} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -107,10 +123,7 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
               <Input id="city" name="city" value={formData.city} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
             </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="country">Country</Label>
-            <Input id="country" name="country" value={formData.country} onChange={handleChange} required className="bg-gray-800 border-gray-700 text-white" />
-          </div>
+          <CountrySelect value={formData.country_code} onChange={handleChange} required />
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">

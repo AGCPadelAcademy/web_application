@@ -47,7 +47,7 @@ specs/features/               New work — one folder per feature
 1. **Specify** — `specs/features/<feature>/spec.md`. User approves.
 2. **Plan** — `specs/features/<feature>/plan.md`. User approves.
 3. **Tasks** — `specs/features/<feature>/tasks.md`. User approves.
-4. **Implement** — execute tasks; mark complete as they ship.
+4. **Implement** — on git branch `sdd/<feature-folder>` (never `main`); execute tasks; mark complete as they ship.
 
 No implementation of non-trivial work begins without an approved spec and plan. Feature specs **reference requirement IDs** from `specs/baseline-system/requirements.md`; they do not restate the baseline.
 

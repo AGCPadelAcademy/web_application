@@ -36,14 +36,15 @@ export interface AccountingProvider {
   issueInvoice(ref: ExternalInvoiceRef): Promise<ExternalInvoice>;   // draft → issued
   getInvoice(ref: ExternalInvoiceRef): Promise<ExternalInvoice>;     // status + totals
   getInvoicePdf(ref: ExternalInvoiceRef): Promise<ProviderPdf>;      // { bytes, fileName }
+  sendInvoiceEmail(ref: ExternalInvoiceRef, input: InvoiceEmailInput): Promise<void>;
   cancelInvoice(ref: ExternalInvoiceRef): Promise<void>;             // issued → cancelled
 }
 
 export interface InvoiceInput {
   apiReference: string;            // 'agc:booking:{uuid}' — FR-016
   contact: ExternalContactRef;
-  title: string;                   // e.g. 'Padel lesson — {lesson type} {date}'
-  lines: Array<{ text: string; amount: number; unitPrice: number; }>; // gross CHF from lesson_types.price
+  title: string;                   // e.g. '{lesson name} — {date}'
+  lines: Array<{ text: string; amount: number; unitPrice: number; }>; // gross CHF from lessons.price_amount
   currency: 'CHF';
   isValidFrom: string;             // ISO date
   isValidTo: string;               // payment term from config
@@ -66,7 +67,7 @@ export interface ExternalInvoice {
 
 | Operation | Bexio call | Verified |
 |---|---|---|
-| token exchange/refresh | `POST https://idp.bexio.com/token` | docs + knowledge base |
+| token exchange/refresh | `POST https://auth.bexio.com/realms/bexio/protocol/openid-connect/token` | docs + live OIDC discovery (2026-08-21) |
 | current user (setup) | `GET /3.0/users/me` | docs |
 | find contact | `POST /2.0/contact/search` field `mail` | docs |
 | create/update contact | `POST /2.0/contact`, `POST /2.0/contact/{id}` (`contact_type_id: 2`, `name_1` last, `name_2` first) | docs |
@@ -74,7 +75,8 @@ export interface ExternalInvoice {
 | create invoice | `POST /2.0/kb_invoice` (positions `type: "KbPositionCustom"`, config IDs) | docs |
 | issue invoice | `POST /2.0/kb_invoice/{id}/issue` (requires draft) | docs |
 | get invoice | `GET /2.0/kb_invoice/{id}` (totals, `kb_item_status_id`, `qr_invoice_id`) | docs |
-| invoice PDF | `GET /2.0/kb_invoice/{id}/pdf` (base64 `{ data, name }`) | docs |
+| invoice PDF | `GET /2.0/kb_invoice/{id}/pdf` (JSON `{ name, size, mime, content }` — `content` is base64) | docs |
+| send invoice email | `POST /2.0/kb_invoice/{id}/send` (`recipient_email`, `subject`, `message` with `[Network Link]`, `attach_pdf: true`) | docs |
 | cancel invoice | `POST /2.0/kb_invoice/{id}/cancel` (issued only) | docs |
 | discovery (setup) | `/2.0/payment_type`, `/2.0/country`, `/2.0/language`, `/3.0/banking/accounts`, `/3.0/taxes?types=sales_tax&scope=active`, `/3.0/currencies`, document templates | docs |
 
@@ -84,4 +86,4 @@ export interface ExternalInvoice {
 2. **Rate limiting**: on `429`, honor `RateLimit-*`/`Retry-After` with exponential backoff + jitter; exhausted budget ⇒ `ProviderUnavailableError` ⇒ caller enqueues into `billing_operations` (FR-008, FR-030).
 3. **Idempotency**: `createInvoice` MUST be preceded by `findInvoiceByApiReference` in the same orchestration step (research R-05); adapters never auto-create duplicates.
 4. **Logging**: adapters log method, status code, correlation id (`api_reference` / idempotency key), and sanitized error class only — never tokens, headers, or full bodies (FR-032/FR-034).
-5. **Cancellation**: `cancelInvoice` is exposed for admin-triggered use only (V1 hybrid per spec §Cancellation/Refunds); callers must confirm the invoice is `issued` and unpaid first.
+5. **Cancellation**: `cancelInvoice` is issued-and-unpaid only. The caller is the **student unpaid-lesson cancel** path, not an admin invoice console.

@@ -11,6 +11,7 @@ import ContactPage from '@/pages/ContactPage';
 import LoginPage from '@/pages/LoginPage';
 import TermsPage from '@/pages/TermsPage';
 import AdminDashboard from '@/pages/AdminDashboardPage';
+import CoachRosterPage from '@/pages/CoachRosterPage';
 import ProfileManagementPage from '@/pages/ProfileManagementPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import AuthCallbackPage from '@/pages/AuthCallbackPage';
@@ -62,12 +63,22 @@ function App() {
               }
             />
 
-            <Route path="admin" element={<Navigate to="/admin/payment-verification" replace />} />
+            <Route path="admin" element={<Navigate to="/admin/integrations" replace />} />
+            <Route path="admin/payment-verification" element={<Navigate to="/admin/integrations" replace />} />
             <Route
-              path="admin/payment-verification"
+              path="admin/integrations"
               element={
                 <ProtectedRoute requireAdmin={true}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="coach/roster"
+              element={
+                <ProtectedRoute allowedRoles={['coach']}>
+                  <CoachRosterPage />
                 </ProtectedRoute>
               }
             />

@@ -2,11 +2,12 @@
 
 **Feature Branch**: `006-roles-and-permissions`  
 **Created**: 2026-08-19  
-**Status**: Draft (reverse-engineered, as-is)  
-**Input**: Live authorization — `profiles.role`, RLS (`is_admin()`), Edge Function checks, `ProtectedRoute`
+**Updated**: 2026-08-25 (F1.02 as implemented on `sdd/008-roles-and-permissions`)  
+**Status**: Reverse-engineered as-is **after F1.02**  
+**Input**: `profiles.role`, RLS (`is_admin()` / `is_coach()`), `session_roster`, storage policies, Edge Function checks, `ProtectedRoute`
 
-> Reverse spec of **observed** behavior. **Intended** = documented or shown in copy but not implemented. Bugs are in Known gaps, not in FR-*.  
-> `coach` and `accounting` exist on the CHECK constraint only. They are **not** live actors. Do not write FRs that treat those roles as working products.
+> Reverse spec of **observed** behavior of this codebase after F1.02. Apply migration `0008_f102_roles_and_permissions.sql` on the target Supabase project for the remote schema to match.  
+> Forward delta that produced this as-is: [`specs/features/008-roles-and-permissions/spec.md`](../008-roles-and-permissions/spec.md). Do not keep a second living permission matrix in 008 after this refresh.
 
 ---
 
@@ -14,62 +15,74 @@
 
 ### User Story 1 - Student owns their data (Priority: P1)
 
-A signed-in user with `profiles.role = student` (the default) can create and see their own bookings and proofs, and cannot use admin APIs.
+A signed-in user with `profiles.role = student` (the default) can create and see their own bookings and invoice documents, and cannot use admin APIs or other students’ profiles/files. Payment-proof UI is dormant after 007, but its table/storage authorization remains enforced.
 
-**Why this priority**: Almost all live users are students (`supabase-backend.md`: 43 student / 1 admin at snapshot).
+**Why this priority**: Almost all live users are students.
 
-**Independent Test**: As a student, SELECT own bookings; INSERT own booking; `/admin/payment-verification` redirects home; `generate-invoice-pdf` for another user’s booking returns 403.
+**Independent Test**: As a student, SELECT own bookings; INSERT own booking; `/admin/integrations` redirects home; `GET profiles?id=eq.<other>` is empty; `PATCH role` fails; invoice retrieval for another user’s booking returns 403.
 
 **Acceptance Scenarios**:
 
-1. **Given** a new profile, **When** the row is created, **Then** `role` defaults to `student` and CHECK allows `student|coach|accounting|admin` (`supabase-backend.md` `profiles.role`; ACT-001).
-2. **Given** `bookings.user_id = auth.uid()`, **When** the student SELECTs/INSERTs/UPDATEs bookings, **Then** RLS allows those owner operations (ACT-002; `supabase-backend.md` §5).
-3. **Given** a student session, **When** `/admin/payment-verification` is requested, **Then** client navigates to `/` (`ProtectedRoute.jsx`; ACT-005).
-4. **Given** a student JWT, **When** `notify-payment-verification` is invoked, **Then** the function returns 403 (`api-contracts.md` v6).
+1. **Given** a new profile, **When** the row is created, **Then** `role` defaults to `student` and CHECK allows `student|coach|accounting|admin`.
+2. **Given** `bookings.user_id = auth.uid()`, **When** the student SELECTs/INSERTs/UPDATEs bookings (except `coach_id`), **Then** RLS allows those owner operations.
+3. **Given** a student session, **When** `/admin/integrations` is requested, **Then** client navigates to `/`.
+4. **Given** a student JWT, **When** an admin-only Bexio action is invoked, **Then** the function returns 403.
+5. **Given** student A, **When** they SELECT student B’s profile, booking, or payment-proof object, **Then** no row / storage deny.
+6. **Given** any PostgREST JWT, **When** they PATCH `profiles.role`, **Then** the trigger refuses and the row is unchanged.
 
 ---
 
-### User Story 2 - Admin is the only extra live actor (Priority: P1)
+### User Story 2 - Admin is unrestricted operationally (Priority: P1)
 
-A user with `profiles.role = admin` can read all bookings/proofs, update any proof/booking for verification, and call admin Edge Functions.
+A user with `profiles.role = admin` can manage the Bexio integration, inspect operational billing records, assign coaches, and call admin Edge Functions.
 
-**Why this priority**: Payment verification (004) is the only extra live workflow (ACT-003, FEAT-ADM-001).
-
-**Independent Test**: Set role to admin; open `/admin/payment-verification`; approve a proof; RLS UPDATE succeeds.
+**Independent Test**: Set role to admin (out-of-band SQL); open `/admin/integrations`; inspect Bexio state; set `bookings.coach_id` to a coach profile.
 
 **Acceptance Scenarios**:
 
-1. **Given** `profiles.role = admin`, **When** `fetchRole` runs, **Then** `useAuth().role` is `admin` (`SupabaseAuthContext.jsx`).
-2. **Given** admin, **When** `is_admin()` is evaluated in RLS, **Then** SELECT all bookings, SELECT all payment_proofs, UPDATE any booking, UPDATE any payment_proof (`supabase-backend.md`; migration `0007` GRANT EXECUTE on `is_admin()`).
-3. **Given** admin JWT, **When** `generate-invoice-pdf` is called for any booking, **Then** ownership-or-admin check passes (`api-contracts.md` §1.1).
-4. **Given** `ProtectedRoute requireAdmin`, **When** role is admin, **Then** `AdminDashboardPage` renders (`App.jsx`).
+1. **Given** `profiles.role = admin`, **When** `fetchRole` runs, **Then** `useAuth().role` is `admin`.
+2. **Given** admin, **When** `is_admin()` is evaluated in RLS, **Then** admin SELECT/UPDATE policies and admin-only billing reads succeed.
+3. **Given** admin JWT, **When** `generate-invoice-pdf` is called for any booking, **Then** ownership-or-admin check passes.
+4. **Given** `ProtectedRoute requireAdmin`, **When** role is admin, **Then** `AdminDashboardPage` renders (Bexio integration + Coach assignment tabs).
+5. **Given** admin, **When** they set `coach_id` to a profile with `role = coach`, **Then** the assignment succeeds; setting it to a student fails.
 
 ---
 
-### User Story 3 - Anonymous visitors see only non-PII availability (Priority: P2)
+### User Story 3 - Coach sees assigned-session participants only (Priority: P1)
 
-Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking PII.
+A user with `profiles.role = coach` signs in like any user and sees only operational roster rows for bookings assigned to them.
 
-**Why this priority**: Public grid (001) after migration `0006` (XR-004).
-
-**Independent Test**: Signed out, `/lessons` grid loads; direct `bookings` SELECT as anon fails.
+**Independent Test**: Assign coach C to occurrence A only; C’s `/coach/roster` lists A not B; `/admin/integrations` redirects; admin-only billing actions return 403.
 
 **Acceptance Scenarios**:
 
-1. **Given** anon, **When** `lessons` and `booking_slots` are selected, **Then** public policies allow it (`supabase-backend.md`; `bookings.js` `fetchDayBookings`).
-2. **Given** anon, **When** `bookings` SELECT is attempted, **Then** owner/admin policies deny it (migration `0006`).
+1. **Given** coach C assigned to booking A, **When** they open `/coach/roster` or SELECT `session_roster`, **Then** they see A’s participant name, lesson, date, and time — not price, payment, or email.
+2. **Given** coach C, **When** they SELECT another student’s `bookings` row, **Then** RLS returns no row.
+3. **Given** admin clears `coach_id` on A, **When** C refreshes the roster, **Then** A is gone.
+4. **Given** coach C, **When** they open `/admin/integrations`, **Then** the client navigates to `/`.
+
+---
+
+### User Story 4 - Anonymous visitors see only non-PII availability (Priority: P2)
+
+Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking or profile PII.
+
+**Independent Test**: Signed out, `/lessons` grid loads; direct `bookings` or `profiles` SELECT as anon fails.
+
+**Acceptance Scenarios**:
+
+1. **Given** anon, **When** `lessons` and `booking_slots` are selected, **Then** public policies allow it.
+2. **Given** anon, **When** `bookings` or `profiles` SELECT is attempted, **Then** policies deny it.
 
 ---
 
 ### Edge Cases
 
-- **Observed:** `ProtectedRoute` documents that it is **not** a security boundary (`ProtectedRoute.jsx` comment). `allowedRoles` is implemented but **unused** by `App.jsx`.
-- **Observed:** `fetchRole` errors default to `student`, so a transient profile read failure hides admin UI even for an admin (fail-closed on the client).
-- **Observed:** `coach` and `accounting` pass the CHECK and would fail `requireAdmin`; no pages, RLS branches, or EFs treat them as privileged.
-- **Observed:** `profiles` still has public SELECT `true` (`supabase-backend.md` ⚠️) — any visitor can read profile rows including email/role.
-- **Observed:** `payment_proofs` INSERT policy has no owner WITH CHECK; UPDATE is admin-only.
-- **Observed:** `invoices` / `invoice_counters` have RLS enabled and zero client policies (service-role only — intended for 002).
-- **Intended, not live:** permission matrix for coach/accounting (`requirements.md` TODO).
+- `ProtectedRoute` documents that it is **not** a security boundary. `/coach/roster` uses `allowedRoles={['coach']}` (admin still bypasses). `/admin/integrations` uses `requireAdmin`; the legacy `/admin/payment-verification` path redirects there.
+- `fetchRole` errors default to `student` (fail-closed on the client). Session loading stays true until role is resolved.
+- `accounting` passes the CHECK and is treated as a non-admin authenticated user: no roster rows, no admin UI, role PATCH still denied.
+- Role promotion to coach or admin remains out-of-band SQL.
+- `availability.trainer_id` is not assignment.
 
 ---
 
@@ -77,104 +90,103 @@ Unsigned visitors can read the lesson catalogue and `booking_slots`, not booking
 
 ### Functional Requirements
 
-Observed unless marked intended.
-
-- **FR-001**: Canonical authorization attribute MUST be `profiles.role` with CHECK `student | coach | accounting | admin` and default `student` (ACT-001).
-- **FR-002**: Student ownership of a booking MUST be `bookings.user_id = auth.uid()` (ACT-002).
-- **FR-003**: Admin MUST be `profiles.role = admin`. Client `/admin/payment-verification` uses `ProtectedRoute requireAdmin`. Server uses `is_admin()` and EF role checks (ACT-003, XR-003).
-- **FR-004**: Unauthenticated access to `/profile`, `/payments`, `/admin/*` MUST redirect to `/login` (ACT-004).
-- **FR-005**: Non-admin authenticated users MUST be redirected to `/` from `/admin/payment-verification` (ACT-005).
-- **FR-006**: `/admin` MUST redirect to `/admin/payment-verification` (FEAT-PUB-005).
-- **FR-007**: Anonymous PII MUST NOT be readable from `bookings`; public occupancy is `booking_slots` only (XR-004).
-- **FR-008**: `is_admin()` MUST be executable by the roles that evaluate RLS (migration `0007`).
+- **FR-001**: Canonical authorization attribute MUST be `profiles.role` with CHECK `student | coach | accounting | admin` and default `student`.
+- **FR-002**: Student ownership of a booking MUST be `bookings.user_id = auth.uid()`.
+- **FR-003**: Admin MUST be `profiles.role = admin`. Client `/admin/integrations` uses `ProtectedRoute requireAdmin`. Server uses `is_admin()` and EF role checks. PostgREST MUST NOT change `role` (out-of-band SQL only).
+- **FR-004**: Unauthenticated access to `/profile`, `/payments`, `/admin/*`, `/coach/*` MUST redirect to `/login`. Anon MUST NOT read profile PII.
+- **FR-005**: Non-admin authenticated users MUST be redirected to `/` from `/admin/integrations`.
+- **FR-006**: `/admin` and legacy `/admin/payment-verification` MUST redirect to `/admin/integrations`.
+- **FR-007**: Anonymous PII MUST NOT be readable from `bookings`; public occupancy is `booking_slots` only.
+- **FR-008**: `is_admin()` and `is_coach()` MUST be executable by the roles that evaluate RLS.
 - **FR-009**: The SPA MUST read role via `useAuth().role` (`fetchRole` on session).
-- **FR-010**: Coach and accounting MUST remain **schema-only** in this reverse spec — no live UI or workflow FRs.
+- **FR-010**: Coach MUST see only assigned-session participants via `session_roster` (name / lesson / date / time). Coaches MUST NOT SELECT other students’ financial `bookings` columns or use admin/finance Edge Functions.
+- **FR-011**: Admin MUST assign or clear `bookings.coach_id` targeting a `profiles.role = coach` row. Non-admins MUST NOT change `coach_id`.
+- **FR-012**: `payment-proofs` storage objects MUST be readable/insertable by the booking owner or admin, using the first path segment as `bookings.id`.
+- **FR-013**: `accounting` MUST remain unused (no roster, no admin tools).
 
 ### Key Entities
 
-- **Profile.role** — single role per user (join table and JWT claims rejected — `supabase-backend.md`).
-- **is_admin()** — SQL helper used by bookings and payment_proofs policies.
+- **Profile.role** — single role per user.
+- **is_admin() / is_coach()** — SQL helpers.
+- **bookings.coach_id** — assignment (nullable FK).
+- **session_roster** — operational view.
 - **ProtectedRoute** — client UX guard.
 
 ---
 
 ## Success Criteria *(mandatory)*
 
-### Measurable Outcomes
-
-- **SC-001**: Students cannot mutate another user’s bookings or approve proofs.
-- **SC-002**: Admins can complete 004 without using the student’s account.
-- **SC-003**: Anonymous visitors can use `/lessons` without seeing who booked a slot.
-- **SC-004**: Removing `ProtectedRoute` would still leave RLS/EF blocking student writes to admin tables (XR-003).
+- **SC-001**: Students cannot read or mutate another user’s profile, bookings, proofs, or proof files, and cannot change `role`.
+- **SC-002**: Admins can manage Bexio and coach assignment without using the student’s account.
+- **SC-003**: A coach assigned only to occurrence A sees A’s participant on the roster and not occurrence B.
+- **SC-004**: Coaches cannot manage Bexio or retrieve another student’s invoice.
+- **SC-005**: Anonymous visitors can use `/lessons` without seeing who booked a slot or profile emails.
+- **SC-006**: Removing `ProtectedRoute` would still leave RLS/EF blocking unauthorized writes.
 
 ---
 
 ## Data impact
 
-- **Read:** `profiles.role` (own row + currently also public SELECT).
-- **Write:** role is not changed by any live SPA form. Admin assignment is out-of-band (dashboard / SQL).
-- **Policies:** listed in `specs/baseline-system/supabase-backend.md` §5.
+- **Read:** `profiles.role` (own row, or any row if admin); coaches read `session_roster`.
+- **Write:** SPA profile forms never send `role`. Admin assignment writes `bookings.coach_id`. Role changes are out-of-band SQL.
+- **Policies:** `specs/baseline-system/supabase-backend.md` §5 (after `0008`).
 
 ---
 
 ## Auth / security impact
 
-Live matrix (observed):
+Live matrix (after `0008`):
 
-| Action | student | admin | anon | coach / accounting |
-|---|---|---|---|---|
-| Book lesson / own bookings | yes | yes (as user) | no | same as student in UI |
-| `/payments` proofs | own | via RLS all | no | same as student in UI |
-| `/admin/payment-verification` | redirect `/` | yes | `/login` | redirect `/` |
-| `generate-invoice-pdf` | own booking | any | 401 | 403 unless they own |
-| `notify-payment-verification` | 403 | yes | 401 | 403 |
-| `booking_slots` | yes | yes | yes | yes |
+| Action | student | admin | coach | accounting | anon |
+|---|---|---|---|---|---|
+| Book lesson / own bookings | yes | yes | own only | own only | no |
+| `/payments` invoices | own | own view + admin APIs | own only | own only | no |
+| `/admin/integrations` | redirect `/` | yes | redirect `/` | redirect `/` | `/login` |
+| `/coach/roster` | redirect `/` | yes (bypass) | assigned roster | redirect `/` | `/login` |
+| `session_roster` | empty | all operational | assigned | empty | none |
+| Change `profiles.role` via PostgREST | no | no | no | no | no |
+| Change `bookings.coach_id` | no | yes (coach target) | no | no | no |
+| `generate-invoice-pdf` | own booking | any | 403 unless own | 403 unless own | 401 |
+| Admin-only Bexio actions | 403 | yes | 403 | 403 | 401 |
+| `booking_slots` | yes | yes | yes | yes | yes |
+| Public `profiles` SELECT | no | own-or-admin | own | own | no |
 
-`ProtectedRoute` is UX. Authorization for writes is RLS + EF (XR-003).
+`ProtectedRoute` is UX. Authorization for writes is RLS + EF.
 
 ---
 
 ## UI impact
 
-- `ProtectedRoute` on `/profile`, `/payments`, `/admin/payment-verification`.
-- Header has profile, payments, sign out — **no admin link** (004 gap).
-- `allowedRoles` unused.
+- `ProtectedRoute` on `/profile`, `/payments`, `/admin/integrations`, `/coach/roster`.
+- Header: profile, payments, sign out; **Session roster** when `role === 'coach'`. Still no admin Header link.
+- Admin Dashboard: Bexio integration + Coach assignment tabs.
 
 ---
 
 ## Non-goals
 
-- Implementing coach calendars, accounting dashboards, or a permission matrix product.
-- JWT custom claims.
-- Multi-tenant academies (XR-002).
-- Hardening work (public profiles SELECT, payment_proofs INSERT) as if it were already done.
-- `plan.md` / `tasks.md` / production code changes.
+- Coach calendars, class scheduler, or accounting dashboards.
+- JWT custom claims or a roles table.
+- Multi-tenant academies.
+- Granting coaches SELECT on `bookings`.
+- Using `availability.trainer_id` as assignment.
 
 ---
 
 ## Known gaps
 
-- Coach / accounting: CHECK values only; no workflows. **Decision 2026-08-19:** stay schema-only; no admin-equivalent access until `coach-accounting-matrix` after class-assignment / memberships-credits.
-- `profiles` public SELECT `true`.
-- Permissive `payment_proofs` INSERT and service-role-on-public policy (`supabase-backend.md` Advisor).
+- `invoices` / `invoice_counters` remain service-role-only (no client policies).
+- Permissive `payment_proofs` service-role-on-public policy (`supabase-backend.md` Advisor) is unchanged by F1.02.
 - No admin nav in Header.
-- Client role fetch failure defaults to student (admin UI hidden until reload).
-- `allowedRoles` dead API.
-
----
-
-## Open questions
-
-- ~~What may coach vs accounting do once specified?~~ **Deferred (2026-08-19).** Do not invent a matrix now. Specify after class-assignment / memberships-credits in `coach-accounting-matrix`. Until then only `student` and `admin` are live actors; accounting does not share admin access.
-- Should public `profiles` SELECT be replaced with own-or-admin?
-- Should INSERT on `payment_proofs` require booking ownership?
+- `0008` must be applied on the target project; until then production still has public `profiles` SELECT.
 
 ---
 
 ## Assumptions
 
-- One role per user is enough (`supabase-backend.md` decision).
-- Role changes happen outside the SPA and take effect on next `fetchRole` (no JWT claim refresh required).
+- One role per user is enough.
+- Role changes happen outside the SPA and take effect on next `fetchRole`.
+- Session occurrence is the current `bookings` row until a later class-assignment feature.
 
 ---
 
@@ -183,7 +195,7 @@ Live matrix (observed):
 | ID | Covered? |
 |---|---|
 | ACT-001 … ACT-005 | Yes |
-| XR-003, XR-004 | Yes (profiles public SELECT remains a gap under XR-003/PII) |
-| FEAT-ADM-001 | Route + admin actor (panel behavior is 004) |
+| XR-003, XR-004 | Yes (public profiles SELECT closed by `0008`) |
+| FEAT-ADM-001 | Route + admin actor (panel behavior is 004 + coach assignment) |
 | FEAT-PUB-005 | Yes |
-| Coach / accounting TODOs | **Gaps**, not FRs |
+| Coach roster | F1.02 / FR-010 |

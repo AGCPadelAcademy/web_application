@@ -76,8 +76,8 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 
 ## R-09. Scheduling mechanism for the polling worker
 
-- **Decision**: Enable `pg_cron` + `pg_net` (both available, not yet installed, per baseline §2) and register a cron job (every 15 minutes) that invokes the `bexio-reconcile` Edge Function via `pg_net.http_post` with a scheduler shared-secret header. The job definition ships in the feature's SQL migration.
-- **Rationale**: This is the Supabase-documented pattern for scheduled Edge Functions, keeps all backend behavior inside the fixed stack (constitution: no custom Node server), and the 15-minute cadence meets SC-003 (< 30 min worst case) with 3× headroom while staying far below Bexio rate limits.
+- **Decision**: Enable `pg_cron` + `pg_net` (both available, not yet installed, per baseline §2) and register a cron job (every six hours) that invokes the `bexio-reconcile` Edge Function via `pg_net.http_post` with a scheduler shared-secret header. The job definition ships in the feature's SQL migration.
+- **Rationale**: This is the Supabase-documented pattern for scheduled Edge Functions and keeps backend behavior inside the fixed stack (constitution: no custom Node server). Bank transfers take 2–3 days to arrive; a six-hour cadence reduces Bexio polling while keeping the additional confirmation delay bounded. An admin can still run reconciliation on demand.
 - **Alternatives considered**:
   - *Vercel Cron hitting the function URL* — viable without new extensions, but adds a public unauthenticated-by-default surface and couples backend behavior to the hosting layer; rejected in favor of the in-stack pattern.
   - *Admin-triggered manual polling only* — rejected: fails SC-002 (automatic confirmation without admin action).
@@ -132,6 +132,6 @@ Sources: fetched official Bexio API documentation (docs.bexio.com, captured duri
 | NEEDS CLARIFICATION: scheduling | `pg_cron` + `pg_net` | R-09 |
 | NEEDS CLARIFICATION: token storage | Supabase Vault | R-02 |
 | NEEDS CLARIFICATION: VAT | 0% active sales tax discovered from Bexio (2026-08-29) | R-14 |
-| NEEDS CLARIFICATION: reconciliation cadence | 15 min via cron; manual trigger available | R-09 |
+| NEEDS CLARIFICATION: reconciliation cadence | Every six hours via cron; manual trigger available (2026-09-02) | R-09 |
 
 All Technical Context unknowns are resolved. No remaining `NEEDS CLARIFICATION` items.

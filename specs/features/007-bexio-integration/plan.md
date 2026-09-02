@@ -6,7 +6,7 @@
 
 ## Summary
 
-Integrate Bexio as the external financial/accounting system so AGC never builds its own accounting ERP. New bookings produce Bexio-issued invoices (document of record, Q1-A) with Swiss QR payment parts; Bexio's bank reconciliation is authoritative for the `paid` state, synchronized into AGC by a scheduled polling worker. Implementation follows the mandated layering `FinancialService → AccountingProvider → BexioAdapter → Bexio API` inside Supabase Edge Functions (new in-repo sources under `supabase/functions/`), persists provider-neutral integration state in five new Postgres tables (+2 additive columns on `bookings`), stores OAuth tokens in Supabase Vault, schedules reconciliation via `pg_cron` + `pg_net` every 15 minutes, and exposes a new admin Integrations page. Legacy invoice generation remains for pre-integration records. Proof-of-payment is removed (Decision 2026-08-24).
+Integrate Bexio as the external financial/accounting system so AGC never builds its own accounting ERP. New bookings produce Bexio-issued invoices (document of record, Q1-A) with Swiss QR payment parts; Bexio's bank reconciliation is authoritative for the `paid` state, synchronized into AGC by a scheduled polling worker. Implementation follows the mandated layering `FinancialService → AccountingProvider → BexioAdapter → Bexio API` inside Supabase Edge Functions (new in-repo sources under `supabase/functions/`), persists provider-neutral integration state in five new Postgres tables (+2 additive columns on `bookings`), stores OAuth tokens in Supabase Vault, schedules reconciliation via `pg_cron` + `pg_net` every six hours (Decision 2026-09-02), and exposes a new admin Integrations page. Legacy invoice generation remains for pre-integration records. Proof-of-payment is removed (Decision 2026-08-24).
 
 ## Technical Context
 
@@ -22,7 +22,7 @@ Integrate Bexio as the external financial/accounting system so AGC never builds 
 
 **Project Type**: Web application (frontend SPA + serverless backend on existing fixed stack).
 
-**Performance Goals**: Invoice issuance adds ≤ 5 s to booking flow (SC-006); reconciliation detects payment within 30 min worst case (SC-003) — 15-min cadence + on-demand trigger; admin status queries < 1 s.
+**Performance Goals**: Invoice issuance adds ≤ 5 s to booking flow (SC-006); reconciliation detects payment within 6 h worst case (Decision 2026-09-02) — six-hour cadence + on-demand trigger; admin status queries < 1 s.
 
 **Constraints**: Bexio rate limits (429 + `RateLimit-*` headers, exact quota unpublished — backoff-driven, research R-10); access token TTL 1 h / refresh token 365 d with rotation; no native Bexio webhooks (polling mandated); no credit-note API (hybrid manual refunds, spec §Cancellation); brownfield — no changes to existing tables' semantics, RLS patterns, or legacy invoice path for historical records; secrets never in tables/logs/responses.
 

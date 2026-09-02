@@ -270,7 +270,7 @@ const IntegrationsPanel = () => {
           <CardHeader>
             <CardTitle className="text-white">Reconciliation worker</CardTitle>
             <CardDescription className="text-gray-400">
-              Bank payments recorded in Bexio are synced into AGC every 15 minutes.
+              Bank payments recorded in Bexio are synced into AGC every six hours.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">

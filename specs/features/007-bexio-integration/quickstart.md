@@ -49,7 +49,7 @@ This guide proves the feature end-to-end. It assumes the implementation (from `t
 | Step | Action | Expected |
 |---|---|---|
 | 4.1 | In Bexio, register a payment covering the invoice (demo company: open the invoice → record payment. A live bank feed is **not** required.) | Bexio invoice shows received = total |
-| 4.2 | Wait ≤ 15 min (or press "Run reconciliation now" as admin) | Booking `status = 'confirmed'`, `payment_status = 'confirmed'`, `payment_confirmation_source = 'bexio_reconciliation'`; document status `paid`; `payment.reconciled` audit event |
+| 4.2 | Wait ≤ 6 h (or press "Run reconciliation now" as admin) | Booking `status = 'confirmed'`, `payment_status = 'confirmed'`, `payment_confirmation_source = 'bexio_reconciliation'`; document status `paid`; `payment.reconciled` audit event |
 | 4.3 | Re-run reconciliation | No state change, no duplicate events (idempotent) |
 | 4.4 | Partial payment case | Document shows `partially_paid`; booking remains `pending`; visible to admin |
 

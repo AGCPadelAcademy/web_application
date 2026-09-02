@@ -2,7 +2,7 @@
 -- Migration: 0004_bexio_reconcile_cron
 -- Purpose  : Register the scheduled reconciliation worker for the Bexio
 --            integration (spec: specs/features/007-bexio-integration,
---            research R-09). Every 15 minutes pg_cron invokes the
+--            research R-09). Every six hours pg_cron invokes the
 --            `bexio-reconcile` Edge Function via pg_net with a shared secret.
 --
 -- Review notes
@@ -55,7 +55,7 @@ $$;
 
 SELECT cron.schedule(
   'bexio-reconcile',
-  '*/15 * * * *',
+  '0 */6 * * *',
   $cmd$
     SELECT net.http_post(
       url := 'https://jokjxpogvwxbwdaroqkc.supabase.co/functions/v1/bexio-reconcile',

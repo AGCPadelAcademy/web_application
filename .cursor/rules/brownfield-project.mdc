@@ -69,6 +69,7 @@ Spec Kit does **not** create a git branch (`.specify/scripts/.../create-new-feat
 - **When:** create and `git checkout` the branch from up-to-date `main` **before** `/speckit-implement` (or before the first implementation commit). If work already started on `main`, create the branch from the current HEAD immediately — do not commit implementation to `main`.
 - **Push:** `git push -u origin HEAD` to the feature branch only.
 - **Pull requests:** do **not** open a PR into `main` until the feature’s implementation and quickstart verification are complete **and** the user asks for a PR. Cloud agents must not auto-open a draft PR after every push.
+- **Protected `main`:** Never attempt a direct `git push origin main`. After verification and an explicit user request to merge, create or update a pull request into `main`; GitHub branch protection performs the merge after its required checks and approvals.
 - **Merge:** do **not** merge or push to `main` until verification is complete and the user explicitly asks.
 - **Reverse-engineered live specs** (`spec.md` only, no implementation) do not require a branch.
 - **Commits:** one commit per completed user-story phase (not per task, not one dump at the end).

@@ -29,7 +29,7 @@ Three lines: **lessons** (live booking + payment), **tournaments** (marketing on
 2. **Register & sign in** — email + password; confirmation; password recovery lands on `/reset-password` (must not silently log in).
 3. **Complete profile** — billing fields required before a booking is created.
 4. **Book a lesson** — pick active catalogue item + date/slot → insert booking → generate branded invoice PDF (Swiss QR) → My Payments.
-5. **Pay** — bank transfer using the QR invoice. The booking is confirmed when Bexio records the payment (reconciliation worker, every 15 minutes or admin "Run now").
+5. **Pay** — bank transfer using the QR invoice. The booking is confirmed when Bexio records the payment (reconciliation worker, every six hours or admin "Run now").
 6. **Re-get invoice** — open existing PDF or issue/reuse from My Payments if needed.
 
 Trips and tournaments are **not** bookable. There is **no** live cancel-booking action.

@@ -218,7 +218,7 @@ Single additive migration `supabase/migrations/0XX_bexio_integration.sql` (appli
 2. Five new tables + constraints + indexes as above.
 3. Two additive columns on `bookings`.
 4. RLS enable + policies for all new tables; view + grant.
-5. `pg_cron` job registration calling `bexio-reconcile` every 15 min with scheduler secret read from Vault (`bexio_scheduler_secret` — generated at deploy, stored in Vault, not in the migration).
+5. `pg_cron` job registration calling `bexio-reconcile` every six hours with scheduler secret read from Vault (`bexio_scheduler_secret` — generated at deploy, stored in Vault, not in the migration).
 
 **Backward compatibility**: no existing table, policy, function, bucket, or enum is altered. Rollback = drop cron job, drop new objects, drop two columns — no data loss to pre-existing entities. Legacy `invoices` data and the `invoices` bucket are untouched (Q1-A).
 

@@ -30,6 +30,7 @@ Do not pre-create empty folders. Add a folder when a spec is started.
 |---|---|
 | `007-bexio-integration` | Bexio accounting integration |
 | `008-roles-and-permissions` | F1.02 — live Coach + student isolation tightenings (delta vs `006`) |
+| `009-client-management` | F1.04 — client profiles, admin directory, deactivation (delta vs `005`/`006`) |
 
 ---
 

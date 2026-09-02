@@ -6,61 +6,47 @@ alwaysApply: true
 
 Every F1.xx feature follows:
 
-GitHub Issue
-→ Specify
-→ Spec Review
-→ Plan
-→ Plan Review
-→ Tasks
-→ Analyze
-→ Implement
-→ Verify
-→ PR
-→ PRE
-→ Testing
-→ PRO
-→ Done
+1. GitHub Issue
+2. /speckit-specify
+3. Specification review
+4. /speckit-plan
+5. Plan review
+6. /speckit-tasks
+7. /speckit-analyze
+8. /speckit-implement
+9. Verification
+10. Pull Request
+11. PRE validation
+12. PRO deployment
 
 ## Stage Boundaries
 
 ### Specify
+Produces `spec.md`.
 
-Produces:
+After specification generation, stop.
 
-spec.md
-
-Must stop after specification generation and
-configured post-specification hooks.
+Configured post-specification hooks may execute.
 
 ### Plan
+Requires an approved `spec.md`.
 
-Produces:
-
-plan.md
-
-Must not begin until spec.md has been approved.
+Produces `plan.md`.
 
 ### Tasks
+Requires an approved `plan.md`.
 
-Produces:
+Produces `tasks.md`.
 
-tasks.md
+### Implementation
+Requires:
 
-Must not begin until plan.md has been approved.
+- approved `spec.md`
+- approved `plan.md`
+- `tasks.md`
+- satisfied feature dependencies
 
-### Implement
+### Implementation completion
 
-May only begin when:
-
-- spec.md exists
-- plan.md exists
-- tasks.md exists
-- required dependencies are satisfied
-
-### Completion
-
-Implementation is not complete merely because
-all tasks are checked.
-
-Verification must pass before the feature can
-move to Review/Testing.
+Implementation is not considered complete until
+verification passes.

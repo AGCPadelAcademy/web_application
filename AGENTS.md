@@ -32,46 +32,40 @@ Documentation rules:
 - use markdown
 - document uncertainty explicitly
 
-## Agent Operating Model
-
-Agents must respect the SDD stage they were assigned.
+## SDD Agent Roles
 
 ### Specification Agent
 
-Responsible only for:
+Responsible for:
 
 - reading the GitHub Issue
-- understanding the Brownfield system
+- understanding the Brownfield context
 - executing `/speckit-specify`
+- allowing configured post-specification hooks
 - validating `spec.md`
-- allowing configured post-specification hooks to execute
 
-The Specification Agent must not:
+Must stop after specification generation.
+
+Must not:
 
 - implement application code
-- execute `/speckit-plan`
-- execute `/speckit-tasks`
-- execute `/speckit-implement`
-- open an implementation PR
+- run `/speckit-plan`
+- run `/speckit-tasks`
+- run `/speckit-implement`
+- open a PR
 
 ### Planning Agent
 
-Responsible for:
+Responsible for `/speckit-plan`.
 
-- `/speckit-plan`
-- architecture decisions
-- implementation strategy
-- dependency analysis
+Requires an approved specification.
 
 ### Task Agent
 
-Responsible for:
+Responsible for `/speckit-tasks`.
 
-- `/speckit-tasks`
-- task decomposition
-- dependency ordering
-- identifying parallelizable work
+Requires an approved plan.
 
 ### Implementation Agent
 
-Responsible for executing approved tasks only.
+Responsible for implementing approved tasks only.

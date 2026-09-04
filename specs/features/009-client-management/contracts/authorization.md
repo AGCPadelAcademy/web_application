@@ -1,7 +1,7 @@
 # Contract: Client Management Authorization (F1.04)
 
-**Feature**: [spec.md](../spec.md)  
-**Data model**: [data-model.md](../data-model.md)  
+**Feature**: [spec.md](../spec.md)
+**Data model**: [data-model.md](../data-model.md)
 **Date**: 2026-09-04
 
 This contract defines browser-visible data operations and their server-enforced outcomes. The application uses the existing Supabase Data API, RLS, triggers, and fixed-output projections. No new custom HTTP API is introduced.

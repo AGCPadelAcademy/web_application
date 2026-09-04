@@ -1,7 +1,7 @@
 # Data Model: Client Management (F1.04)
 
-**Feature**: [spec.md](spec.md)  
-**Research**: [research.md](research.md)  
+**Feature**: [spec.md](spec.md)
+**Research**: [research.md](research.md)
 **Date**: 2026-09-04
 
 ## 1. Model summary

@@ -1,7 +1,7 @@
 # Quickstart: Validate Client Management (F1.04)
 
-**Feature**: [spec.md](spec.md)  
-**Authorization contract**: [contracts/authorization.md](contracts/authorization.md)  
+**Feature**: [spec.md](spec.md)
+**Authorization contract**: [contracts/authorization.md](contracts/authorization.md)
 **Data model**: [data-model.md](data-model.md)
 
 Use a separate test Supabase project. Never run destructive setup or role/status mutation checks against production.

@@ -1,7 +1,7 @@
 # Research: Client Management (F1.04)
 
-**Feature**: [spec.md](spec.md)  
-**Date**: 2026-09-04  
+**Feature**: [spec.md](spec.md)
+**Date**: 2026-09-04
 **Baseline**: `005` own-profile flow, `006`/`008` authorization and coach roster, migrations `0001`–`0010`
 
 No `NEEDS CLARIFICATION` items remain. Decisions below resolve the implementation choices needed by the plan.

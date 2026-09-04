@@ -40,8 +40,9 @@ For an authenticated non-admin owner:
 
 For an active admin:
 - Permit personal and academy-field changes on other profiles.
-- Never permit profile-email changes (login email remains Auth-owned).
-- Reject changing their own role.
+- Permit profile-email synchronization only when the value exactly matches the target user’s signed Auth email; never accept an arbitrary profile email.
+- Reject changing their own role or active status.
+- Permit role assignment only to `student`, `coach`, or `admin`; the legacy `accounting` value remains stored but is not assignable.
 - Apply last-active-admin protection to role/status changes.
 
 **Rationale**: Comparing row differences to an explicit allow-list enforces field authorization even if a caller bypasses the form and automatically protects future academy-controlled columns until their owning feature intentionally allows them.
@@ -80,7 +81,7 @@ For an active admin:
 
 ## R-06 — Serialize last-admin changes
 
-**Decision**: The profile-mutation trigger takes a transaction-scoped advisory lock before demoting or deactivating an active admin, then recounts active admins and refuses the change when only one remains.
+**Decision**: Client management refuses admin self-deactivation. When one admin demotes or deactivates another active admin, the profile-mutation trigger takes a transaction-scoped advisory lock, recounts active admins, and refuses the change when only one remains.
 
 **Rationale**: A simple count is race-prone: two concurrent transactions could both observe two admins and remove both. The shared transaction lock serializes all app-originated role/status removals.
 
@@ -108,13 +109,13 @@ For an active admin:
 - Delete profile/auth user — rejected because it can break history and contradicts retention.
 - UI-only disable — rejected because direct requests would still mutate.
 
-## R-08 — Make session bootstrap create-only
+## R-08 — Create or synchronize only Auth-owned identity data
 
-**Decision**: Refactor auth session profile bootstrap to create a missing profile but not overwrite an existing profile on every sign-in. Load `role` and `is_active` together into auth context.
+**Decision**: Refactor auth session profile bootstrap to create a missing profile. For an existing profile, synchronize only `profiles.email` to the signed Auth email when absent or changed; do not overwrite profile-controlled or academy-controlled fields. Load `role` and `is_active` together into auth context.
 
-**Rationale**: The current upsert rewrites name, phone, and `updated_at` from stale Auth metadata on every session restore. That would overwrite admin-managed client information and produce denied writes for inactive profiles. Once created, the application profile is authoritative.
+**Rationale**: The current upsert rewrites name, phone, and `updated_at` from stale Auth metadata on every session restore. That would overwrite admin-managed client information and produce denied writes for inactive profiles. Email is different: the baseline has existing null profile emails, and the signed Auth email remains the identity source of truth. A narrow exact-match synchronization preserves that backfill without reopening arbitrary email edits.
 
-**Compatibility**: Signup and legacy missing-profile recovery still create the required row. Existing users keep the same login/profile relationship.
+**Compatibility**: Signup and legacy missing-profile recovery still create the required row. Existing null profile emails are backfilled from Auth. Existing users keep the same login/profile relationship.
 
 **Alternatives considered**:
 - Allow inactive auth-sync updates — rejected because it violates read-only deactivation.
@@ -159,11 +160,11 @@ For an active admin:
 - Global redirect for inactive users — rejected because they must view profile/history.
 - Add DOB to completion modal — rejected because it is optional.
 
-## R-12 — Preserve email ownership
+## R-12 — Preserve email ownership with exact Auth synchronization
 
-**Decision**: Neither student nor admin client-management writes `profiles.email`; it remains a displayed copy of the Auth identity.
+**Decision**: Neither student nor admin forms write `profiles.email`. Session bootstrap may set it only to the exact signed Auth email for the same profile. The mutation guard rejects every arbitrary profile-email value.
 
-**Rationale**: Editing only the profile copy would create a mismatch with login identity and Bexio/contact behavior. Auth-email change is explicitly out of scope.
+**Rationale**: Editing only the profile copy would create a mismatch with login identity and Bexio/contact behavior. Exact identity synchronization fills legacy null values and follows a completed Auth email change without creating a second email authority.
 
 **Alternatives considered**:
 - Admin edits profile email only — rejected as inconsistent.
@@ -184,7 +185,7 @@ For an active admin:
 **Decision**: Use three layers:
 1. Vitest unit/contract tests for profile payload allow-lists, admin queries, roster columns, and inactive UI helpers.
 2. Executable/commented SQL role scenarios on a separate test project for RLS, trigger, concurrency invariant, and projection grants.
-3. Manual browser checks for student, admin, coach, and inactive-client journeys, followed by lint, full tests, and production build.
+3. Deploy every changed Edge Function to the separate test project, then run direct and manual browser checks for student, admin, coach, and inactive-client journeys, followed by lint, full tests, and production build.
 
 **Rationale**: UI tests alone cannot prove direct-request authorization. SQL checks alone cannot prove user journeys. Existing repository conventions use Vitest plus SQL authorization checklists.
 
@@ -194,7 +195,7 @@ For an active admin:
 
 ## Observations / implementation risks
 
-- The deployed legacy `generate-invoice-pdf` function is documented but its source is not currently versioned under `supabase/functions/`. Before implementation closes FR-009, retrieve/inspect the deployed source or otherwise prove inactive owners cannot use it to create a missing invoice.
+- The deployed legacy `generate-invoice-pdf` function is documented but its source is not currently versioned under `supabase/functions/`. Source retrieval and safe versioning are a blocking prerequisite: if unavailable, stop implementation rather than create a placeholder or leave the inactive-owner mutation path unverified.
 - Existing billing functions perform direct `role === 'admin'` checks. Mutating/admin functions must also require `is_active`; invoice-document retrieval should continue to allow inactive owners.
 - PostgreSQL cannot change a table-returning function’s output shape with a simple `CREATE OR REPLACE`; drop/recreate the dependent roster view/function in one migration and restore exact grants.
 - `ensureProfile` currently overwrites application fields during session restoration. R-08 is required to prevent admin edits being reverted.

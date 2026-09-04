@@ -35,7 +35,7 @@ Extend the existing 1:1 `profiles` client model rather than adding another user 
 | Principle / constraint | Evaluation | Result |
 |---|---|---|
 | I. Understand before modifying | Reviewed baseline/domain/API docs, `005`/`006`/`008`, profile/auth/booking/admin/coach sources, migrations `0001`–`0010`, and current Supabase RLS guidance | PASS |
-| II. Spec-driven | `spec.md` and quality checklist precede plan; tasks/implementation remain later gates | PASS |
+| II. Spec-driven | `spec.md` and quality checklist precede plan; tasks/implementation remain later gates; this managed Cloud Agent uses the constitution-approved dedicated `cursor/` feature branch | PASS |
 | III. Incremental/backward compatible | Two additive profile fields; existing identity/FKs/history retained; existing profile completeness unchanged | PASS |
 | IV. Security-first | Owner/admin row RLS plus field trigger; active-aware privileges; fixed-output coach projection; direct-request tests | PASS |
 | V. Migration discipline | One forward migration after remote history confirmation; applied migrations untouched; no unrelated schema debt | PASS |
@@ -76,6 +76,9 @@ supabase/
 ├── migrations/
 │   └── 0011_f104_client_management.sql        # tentative next number; confirm remote history first
 └── functions/
+    ├── _shared/
+    │   ├── profile-access.ts                   # NEW: common role/activity decisions
+    │   └── profile-access.test.ts              # NEW: Deno unit tests
     ├── billing-issue-invoice/index.ts          # active owner/admin for mutation
     ├── billing-cancel-invoice/index.ts         # active owner/admin for mutation
     ├── billing-invoice-document/index.ts       # preserve inactive owner read
@@ -84,7 +87,7 @@ supabase/
 
 src/
 ├── contexts/
-│   └── SupabaseAuthContext.jsx                 # create-only bootstrap; expose isActive
+│   └── SupabaseAuthContext.jsx                 # create/sync Auth email only; expose isActive
 ├── lib/
 │   ├── profileService.js                       # own DOB/status mapping; preserve payload allow-list
 │   ├── profileService.test.js                  # NEW
@@ -112,7 +115,7 @@ tests/sql/
 └── 0011_f104_client_management.test.sql         # tentative number; direct RLS/trigger/projection checks
 ```
 
-**Structure Decision**: Stay in the existing SPA, direct Supabase service modules, migrations, and Edge Function layout. The admin directory is a tab in the existing protected dashboard. No new route or backend service is required unless component size during implementation demonstrates a separate protected `/admin/clients` route is clearer; either route uses the same contract.
+**Structure Decision**: Stay in the existing SPA, direct Supabase service modules, migrations, and Edge Function layout. The admin directory is a tab in the existing protected dashboard; no new route or backend service is introduced.
 
 ## Phase 0: Research result
 
@@ -122,7 +125,7 @@ tests/sql/
 - field-difference trigger and active-aware RLS
 - last-admin concurrency protection
 - inactive read-only lifecycle across browser and service-role paths
-- create-only auth profile bootstrap
+- create-or-sync Auth bootstrap that updates only the signed Auth email on existing profiles
 - fixed-output coach phone projection
 - dashboard/query/test strategy
 
@@ -144,11 +147,11 @@ Create one migration only after checking local/remote numbering:
 2. Replace `is_admin()` / `is_coach()` bodies to require active profile while preserving signatures/grants.
 3. Replace `prevent_role_self_service` with a profile mutation guard:
    - reject future DOB
-   - reject profile-email mutation for all Data API callers
+   - reject profile-email mutation except exact same-user synchronization to the signed Auth email
    - active non-admin owner: explicit changed-column allow-list
    - inactive owner: no UPDATE
-   - active admin: other-profile role/status allowed, own-role denied
-   - advisory-lock + recount before removing an active admin
+   - active admin: other-profile role/status allowed only for `student`, `coach`, or `admin`; own role/status and `accounting` assignment denied
+   - advisory-lock + recount before removing another active admin
 4. Recreate profile UPDATE and booking owner INSERT/UPDATE policies with activity rules; preserve owner SELECT regardless of activity and active-admin policies.
 5. Drop/recreate roster view and table-returning private reader to add participant id/phone, then restore exact grants and security-invoker settings.
 6. Reload Data API schema cache.
@@ -157,7 +160,7 @@ Do not modify profile INSERT/bootstrap policies, foreign keys, DELETE permission
 
 ### 2. Auth/profile services
 
-- Session restoration queries existing profile state first and inserts only when missing; it no longer overwrites application profile fields from stale Auth metadata.
+- Session restoration queries existing profile state first, inserts when missing, and otherwise synchronizes only the exact signed Auth email when absent or changed; it never overwrites profile-controlled or academy-controlled fields from Auth metadata.
 - Auth context carries current role/activity for UX guards while database checks remain authoritative.
 - `profileService` maps DOB/status, but owner update payload contains only client-controlled fields.
 - The profile screen shows email/role/status read-only, DOB optional, and disables save when inactive.
@@ -167,7 +170,7 @@ Do not modify profile INSERT/bootstrap policies, foreign keys, DELETE permission
 
 - `clientManagement.js` owns bounded list/search/filter and explicit personal/role/status updates.
 - Admin panel reuses existing inputs, country selector, cards/dialogs, toast patterns, and dashboard tab composition.
-- UI prevents own-role and last-admin actions when known, but always handles server rejection.
+- UI prevents own-role, own-deactivation, legacy `accounting` assignment, and last-admin actions when known, but always handles server rejection.
 - Do not expose an invite/create-login button.
 
 ### 4. Inactive operations
@@ -175,7 +178,8 @@ Do not modify profile INSERT/bootstrap policies, foreign keys, DELETE permission
 - `/lessons` checks profile status before completeness/confirmation and shows a clear message.
 - Database policies reject stale-tab/direct booking inserts and owner booking updates/cancellations.
 - Mutating billing/admin Edge Functions query both role and activity. Existing invoice-document retrieval remains owner-readable when inactive.
-- Inspect the deployed legacy invoice generator (source absent locally) and close or document its inactive-owner mutation path before declaring FR-009 complete.
+- Retrieve and safely version the deployed legacy invoice generator before implementation continues; if its source is unavailable, stop rather than create a placeholder or leave its inactive-owner mutation path unverified.
+- Deploy every changed Edge Function to the separate test project before direct authorization checks; local Deno tests alone do not prove deployed behavior.
 
 ### 5. Coach projection
 
@@ -191,11 +195,12 @@ Run against a separate test project with two admins, two students, one assigned 
 - [ ] Anon cannot SELECT profiles
 - [ ] Student A SELECTs own profile/history but not B
 - [ ] Active student changes allowed fields only; email/role/status/future fields rejected
+- [ ] Session bootstrap backfills/synchronizes only the exact signed Auth email and does not rewrite profile-controlled fields
 - [ ] Future DOB rejected; null/past DOB accepted
 - [ ] Inactive student SELECTs own profile/bookings/invoice document
 - [ ] Inactive student profile UPDATE, booking INSERT/UPDATE/cancel, and invoice issuance denied
 - [ ] Active admin lists/edits another profile and changes another role/status
-- [ ] Admin own-role change denied
+- [ ] Admin own-role and self-deactivation changes denied; `accounting` assignment denied
 - [ ] Concurrent/removal attempts cannot leave zero active admins
 - [ ] Inactive admin fails `is_admin()` and admin Edge Function checks
 - [ ] Active coach sees only assigned roster rows with participant id/name/phone
@@ -203,6 +208,7 @@ Run against a separate test project with two admins, two students, one assigned 
 - [ ] Roster contains no email/address/DOB/status/role/financial fields
 - [ ] Accounting gets no directory/roster/admin privilege
 - [ ] Existing active student booking, active admin Bexio, coach assignment, and anonymous `booking_slots` flows still work
+- [ ] Admin find/edit/toggle journey completes within three measured minutes
 - [ ] Public views are security-invoker; private fixed-output function grants match contract
 - [ ] No profile/history DELETE or cascade behavior added
 

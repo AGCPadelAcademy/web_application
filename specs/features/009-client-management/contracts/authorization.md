@@ -15,7 +15,7 @@ This contract defines browser-visible data operations and their server-enforced 
 | Inactive client | own `profiles.is_active=false`, any stored role |
 | Active coach | own row has `role=coach`, `is_active=true` |
 | Active admin | own row has `role=admin`, `is_active=true` |
-| Accounting | stored `role=accounting`; no added privileges |
+| Accounting | legacy stored `role=accounting`; no added privileges and not assignable through client management |
 
 Role/status are read from `profiles`; Auth user metadata is never authorization input.
 
@@ -69,7 +69,8 @@ postal_code, city, country, country_code, date_of_birth, updated_at
 |---|---|
 | Active owner; only allowed keys; valid DOB | Updated row |
 | Inactive owner | Denied; row unchanged |
-| Any owner changes `email`, `role`, `is_active`, `id`, or unknown field | Denied; row unchanged |
+| Any form/direct caller sets arbitrary `email`, `role`, `is_active`, `id`, or unknown field | Denied; row unchanged |
+| Session bootstrap sets `email` to the same user’s exact signed Auth email | Allowed identity synchronization; no other field changes |
 | Owner targets another id | Zero rows / denied |
 | DOB is in future | Validation error; row unchanged |
 
@@ -82,10 +83,12 @@ PATCH /rest/v1/profiles?id=eq.{target_id}
 | Change | Outcome |
 |---|---|
 | Active admin edits target personal fields | Success |
-| Active admin changes another target’s role | Success if role is allowed and last-admin invariant holds |
-| Active admin changes target status | Success if last-admin invariant holds |
+| Active admin changes another target’s role to `student`, `coach`, or `admin` | Success if last-admin invariant holds |
+| Active admin assigns `accounting` | Denied |
+| Active admin changes another target’s status | Success if last-admin invariant holds |
 | Active admin changes own role | Denied |
-| Any app caller changes profile email | Denied |
+| Active admin deactivates self | Denied |
+| Any form/direct caller changes profile email arbitrarily | Denied |
 | Change would leave zero active admins | Denied |
 | Inactive/non-admin caller uses same request | Denied |
 
@@ -151,7 +154,7 @@ Assignment removal or coach deactivation affects the next request.
 Rules:
 
 - Missing-profile session bootstrap inserts one profile.
-- Session restore does not overwrite an existing application profile from Auth metadata.
+- Session restore may synchronize only the exact signed Auth email onto the same existing profile; it does not overwrite profile-controlled or academy-controlled data.
 - Client routing remains role-based UX only; RLS/triggers remain the security boundary.
 - Stale browser status may show an action briefly, but the server refuses it immediately.
 
@@ -168,7 +171,7 @@ Service-role functions bypass RLS and must apply activity checks explicitly.
 
 Existing active owners/admins retain current ownership/role checks.
 
-The deployed legacy invoice generator must be inspected during implementation because its source is not currently versioned. It must not permit an inactive owner to create a missing financial document.
+The deployed legacy invoice generator source must be retrieved and safely versioned before implementation continues. If unavailable, implementation is blocked; do not create a placeholder. Once modified, it must be deployed to the test project and must not permit an inactive owner to create a missing financial document.
 
 ## 8. Error semantics
 
@@ -179,6 +182,8 @@ User-facing services map server failures to stable messages:
 | inactive profile mutation | “This client profile is inactive. Contact the academy.” |
 | protected field | “You are not allowed to change this field.” |
 | admin self-role | “You cannot change your own role.” |
+| admin self-deactivation | “You cannot deactivate your own administrator profile.” |
+| legacy accounting assignment | “Accounting is managed in Bexio and cannot be assigned here.” |
 | last active admin | “At least one active administrator is required.” |
 | future DOB | “Date of birth cannot be in the future.” |
 | unauthorized row | Generic permission/not-found response; do not reveal another client exists |

@@ -11,6 +11,7 @@ Use a separate test Supabase project. Never run destructive setup or role/status
 - Node.js `>=20.19`
 - Project dependencies installed with `npm ci`
 - Test Supabase project with the feature migration applied
+- Every changed Edge Function deployed to that test project
 - Test identities:
   - active admin A
   - active admin B (needed for safe demotion/deactivation tests)
@@ -78,6 +79,8 @@ Perform these requests with each actor’s test JWT (Data API client, SQL role h
 - [ ] Update S1 personal fields succeeds.
 - [ ] Change S1 role to coach and back to student succeeds.
 - [ ] Change A’s own role fails.
+- [ ] Deactivate A’s own profile fails.
+- [ ] Assigning the legacy `accounting` role fails.
 - [ ] Change profile email fails.
 - [ ] With A and B active, deactivating/reactivating B succeeds.
 - [ ] With only A active as admin, demoting or deactivating A fails.
@@ -142,8 +145,9 @@ Expected: permitted values persist; existing booking/profile flows remain usable
 5. Verify directory state updates and historical records remain visible.
 6. Reactivate S1.
 7. Change another test user’s role and verify authorization changes after that user refreshes their session.
+8. Repeat find → edit → toggle while measuring elapsed time.
 
-Expected: all primary tasks complete without impersonation; own-role and last-admin controls are disabled/refused.
+Expected: all primary tasks complete without impersonation and within three minutes; own-role, self-deactivation, `accounting`, and last-admin controls are disabled/refused.
 
 ### Inactive client
 
@@ -164,6 +168,7 @@ Expected: B1 disappears immediately on the next request.
 ## 6. Regression checklist
 
 - [ ] Existing registration creates exactly one profile.
+- [ ] Existing null/mismatched profile email synchronizes to the exact signed Auth email without changing name, phone, address, DOB, role, or status.
 - [ ] Existing profile completion and booking work for active students.
 - [ ] Admin Bexio integration and reconciliation still require an active admin.
 - [ ] Coach assignment still validates target role.
@@ -177,6 +182,7 @@ Expected: B1 disappears immediately on the next request.
 Capture:
 
 - automated command output for lint/test/build
+- deployment output identifying each changed test-project Edge Function version
 - direct authorization results for student/admin/inactive/coach cases
 - one concise browser recording covering admin deactivate/reactivate plus inactive-client behavior
 - one roster screenshot/recording proving assigned phone visibility and unrelated-client denial

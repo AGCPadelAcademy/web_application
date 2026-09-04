@@ -56,7 +56,7 @@ Deactivation changes one profile field. It does not delete or re-key any entity.
 | `first_name` | text, nullable | client-controlled | Trim before write |
 | `last_name` | text, nullable | client-controlled | Trim before write |
 | `full_name` | text, NOT NULL | derived client-controlled | Rebuilt from first/last by existing profile service |
-| `email` | text, nullable | Auth-owned | Displayed; not writable through client management |
+| `email` | text, nullable | Auth-owned | Displayed; forms cannot write it; session bootstrap may synchronize only the exact signed Auth email |
 | `phone` | text, nullable | client-controlled | Existing profile formatting/validation remains |
 | `address` | text, nullable | client-controlled | Existing behavior |
 | `postal_code` | text, nullable | client-controlled | Existing behavior |
@@ -79,11 +79,11 @@ Deactivation changes one profile field. It does not delete or re-key any entity.
 |---|---:|---:|---:|---:|
 | Name, phone, address, country, DOB | update | no update | update | no update |
 | Email | no update | no update | no update | no update |
-| Role | no update | no update | update | no update |
-| Active status | no update | no update | update | no update |
+| Role | no update | no update | update to `student`, `coach`, or `admin` | no update |
+| Active status | no update | no update | update on another profile only | no update |
 | Future/unrecognized fields | no update by default | no update | permitted only when intentionally exposed to admin | no update |
 
-Admin self-role change is always refused. Removing the last active admin by role change or deactivation is refused.
+Admin self-role and self-deactivation are always refused. The legacy `accounting` role is not assignable. Removing the last active admin by changing another admin’s role or status is refused.
 
 ## 3. Profile lifecycle
 
@@ -114,10 +114,12 @@ stateDiagram-v2
 
 1. Exactly one Profile is associated with an Auth user.
 2. `date_of_birth` is null or no later than the current date at write time.
-3. Profile email cannot be changed through F1.04.
+3. Profile email cannot be changed through a form; bootstrap may synchronize it only to the same user’s exact signed Auth email.
 4. Non-admin profile writes can change only the explicit client-controlled allow-list.
-5. No application operation can leave zero active admins.
-6. Deactivation never deletes profile/history.
+5. An admin cannot change their own role or deactivate themselves through client management.
+6. Assignable roles are `student`, `coach`, and `admin`; `accounting` remains legacy stored data only.
+7. No application operation can leave zero active admins.
+8. Deactivation never deletes profile/history.
 
 ## 4. `public.bookings` impact
 
@@ -175,10 +177,10 @@ One profile mutation guard supersedes the current role-only check:
 
 1. Determine authenticated caller and whether caller is an active admin.
 2. Reject future DOB.
-3. Reject application-originated email change for all callers.
+3. Reject application-originated email changes except exact same-user synchronization to the signed Auth email.
 4. For non-admin: require target=self, existing profile active, and changed-column subset of client-controlled fields.
-5. For admin: reject own role change.
-6. Before removing an active admin (role away from admin or `is_active=false`), serialize and enforce at least one active admin remains.
+5. For admin: reject own role/status changes and reject assignment to `accounting`.
+6. Before removing another active admin (role away from admin or `is_active=false`), serialize and enforce at least one active admin remains.
 
 Trusted signup/profile-creation triggers remain able to insert profile rows. RLS and trigger code must not use user metadata for authorization.
 

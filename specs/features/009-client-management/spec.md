@@ -27,7 +27,7 @@ Inspected: reverse specs `005`/`006`, F1.02 delta `008`, domain model, baseline 
 | Admin creates clients | Profiles are created only when a person signs up. | **Do not add** admin-created logins or invite-by-email. “Where supported by the existing architecture” is: not supported without a new identity-provisioning flow. Clients continue to register themselves (`005`). |
 | Coach sees assigned-session clients only | Coach sees an operational roster (participant name, lesson, date, time) for assigned session occurrences. Coach cannot open another person’s full profile. | **Keep** roster as the coach entry point. **Add** a permitted operational view of an assigned participant (identity + phone for session coordination). Coach cannot see unrelated clients, cannot see billing/address/email/role/status/date of birth, and cannot change another client’s profile. |
 | Activate / deactivate | No profile status. Deleting a profile would threaten historical bookings (bookings require a profile). | **Add** a non-destructive active/inactive status. Deactivation MUST NOT delete the login identity, the profile, or historical bookings, invoices, or other domain records. |
-| Field-level authorization enforced on the server | Student form omits role; server also refuses role changes. Other academy-controlled fields do not exist. Admin cannot write another profile at all. | **Add** server-side field rules: students write only client-controlled fields on **their own** active profile; admins write client-controlled and academy-controlled fields on any profile (except their own role); coaches write none of another client’s fields. Hiding a field on screen is not sufficient. |
+| Field-level authorization enforced on the server | Student form omits role; server also refuses role changes. Other academy-controlled fields do not exist. Admin cannot write another profile at all. | **Add** server-side field rules: students write only client-controlled fields on **their own** active profile; admins write client-controlled and academy-controlled fields on other profiles but cannot change their own role/status; coaches write none of another client’s fields. Hiding a field on screen is not sufficient. |
 
 **Does not replace** `005` (signup, session, own billing profile, completeness gate) or `006`/`008` (role matrix, student isolation, coach assignment, roster). Those journeys stay in force except the admin-write and coach-view expansions above.
 
@@ -61,7 +61,7 @@ An admin opens a client directory, finds any client, views the information neede
 
 **Why this priority**: This is the missing operational capability. Today an admin can read profiles but cannot manage them from the product.
 
-**Independent Test**: As admin, list clients, edit student A’s phone and status, set student B’s role to coach. As student A, confirm the phone change. Confirm the admin’s own role cannot be changed from this screen. Confirm a student cannot open the directory.
+**Independent Test**: As admin, list clients, edit student A’s phone and status, set student B’s role to coach. As student A, confirm the phone change. Confirm the admin’s own role and status cannot be changed from this screen, and that `accounting` is not assignable. Confirm a student cannot open the directory.
 
 **Acceptance Scenarios**:
 
@@ -69,8 +69,9 @@ An admin opens a client directory, finds any client, views the information neede
 2. **Given** an authenticated admin, **When** they change a client’s permitted personal fields, **Then** the changes are stored and that client sees them on their own profile.
 3. **Given** an authenticated admin, **When** they assign another person’s application role (student, coach, or admin), **Then** the new role is the one used for subsequent authorization (`006` / F1.02).
 4. **Given** an authenticated admin, **When** they attempt to change **their own** role through client management, **Then** the change is refused.
-5. **Given** a student or coach, **When** they request the admin client directory or another user’s profile by identifier, **Then** access is denied.
-6. **Given** an admin, **When** they manage clients, **Then** they do so against the existing profile of each authenticated user — no second client record is created.
+5. **Given** an authenticated admin, **When** they attempt to assign the unused `accounting` role, **Then** the change is refused because accounting operations remain in Bexio.
+6. **Given** a student or coach, **When** they request the admin client directory or another user’s profile by identifier, **Then** access is denied.
+7. **Given** an admin, **When** they manage clients, **Then** they do so against the existing profile of each authenticated user — no second client record is created.
 
 ---
 
@@ -116,8 +117,8 @@ A coach continues to use assigned-session access from F1.02. For a participant o
 - An incomplete deactivated profile does not become “complete” by deactivation; on reactivation the existing completeness gate (`005`) still applies before booking.
 - Admin can edit a deactivated client’s fields (for example to correct a phone number) without having to reactivate first.
 - Date of birth may be empty; emptiness does not block profile completeness for booking (completeness stays the existing billing fields from `005`).
-- `accounting` remains a stored role with no extra client-management powers (`006`). An admin may assign it; the person still cannot use admin client management or coach participant views.
-- The last remaining admin cannot be demoted or deactivated through client management if that would leave the academy with zero admins.
+- `accounting` remains a legacy stored value with no client-management powers (`006`) and is not assignable through client management; accounting operations remain in Bexio.
+- An admin cannot deactivate themselves through client management. An admin also cannot demote or deactivate another admin when that would leave the academy with zero active admins.
 - A coach who is also a student on their own booking keeps their own-profile rights; that does not grant other clients’ profiles.
 - Anonymous visitors still cannot read profiles (`006`).
 - Groups, class placement, attendance, memberships, and a dedicated level catalog do not exist yet; coach “assigned session” means today’s F1.02 assigned lesson reservation until those features land.
@@ -136,12 +137,12 @@ A coach continues to use assigned-session access from F1.02. For a participant o
 - **FR-004**: A student MUST NOT change **academy-controlled** fields: application role, active/inactive status, official academy level, membership, group assignment, or attendance. When those fields do not yet exist in the product, the server MUST still refuse student writes to them if they are introduced later under the same names/meanings.
 - **FR-005**: An admin MUST be able to list, view, and update any client profile without impersonating that client.
 - **FR-006**: An admin MUST be able to update both client-controlled fields and academy-controlled fields that exist in this slice (role and active/inactive status) on another person’s profile.
-- **FR-007**: An admin MUST be able to assign or change another person’s application role among the live F1.02 values. A user MUST NOT change their own role. Client management MUST refuse an action that would leave the academy with zero admins.
-- **FR-008**: An admin MUST be able to deactivate and reactivate a client. Deactivation MUST NOT delete the login identity, the profile, or historical bookings, invoices, or other domain records attached to that client. Those records MUST remain traceable to the same client.
+- **FR-007**: An admin MUST be able to assign or change another person’s application role to `student`, `coach`, or `admin`. Client management MUST NOT assign the legacy `accounting` value because accounting operations are handled in Bexio. A user MUST NOT change their own role. Client management MUST refuse an action that would leave the academy with zero active admins.
+- **FR-008**: An admin MUST be able to deactivate and reactivate another client, but MUST NOT deactivate themselves through client management. Deactivation MUST NOT delete the login identity, the profile, or historical bookings, invoices, or other domain records attached to that client. Those records MUST remain traceable to the same client.
 - **FR-009**: A deactivated client MAY sign in and MUST be able to view their own profile and existing bookings/invoices. A deactivated client MUST NOT create a new booking, MUST NOT update their profile, and MUST NOT use other normal student self-service mutations. Reactivation restores those operations subject to existing rules (including profile completeness before booking).
 - **FR-010**: A coach MUST access only participants of session occurrences assigned to them (F1.02 assignment). Permitted coach information is operational: participant identity and phone. A coach MUST NOT access unrelated clients, MUST NOT use admin client management, and MUST NOT change another client’s profile, role, or status.
 - **FR-011**: Authorization for FR-002–FR-010 MUST be enforced on the server. Removing or bypassing a screen MUST NOT grant extra access. Direct identifier manipulation MUST be denied the same way as a hidden button.
-- **FR-012**: Existing signup, sign-in, password recovery, and own-profile billing flows (`005`) MUST continue to work for already-authenticated users. New profile fields MUST be additive and optional so incomplete existing profiles remain valid.
+- **FR-012**: Existing signup, sign-in, password recovery, and own-profile billing flows (`005`) MUST continue to work for already-authenticated users. Session bootstrap MUST create a missing profile and MAY synchronize only the Auth-owned email onto an existing profile; it MUST NOT overwrite profile-controlled fields. New profile fields MUST be additive and optional so incomplete existing profiles remain valid.
 - **FR-013**: This feature MUST NOT provision new logins on behalf of an admin. New clients continue to create their own authenticated account through the existing registration flow.
 - **FR-014**: Official academy level, declared level, Playtomic level, level history, groups, memberships, attendance, recoveries, and class assignment are **not** delivered here. This feature MUST leave the profile as the single client reference those features will attach to, and MUST NOT duplicate user identity into those later records.
 
@@ -150,7 +151,7 @@ A coach continues to use assigned-session access from F1.02. For a participant o
 - **Login identity** — the authenticated user. Owned by the existing sign-in system. Not duplicated.
 - **Client profile** — the application profile already attached 1:1 to that login identity. Holds contact/billing details, date of birth, application role, and active/inactive status. This **is** the client; there is no separate Client entity.
 - **Client-controlled fields** — first name, last name, phone, address, postal code, city, country, date of birth. Editable by the owning student when active, and by an admin at any time.
-- **Academy-controlled fields (this slice)** — application role; active/inactive status. Editable only by an admin (and never the admin’s own role via this feature).
+- **Academy-controlled fields (this slice)** — application role; active/inactive status. Editable by an admin only on another profile; assignable roles are `student`, `coach`, and `admin`.
 - **Academy-controlled fields (later features)** — official academy level (F1.05), membership, group assignment, attendance. Named here so field-level rules stay consistent; not implemented in this spec.
 - **Session occurrence / assignment / participant** — as in F1.02: until class placement exists, the lesson reservation and its assigned coach. Coach client access is granted only through that assignment.
 
@@ -180,7 +181,9 @@ A coach continues to use assigned-session access from F1.02. For a participant o
 - Admin “create client” is not a new invite/provisioning flow. New people still register themselves.
 - Deactivation is a status, not a delete and not a login ban. The person can still sign in to see history; they cannot perform new student operations. This matches “historical records remain associated” and “can no longer perform normal authenticated client operations.”
 - Data retention: the constitution already forbids deleting functionality or records unless explicitly instructed. This spec does not add a right-to-erasure workflow; it forbids cascade delete on deactivation.
-- Role assignment through admin client management is an intentional delta versus F1.02’s current “out-of-band SQL only” practice. F1.02’s rule that a user cannot change **their own** role remains.
+- Role assignment through admin client management is an intentional delta versus F1.02’s current “out-of-band SQL only” practice. Assignable values are `student`, `coach`, and `admin`; the legacy `accounting` value remains stored only because accounting is handled in Bexio.
+- An admin cannot change their own role or active status through client management. Last-active-admin protection still applies when one admin manages another.
+- Session bootstrap may synchronize the signed Auth email because that value is identity-owned; it creates missing profiles but never rewrites name, phone, address, DOB, role, or status on an existing profile.
 - Coach permitted fields are identity + phone. Address, email, date of birth, role, status, and billing stay out of the coach view. Official level, when F1.05 adds it, is expected to join that permitted coach view — not this spec’s delivery.
 - “Assigned session” remains F1.02’s assigned lesson reservation until a later class/group feature redefines session.
 - Swiss personal data (name, email, phone, address, date of birth) stays limited to people who have a business need: the owner, admins, and (for identity + phone only) the assigned coach.

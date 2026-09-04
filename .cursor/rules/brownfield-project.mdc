@@ -65,7 +65,7 @@ For small bug fixes or trivial changes, use judgment and avoid unnecessary docum
 Spec Kit does **not** create a git branch (`.specify/scripts/.../create-new-feature.ps1` only names the spec folder; the optional git extension is not installed). Agents must create the branch themselves.
 
 - **Never implement a feature spec on `main`/`master`.** Docs-only specify/plan/tasks work may stay on `main`; the first source, migration, test, or Edge Function change must be on a feature branch.
-- **Branch name:** `sdd/<feature-folder>` matching `specs/features/<feature-folder>/` (example: `sdd/007-bexio-integration`).
+- **Branch name:** local/unmanaged agents use `sdd/<feature-folder>` matching `specs/features/<feature-folder>/` (example: `sdd/007-bexio-integration`). Managed Cloud Agents may use the platform-required `cursor/<feature>-<suffix>` format; it is equivalent for isolation and must remain scoped to the same feature.
 - **When:** create and `git checkout` the branch from up-to-date `main` **before** `/speckit-implement` (or before the first implementation commit). If work already started on `main`, create the branch from the current HEAD immediately — do not commit implementation to `main`.
 - **Push:** `git push -u origin HEAD` to the feature branch only.
 - **Pull requests:** do **not** open a PR into `main` until the feature’s implementation and quickstart verification are complete **and** the user asks for a PR. Cloud agents must not auto-open a draft PR after every push.

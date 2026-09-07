@@ -20,8 +20,8 @@
 
 **Purpose**: Verify external state that controls migration naming and close the unversioned legacy-function risk before implementation.
 
-- [ ] T001 [P] Compare local `supabase/migrations/` with the test project migration list, then create the next non-conflicting migration as `supabase/migrations/0011_f104_client_management.sql` (rename both planned `0011` paths consistently if remote history already uses that number)
-- [ ] T002 [P] Retrieve and review the deployed `generate-invoice-pdf` source and preserve its current contract in `supabase/functions/generate-invoice-pdf/index.ts`; if the source cannot be retrieved and safely versioned, stop implementation and report the blocker rather than creating a placeholder or proceeding to US3
+- [X] T001 [P] Compare local `supabase/migrations/` with the test project migration list, then create the next non-conflicting migration as `supabase/migrations/0011_f104_client_management.sql` (rename both planned `0011` paths consistently if remote history already uses that number)
+- [X] T002 [P] Retrieve and review the deployed `generate-invoice-pdf` source and preserve its current contract in `supabase/functions/generate-invoice-pdf/index.ts`; if the source cannot be retrieved and safely versioned, stop implementation and report the blocker rather than creating a placeholder or proceeding to US3
 
 **Checkpoint**: Migration filename is safe for the target test project and every owner-facing mutating Edge Function has retrievable, safely versioned source; otherwise implementation is blocked.
 
@@ -35,11 +35,11 @@
 
 ### Tests for the foundation
 
-- [ ] T003 [P] Encode the complete plan.md RLS/trigger/service-role checklist as role-switched assertions in `tests/sql/0011_f104_client_management.test.sql`, including schema/defaults, owner/admin field differences, exact signed-Auth-email synchronization, future DOB, inactive mutations, admin self-deactivation denial, `accounting` assignment denial, concurrent last-admin protection, active-aware helpers, roster columns/grants, accounting/anon denials, and absence of new DELETE access
+- [X] T003 [P] Encode the complete plan.md RLS/trigger/service-role checklist as role-switched assertions in `tests/sql/0011_f104_client_management.test.sql`, including schema/defaults, owner/admin field differences, exact signed-Auth-email synchronization, future DOB, inactive mutations, admin self-deactivation denial, `accounting` assignment denial, concurrent last-admin protection, active-aware helpers, roster columns/grants, accounting/anon denials, and absence of new DELETE access
 
 ### Foundation implementation
 
-- [ ] T004 Implement `supabase/migrations/0011_f104_client_management.sql` per data-model.md §§2–8: add nullable `date_of_birth` and default-true `is_active`; replace `is_admin()`/`is_coach()` with active-aware bodies and preserved grants; replace the role-only trigger with explicit changed-column/DOB guards, exact same-user signed-Auth-email synchronization, admin own-role/self-deactivation and `accounting` assignment denial, and transaction-locked last-admin protection; make profile UPDATE and booking owner INSERT/UPDATE policies active-aware while preserving inactive-owner SELECT; and dependency-safely recreate `private.session_roster_rows()` plus the security-invoker `public.session_roster` with participant id/phone and exact grants
+- [X] T004 Implement `supabase/migrations/0011_f104_client_management.sql` per data-model.md §§2–8: add nullable `date_of_birth` and default-true `is_active`; replace `is_admin()`/`is_coach()` with active-aware bodies and preserved grants; replace the role-only trigger with explicit changed-column/DOB guards, exact same-user signed-Auth-email synchronization, admin own-role/self-deactivation and `accounting` assignment denial, and transaction-locked last-admin protection; make profile UPDATE and booking owner INSERT/UPDATE policies active-aware while preserving inactive-owner SELECT; and dependency-safely recreate `private.session_roster_rows()` plus the security-invoker `public.session_roster` with participant id/phone and exact grants
 - [ ] T005 Apply `supabase/migrations/0011_f104_client_management.sql` to a separate test project, execute `tests/sql/0011_f104_client_management.test.sql`, run Supabase security/performance advisors, and fix every feature-introduced failure in those two files before any frontend work
 
 **Checkpoint**: The database alone enforces profile fields, deactivation, active admin/coach privileges, last-admin safety, and assignment-scoped phone access.

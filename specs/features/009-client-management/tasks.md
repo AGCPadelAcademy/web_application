@@ -40,7 +40,7 @@
 ### Foundation implementation
 
 - [X] T004 Implement `supabase/migrations/0011_f104_client_management.sql` per data-model.md §§2–8: add nullable `date_of_birth` and default-true `is_active`; replace `is_admin()`/`is_coach()` with active-aware bodies and preserved grants; replace the role-only trigger with explicit changed-column/DOB guards, exact same-user signed-Auth-email synchronization, admin own-role/self-deactivation and `accounting` assignment denial, and transaction-locked last-admin protection; make profile UPDATE and booking owner INSERT/UPDATE policies active-aware while preserving inactive-owner SELECT; and dependency-safely recreate `private.session_roster_rows()` plus the security-invoker `public.session_roster` with participant id/phone and exact grants
-- [ ] T005 Apply `supabase/migrations/0011_f104_client_management.sql` to a separate test project, execute `tests/sql/0011_f104_client_management.test.sql`, run Supabase security/performance advisors, and fix every feature-introduced failure in those two files before any frontend work
+- [X] T005 Apply `supabase/migrations/0011_f104_client_management.sql` to a separate test project, execute `tests/sql/0011_f104_client_management.test.sql`, run Supabase security/performance advisors, and fix every feature-introduced failure in those two files before any frontend work
 
 **Checkpoint**: The database alone enforces profile fields, deactivation, active admin/coach privileges, last-admin safety, and assignment-scoped phone access.
 
@@ -54,15 +54,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T006 [P] [US1] Add failing Vitest coverage for own-profile mapping, DOB serialization, omission of email/role/status from form payloads, create-if-missing bootstrap, exact signed-Auth-email synchronization without profile-field overwrite, and protected error mapping in `src/lib/profileService.test.js`
-- [ ] T007 [P] [US1] Add regression cases proving DOB/status are excluded from booking completeness and future DOB validation is independent of completeness in `src/lib/profileValidation.test.js`
+- [X] T006 [P] [US1] Add failing Vitest coverage for own-profile mapping, DOB serialization, omission of email/role/status from form payloads, create-if-missing bootstrap, exact signed-Auth-email synchronization without profile-field overwrite, and protected error mapping in `src/lib/profileService.test.js`
+- [X] T007 [P] [US1] Add regression cases proving DOB/status are excluded from booking completeness and future DOB validation is independent of completeness in `src/lib/profileValidation.test.js`
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Extend `src/lib/profileService.js` with `date_of_birth`, read-only `role`/`is_active` mapping, explicit owner form payload allow-list, create-or-exact-Auth-email-sync bootstrap that never rewrites other existing fields, and stable protected/inactive/DOB error messages required by `contracts/authorization.md`
-- [ ] T009 [US1] Refactor session handling in `src/contexts/SupabaseAuthContext.jsx` to use the create-or-exact-Auth-email-sync profile operation, load `role` and `is_active` together, expose activity state through `useAuth()`, and never overwrite profile-controlled or academy-controlled fields from Auth metadata on sign-in
-- [ ] T010 [US1] Update `src/hooks/useProfile.js` to preserve inactive profile reads, expose read-only state, and refuse/save-map owner mutations through the new `profileService.js` contract
-- [ ] T011 [US1] Add optional DOB editing plus read-only email/role/status and inactive save state to `src/pages/ProfileManagementPage.jsx` without adding DOB/status to the existing completeness requirement
+- [X] T008 [US1] Extend `src/lib/profileService.js` with `date_of_birth`, read-only `role`/`is_active` mapping, explicit owner form payload allow-list, create-or-exact-Auth-email-sync bootstrap that never rewrites other existing fields, and stable protected/inactive/DOB error messages required by `contracts/authorization.md`
+- [X] T009 [US1] Refactor session handling in `src/contexts/SupabaseAuthContext.jsx` to use the create-or-exact-Auth-email-sync profile operation, load `role` and `is_active` together, expose activity state through `useAuth()`, and never overwrite profile-controlled or academy-controlled fields from Auth metadata on sign-in
+- [X] T010 [US1] Update `src/hooks/useProfile.js` to preserve inactive profile reads, expose read-only state, and refuse/save-map owner mutations through the new `profileService.js` contract
+- [X] T011 [US1] Add optional DOB editing plus read-only email/role/status and inactive save state to `src/pages/ProfileManagementPage.jsx` without adding DOB/status to the existing completeness requirement
 - [ ] T012 [US1] Execute the Student S1 direct-request and browser checks in `specs/features/009-client-management/quickstart.md` §§4–5, fix story-specific failures in `src/lib/profileService.js` or `src/pages/ProfileManagementPage.jsx`, and record the verified cases in the quickstart completion section
 
 **Checkpoint**: US1 works independently; existing students sign in and manage permitted own-profile data without gaining protected-field or cross-client access.

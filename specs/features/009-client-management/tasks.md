@@ -77,13 +77,13 @@
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Write failing Vitest contract tests for bounded profile list/search/filter, explicit personal update payloads, separate role/status updates restricted to `student`/`coach`/`admin`, admin self-role/self-deactivation and `accounting` assignment denials, and stable admin error mapping in `src/lib/clientManagement.test.js`
+- [X] T013 [P] [US2] Write failing Vitest contract tests for bounded profile list/search/filter, explicit personal update payloads, separate role/status updates restricted to `student`/`coach`/`admin`, admin self-role/self-deactivation and `accounting` assignment denials, and stable admin error mapping in `src/lib/clientManagement.test.js`
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Implement paginated list/search/filter and explicit personal/role/status update operations in `src/lib/clientManagement.js`, exposing only `student`/`coach`/`admin` assignment and mapping own-role/self-deactivation/`accounting`/last-admin errors from `contracts/authorization.md` §§2–3
-- [ ] T015 [US2] Create `src/components/admin/ClientManagementPanel.jsx` with bounded directory loading, role/status filters, client edit form reusing existing profile controls, separate role/status actions, own-role/self-deactivation/`accounting` safeguards, loading/empty/error states, and no create-login action
-- [ ] T016 [US2] Add a Client management tab to `src/pages/AdminDashboardPage.jsx` while preserving the Bexio integration and Coach assignment tabs and the existing admin route guard
+- [X] T014 [US2] Implement paginated list/search/filter and explicit personal/role/status update operations in `src/lib/clientManagement.js`, exposing only `student`/`coach`/`admin` assignment and mapping own-role/self-deactivation/`accounting`/last-admin errors from `contracts/authorization.md` §§2–3
+- [X] T015 [US2] Create `src/components/admin/ClientManagementPanel.jsx` with bounded directory loading, role/status filters, client edit form reusing existing profile controls, separate role/status actions, own-role/self-deactivation/`accounting` safeguards, loading/empty/error states, and no create-login action
+- [X] T016 [US2] Add a Client management tab to `src/pages/AdminDashboardPage.jsx` while preserving the Bexio integration and Coach assignment tabs and the existing admin route guard
 - [ ] T017 [US2] Execute the Admin A and non-admin direct/browser matrix in `specs/features/009-client-management/quickstart.md` §§4–5, measure and record find → edit → toggle elapsed time (must be under three minutes), fix story-specific failures in `src/lib/clientManagement.js` or `src/components/admin/ClientManagementPanel.jsx`, and record results in the quickstart completion section
 
 **Checkpoint**: US2 works independently after Foundation; admin profile management is available without weakening student/coach/accounting access.

@@ -30,7 +30,9 @@ describe('fetchSessionRoster', () => {
         start_time: '10:00:00',
         end_time: '11:00:00',
         lesson_name: 'Individual Session 60',
+        participant_id: 'student-a',
         participant_full_name: 'Student A',
+        participant_phone: '+41791234567',
         coach_id: 'coach-c',
       },
     ];
@@ -43,6 +45,9 @@ describe('fetchSessionRoster', () => {
     expect(chain.select).toHaveBeenCalledWith(SESSION_ROSTER_COLUMNS);
     expect(chain.order).toHaveBeenNthCalledWith(1, 'booking_date', { ascending: true });
     expect(chain.order).toHaveBeenNthCalledWith(2, 'start_time', { ascending: true });
+    expect(SESSION_ROSTER_COLUMNS).toContain('participant_id');
+    expect(SESSION_ROSTER_COLUMNS).toContain('participant_phone');
+    expect(SESSION_ROSTER_COLUMNS).not.toMatch(/email|address|date_of_birth|role|is_active|price|payment/);
   });
 
   it('returns an empty list when there are no assignments', async () => {

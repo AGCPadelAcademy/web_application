@@ -128,12 +128,12 @@
 
 ### Tests for User Story 4
 
-- [ ] T032 [P] [US4] Update the failing roster contract tests for `participant_id` and `participant_phone` while asserting no email/address/DOB/status/role/financial columns in `src/lib/sessionRoster.test.js`
+- [X] T032 [P] [US4] Update the failing roster contract tests for `participant_id` and `participant_phone` while asserting no email/address/DOB/status/role/financial columns in `src/lib/sessionRoster.test.js`
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] Extend the exact `SESSION_ROSTER_COLUMNS` query contract with participant id/phone and preserve assignment ordering/error behavior in `src/lib/sessionRoster.js`
-- [ ] T034 [US4] Display assigned participant phone accessibly in the existing roster table/empty/error states without adding profile navigation in `src/pages/CoachRosterPage.jsx`
+- [X] T033 [US4] Extend the exact `SESSION_ROSTER_COLUMNS` query contract with participant id/phone and preserve assignment ordering/error behavior in `src/lib/sessionRoster.js`
+- [X] T034 [US4] Display assigned participant phone accessibly in the existing roster table/empty/error states without adding profile navigation in `src/pages/CoachRosterPage.jsx`
 - [ ] T035 [US4] Execute assigned/unassigned/inactive-coach direct and browser checks in `specs/features/009-client-management/quickstart.md` §§4–5, fix story-specific failures in `src/lib/sessionRoster.js` or `src/pages/CoachRosterPage.jsx`, and record results in the quickstart completion section
 
 **Checkpoint**: US4 works independently after Foundation; the coach receives only assigned operational data.

@@ -21,11 +21,11 @@ provides:
 hooks:
   after_specify:
     command: speckit.agent-context.update
-    optional: true
+    optional: false
     description: "Refresh agent context after specification"
   after_plan:
     command: speckit.agent-context.update
-    optional: true
+    optional: false
     description: "Refresh agent context after planning"
 
 tags:

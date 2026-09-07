@@ -148,7 +148,7 @@ erDiagram
 
 **View**
 
-- **`booking_slots`** (migration `0006`) — public projection of `bookings` with `booking_date`, `start_time`, `end_time`, `payment_status` only. Granted to `anon` + `authenticated`; it powers the `/lessons` availability grid without exposing customer PII.
+- **`booking_slots`** (migration `0006`) — public projection of `bookings` with `booking_date`, `start_time`, `end_time`, `payment_status` only. Granted to `anon` + `authenticated`. Originally powered the `/lessons` availability grid; that UI was removed 2026-09-02. The view remains; `/lessons` no longer queries it.
 
 **Database functions / triggers**
 
@@ -272,16 +272,15 @@ sequenceDiagram
   EF->>DB: INSERT notifications_log (sent|failed)
 ```
 
-### 4.3 Public availability
+### 4.3 Public availability (retired on `/lessons`)
+
+The `/lessons` calendar and occupancy grid were removed 2026-09-02. The `booking_slots` view still exists (migration `0006`) and `fetchDayBookings` remains in `src/lib/bookings.js`, but the page does not render slots.
 
 ```mermaid
 flowchart LR
-  Visitor["Visitor / Student"] --> Grid["/lessons availability grid"]
-  Grid --> View["booking_slots view\n(anon + authenticated)"]
-  View --> Bookings["bookings (no PII columns exposed)"]
+  Visitor["Visitor / Student"] --> Catalogue["/lessons catalogue"]
+  Catalogue --> Lessons["lessons (public SELECT)"]
 ```
-
-- The grid renders 08:00–20:30 in 30-minute steps; 14:00 is hard-blocked; slots overlapping `pending` or `confirmed` bookings for the day are disabled.
 
 ### 4.4 Authentication / session
 

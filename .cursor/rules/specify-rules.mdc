@@ -2,8 +2,56 @@
 alwaysApply: true
 ---
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-at specs/features/009-client-management/plan.md
-<!-- SPECKIT END -->
+# AGC Specification Rules
+
+## Feature Context
+
+The GitHub Issue being processed is the authoritative
+source for the current feature request.
+
+Do not use another feature's spec, plan, or tasks as
+the current feature context.
+
+## Brownfield Context
+
+For specification work, inspect relevant existing
+documentation and implementation before making
+architectural assumptions:
+
+- /docs/sdd-brownfield/
+- /specs/project-context/
+- /specs/baseline-system/
+- /src/
+
+Verify documented behavior against the current
+implementation.
+
+If documentation and implementation disagree,
+document the discrepancy.
+
+## Requirements
+
+Preserve confirmed:
+
+- business rules
+- acceptance criteria
+- security requirements
+- integration boundaries
+- existing system constraints
+
+Do not invent requirements or architecture.
+
+## Feature Isolation
+
+The specification must be created under the directory
+corresponding to the current F1.xx feature.
+
+Do not modify another feature's specification, plan,
+or task files.
+
+## Hooks
+
+Allow configured Spec Kit extension hooks to execute
+after specification generation.
+
+Do not manually duplicate an automatically enabled hook.

@@ -31,3 +31,41 @@ Documentation rules:
 - diagrams in Mermaid
 - use markdown
 - document uncertainty explicitly
+
+## SDD Agent Roles
+
+### Specification Agent
+
+Responsible for:
+
+- reading the GitHub Issue
+- understanding the Brownfield context
+- executing `/speckit-specify`
+- allowing configured post-specification hooks
+- validating `spec.md`
+
+Must stop after specification generation.
+
+Must not:
+
+- implement application code
+- run `/speckit-plan`
+- run `/speckit-tasks`
+- run `/speckit-implement`
+- open a PR
+
+### Planning Agent
+
+Responsible for `/speckit-plan`.
+
+Requires an approved specification.
+
+### Task Agent
+
+Responsible for `/speckit-tasks`.
+
+Requires an approved plan.
+
+### Implementation Agent
+
+Responsible for implementing approved tasks only.

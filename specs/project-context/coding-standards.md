@@ -44,7 +44,7 @@
 ### 1.4 Data access
 
 - **Single shared Supabase client singleton**: `src/lib/customSupabaseClient.js` (exported as both `default` and named `supabase`/`customSupabaseClient`). Never call `createClient` elsewhere in the frontend.
-- **No service/repository layer as a blanket rule, but shared query/mutation logic is centralized in `src/lib/` services** once more than one component needs it: `profileService.js` (profiles), `bookings.js` (booking create + invoice invoke + availability), `storage.js` (signed proof URLs), plus the `useProfile` hook wrapping the profile service. One-off reads may still be inline in pages (e.g. `PaymentsPage.jsx`).
+- **No service/repository layer as a blanket rule, but shared query/mutation logic is centralized in `src/lib/` services** once more than one component needs it: `profileService.js` (profiles), `bookings.js` (booking create + invoice invoke), `storage.js` (signed proof URLs), plus the `useProfile` hook wrapping the profile service. One-off reads may still be inline in pages (e.g. `PaymentsPage.jsx`).
 - **Server-side logic lives in Supabase Edge Functions** (Deno + TypeScript, `Deno.serve`, shared `cors.ts` per function). Frontend invokes them via `supabase.functions.invoke('<slug>', { body })`.
 - Env config: only `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, read via `import.meta.env`. Both the client (`customSupabaseClient.js`) and the Vite config (`resolveSupabaseEnv`) **fail fast with explicit errors** when they're missing; `vite.config.js` `define`-injects them so production builds can't silently inline empty strings.
 

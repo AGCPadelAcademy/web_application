@@ -1,0 +1,52 @@
+---
+alwaysApply: true
+---
+
+# AGC SDD Workflow
+
+Every F1.xx feature follows:
+
+1. GitHub Issue
+2. /speckit-specify
+3. Specification review
+4. /speckit-plan
+5. Plan review
+6. /speckit-tasks
+7. /speckit-analyze
+8. /speckit-implement
+9. Verification
+10. Pull Request
+11. PRE validation
+12. PRO deployment
+
+## Stage Boundaries
+
+### Specify
+Produces `spec.md`.
+
+After specification generation, stop.
+
+Configured post-specification hooks may execute.
+
+### Plan
+Requires an approved `spec.md`.
+
+Produces `plan.md`.
+
+### Tasks
+Requires an approved `plan.md`.
+
+Produces `tasks.md`.
+
+### Implementation
+Requires:
+
+- approved `spec.md`
+- approved `plan.md`
+- `tasks.md`
+- satisfied feature dependencies
+
+### Implementation completion
+
+Implementation is not considered complete until
+verification passes.

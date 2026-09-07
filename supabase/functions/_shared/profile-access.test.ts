@@ -31,6 +31,7 @@ Deno.test("inactive owner and inactive admin may not mutate", () => {
 
 Deno.test("missing profile fails closed", () => {
   assertEquals(canMutateOwnedResource(parseProfileAccess(null), true), false);
+  assertEquals(canReadOwnedResource(parseProfileAccess(null), true), false);
   assertEquals(canAdminister(parseProfileAccess(null)), false);
 });
 

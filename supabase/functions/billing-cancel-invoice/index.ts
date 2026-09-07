@@ -56,7 +56,7 @@ async function dbSelect(table: string, query: string): Promise<Record<string, un
 
 async function resolveCaller(
   req: Request,
-): Promise<{ userId: string; role: string; isActive: boolean } | null> {
+): Promise<{ userId: string; role: string; isActive: boolean; exists: boolean } | null> {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
   const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -67,7 +67,7 @@ async function resolveCaller(
   if (!user.id) return null;
   const rows = await dbSelect("profiles", `id=eq.${user.id}&select=role,is_active`);
   const access = parseProfileAccess(rows[0] as { role?: unknown; is_active?: unknown } | undefined);
-  return { userId: user.id, role: access.role, isActive: access.isActive };
+  return { userId: user.id, role: access.role, isActive: access.isActive, exists: access.exists };
 }
 
 async function loadConfig(): Promise<BexioConfig> {
@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
     if (!booking) return json({ error: "not_found", message: "booking not found" }, 404);
     if (
       !canMutateOwnedResource(
-        { role: caller.role, isActive: caller.isActive, exists: true },
+        { role: caller.role, isActive: caller.isActive, exists: caller.exists },
         booking.user_id === caller.userId,
       )
     ) {

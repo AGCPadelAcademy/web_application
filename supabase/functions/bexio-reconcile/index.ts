@@ -11,42 +11,40 @@
  * pg_cron/pg_net job can call without a user token (research R-09).
  */
 
-import {
-  ProviderAuthError,
-  ProviderConfigError,
-} from '../_shared/billing/accounting-provider.ts';
-import { BexioClient } from '../_shared/billing/bexio/bexio-client.ts';
-import { BexioAdapter } from '../_shared/billing/bexio/bexio-adapter.ts';
-import type { BexioConfig } from '../_shared/billing/bexio/bexio-mappers.ts';
-import { readSecret, writeSecret } from '../_shared/billing/vault.ts';
-import { createPostgrestRepo } from '../_shared/billing/financial-service.ts';
+import { ProviderAuthError, ProviderConfigError } from "../_shared/billing/accounting-provider.ts";
+import { BexioClient } from "../_shared/billing/bexio/bexio-client.ts";
+import { BexioAdapter } from "../_shared/billing/bexio/bexio-adapter.ts";
+import type { BexioConfig } from "../_shared/billing/bexio/bexio-mappers.ts";
+import { readSecret, writeSecret } from "../_shared/billing/vault.ts";
+import { createPostgrestRepo } from "../_shared/billing/financial-service.ts";
 import {
   createPostgrestReconcileRepo,
   runReconciliation,
-} from '../_shared/billing/reconciliation-service.ts';
+} from "../_shared/billing/reconciliation-service.ts";
+import { canAdminister, parseProfileAccess } from "../_shared/profile-access.ts";
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-const CLIENT_ID = Deno.env.get('BEXIO_CLIENT_ID') ?? '';
-const CLIENT_SECRET = Deno.env.get('BEXIO_CLIENT_SECRET') ?? '';
-const SCHEDULER_SECRET_NAME = 'bexio_scheduler_secret';
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const CLIENT_ID = Deno.env.get("BEXIO_CLIENT_ID") ?? "";
+const CLIENT_SECRET = Deno.env.get("BEXIO_CLIENT_SECRET") ?? "";
+const SCHEDULER_SECRET_NAME = "bexio_scheduler_secret";
 
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-scheduler-secret',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-scheduler-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...CORS, "Content-Type": "application/json" },
   });
 }
 
 function log(event: Record<string, unknown>): void {
-  console.log(JSON.stringify({ component: 'bexio-reconcile', ...event }));
+  console.log(JSON.stringify({ component: "bexio-reconcile", ...event }));
 }
 
 function secretsEqual(left: string, right: string): boolean {
@@ -67,7 +65,7 @@ async function dbSelect(table: string, query: string): Promise<Record<string, un
 }
 
 async function isAdminJwt(req: Request): Promise<boolean> {
-  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return false;
   const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${token}` },
@@ -75,41 +73,43 @@ async function isAdminJwt(req: Request): Promise<boolean> {
   if (!userRes.ok) return false;
   const user = (await userRes.json()) as { id?: string };
   if (!user.id) return false;
-  const rows = await dbSelect('profiles', `id=eq.${user.id}&select=role`);
-  return rows[0]?.role === 'admin';
+  const rows = await dbSelect("profiles", `id=eq.${user.id}&select=role,is_active`);
+  return canAdminister(
+    parseProfileAccess(rows[0] as { role?: unknown; is_active?: unknown } | undefined),
+  );
 }
 
 async function isScheduler(req: Request): Promise<boolean> {
-  const header = (req.headers.get('x-scheduler-secret') ?? '').trim();
+  const header = (req.headers.get("x-scheduler-secret") ?? "").trim();
   if (!header) return false;
-  const stored = ((await readSecret(SCHEDULER_SECRET_NAME)) ?? '').trim();
+  const stored = ((await readSecret(SCHEDULER_SECRET_NAME)) ?? "").trim();
   if (!stored) return false;
   return secretsEqual(header, stored);
 }
 
 async function loadConfig(): Promise<BexioConfig> {
-  const rows = await dbSelect('billing_integrations', 'provider=eq.bexio&select=config,status');
+  const rows = await dbSelect("billing_integrations", "provider=eq.bexio&select=config,status");
   const row = rows[0];
-  if (!row || (row.status !== 'connected' && row.status !== 'degraded')) {
-    throw new ProviderConfigError('bexio integration is not connected', ['status']);
+  if (!row || (row.status !== "connected" && row.status !== "degraded")) {
+    throw new ProviderConfigError("bexio integration is not connected", ["status"]);
   }
   return (row.config ?? {}) as unknown as BexioConfig;
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-  if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
 
   try {
     const allowed = (await isScheduler(req)) || (await isAdminJwt(req));
-    if (!allowed) return json({ error: 'unauthenticated' }, 401);
+    if (!allowed) return json({ error: "unauthenticated" }, 401);
 
     const config = await loadConfig();
     const client = new BexioClient({
       clientId: CLIENT_ID,
       clientSecret: CLIENT_SECRET,
-      refreshTokenName: 'bexio_refresh_token',
-      accessCacheName: 'bexio_access_token_cache',
+      refreshTokenName: "bexio_refresh_token",
+      accessCacheName: "bexio_access_token_cache",
       readSecret,
       writeSecret,
     });
@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (result.requires_reauth) {
-      return json({ error: 'requires_reauth' }, 503);
+      return json({ error: "requires_reauth" }, 503);
     }
     return json({
       checked: result.checked,
@@ -132,12 +132,12 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err) {
     if (err instanceof ProviderConfigError) {
-      return json({ error: 'integration_not_configured', missing: err.missing }, 409);
+      return json({ error: "integration_not_configured", missing: err.missing }, 409);
     }
     if (err instanceof ProviderAuthError) {
-      return json({ error: 'requires_reauth' }, 503);
+      return json({ error: "requires_reauth" }, 503);
     }
-    log({ event: 'unhandled_error', error: (err as Error).name });
-    return json({ error: 'internal_error' }, 500);
+    log({ event: "unhandled_error", error: (err as Error).name });
+    return json({ error: "internal_error" }, 500);
   }
 });

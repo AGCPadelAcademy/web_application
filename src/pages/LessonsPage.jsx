@@ -75,7 +75,7 @@ const translations = {
 
 const LessonsPage = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isActive } = useAuth();
   const navigate = useNavigate();
   const [lang] = useState("EN");
   const t = translations[lang];
@@ -170,6 +170,14 @@ const LessonsPage = () => {
     setSelectedLesson(lesson);
 
     const profile = await fetchProfile(user.id);
+    if (profile?.is_active === false) {
+        toast({
+          title: 'Booking unavailable',
+          description: 'This client profile is inactive. Contact the academy.',
+          variant: 'destructive',
+        });
+        return;
+    }
     if (!isProfileComplete(profile)) {
         setProfileModalOpen(true);
         return;
@@ -200,7 +208,7 @@ const LessonsPage = () => {
             selectedTime,
             profile: profileData,
             comments: questionnaire.comments,
-        }));
+        }), { isActive: profileData?.is_active });
 
         // 2. Invoice: Bexio when enabled, otherwise legacy PDF.
         // FR-030: a billing failure must not present as a failed booking —
@@ -258,7 +266,7 @@ const LessonsPage = () => {
         <p className="text-xs text-yellow-400/80 mb-4 flex items-center gap-1">
             <AlertTriangle className="w-3 h-3" /> {t.cancellation}: 48 h
         </p>
-        <Button onClick={() => handleBookNow(lesson)} className="w-full mt-auto bg-green-500 hover:bg-green-600 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+        <Button disabled={Boolean(user) && !isActive} onClick={() => handleBookNow(lesson)} className="w-full mt-auto bg-green-500 hover:bg-green-600 text-black font-bold py-4 rounded-xl flex items-center justify-center gap-2">
             <CalendarIcon size={20}/> {t.bookBtn}
         </Button>
     </motion.div>

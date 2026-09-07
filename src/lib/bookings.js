@@ -4,6 +4,11 @@ import { isBexioBillingEnabled, issueBexioInvoice, cancelBexioInvoice } from '@/
 
 // Payment statuses that reserve a slot on the availability grid.
 export const ACTIVE_BOOKING_STATUSES = ['confirmed', 'pending'];
+export const INACTIVE_CLIENT_MESSAGE = 'This client profile is inactive. Contact the academy.';
+
+function assertActive(isActive) {
+  if (isActive === false) throw new Error(INACTIVE_CLIENT_MESSAGE);
+}
 
 export async function fetchDayBookings(bookingDate) {
   // Reads the non-PII booking_slots view (RLS-safe for anonymous visitors).
@@ -35,7 +40,8 @@ export function buildBookingPayload({ userId, lesson, bookingDate, selectedTime,
   };
 }
 
-export async function createBooking(payload) {
+export async function createBooking(payload, { isActive = true } = {}) {
+  assertActive(isActive);
   const { data, error } = await supabase
     .from('bookings')
     .insert(payload)
@@ -54,6 +60,7 @@ export async function createBooking(payload) {
 // the error surfaces to the caller. The Bexio path returns no `url`: the PDF is
 // served on demand by billing-invoice-document (US3).
 export async function requestInvoice({ booking, lesson, profile, userId }) {
+  assertActive(profile?.is_active);
   if (await isBexioBillingEnabled()) {
     const data = await issueBexioInvoice(booking.id);
     return {
@@ -109,7 +116,8 @@ export async function requestInvoice({ booking, lesson, profile, userId }) {
 // Client cancel of an unpaid lesson booking (US5, Decision 2026-08-25).
 // Membership subscriptions and paid-lesson / token rules are future specs.
 // If Bexio is down, the AGC booking still cancels and invoice_cancel is queued.
-export async function cancelBooking(bookingId) {
+export async function cancelBooking(bookingId, { isActive = true } = {}) {
+  assertActive(isActive);
   if (await isBexioBillingEnabled()) {
     return cancelBexioInvoice(bookingId);
   }

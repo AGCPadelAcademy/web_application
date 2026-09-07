@@ -143,6 +143,11 @@ describe('createBooking', () => {
     mockSupabase.from.mockReturnValue(makeChain({ data: null, error: new Error('insert failed') }));
     await expect(createBooking({})).rejects.toThrow('insert failed');
   });
+
+  it('refuses an inactive profile before inserting', async () => {
+    await expect(createBooking({}, { isActive: false })).rejects.toThrow('inactive');
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+  });
 });
 
 describe('requestInvoice', () => {
@@ -192,6 +197,16 @@ describe('requestInvoice', () => {
   it('throws without invoking when there is no session', async () => {
     mockSupabase.auth.getSession.mockResolvedValueOnce({ data: { session: null } });
     await expect(requestInvoice({ booking, lesson, profile, userId: 'user-1' })).rejects.toThrow('signed in');
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('refuses invoice issuance for an inactive owner before invoking', async () => {
+    await expect(requestInvoice({
+      booking: { id: 'booking-1' },
+      lesson,
+      profile: { ...profile, is_active: false },
+      userId: 'user-1',
+    })).rejects.toThrow('inactive');
     expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
   });
 
@@ -253,5 +268,11 @@ describe('cancelBooking', () => {
       body: { booking_id: 'booking-1', idempotency_key: 'booking:booking-1:invoice_cancel:v1' },
     });
     expect(result.outcome).toBe('cancelled');
+  });
+
+  it('refuses cancellation for an inactive owner before any mutation', async () => {
+    await expect(cancelBooking('booking-1', { isActive: false })).rejects.toThrow('inactive');
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
   });
 });

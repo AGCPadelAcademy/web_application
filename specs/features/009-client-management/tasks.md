@@ -98,22 +98,22 @@
 
 ### Tests for User Story 3
 
-- [ ] T018 [P] [US3] Add failing Vitest cases for inactive booking pre-check/error mapping while preserving active booking payloads and read behavior in `src/lib/bookings.test.js`
-- [ ] T019 [P] [US3] Add failing Deno tests for active owner/admin, inactive owner/admin, and missing-profile decisions in `supabase/functions/_shared/profile-access.test.ts`
+- [X] T018 [P] [US3] Add failing Vitest cases for inactive booking pre-check/error mapping while preserving active booking payloads and read behavior in `src/lib/bookings.test.js`
+- [X] T019 [P] [US3] Add failing Deno tests for active owner/admin, inactive owner/admin, and missing-profile decisions in `supabase/functions/_shared/profile-access.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Implement shared profile role/activity parsing and active-mutation/admin decisions without logging PII in `supabase/functions/_shared/profile-access.ts`
-- [ ] T021 [P] [US3] Require an active owner or active admin before invoice issuance while preserving retry/idempotency behavior in `supabase/functions/billing-issue-invoice/index.ts`
-- [ ] T022 [P] [US3] Require an active owner or active admin before booking/invoice cancellation while preserving paid/unpaid conflict behavior in `supabase/functions/billing-cancel-invoice/index.ts`
-- [ ] T023 [P] [US3] Preserve inactive-owner document retrieval but remove admin-wide access for inactive admins in `supabase/functions/billing-invoice-document/index.ts`
-- [ ] T024 [P] [US3] Require active-admin status for manual reconciliation while preserving scheduler-secret execution in `supabase/functions/bexio-reconcile/index.ts`
-- [ ] T025 [P] [US3] Require active-admin status for every authenticated OAuth administration action/callback continuation in `supabase/functions/bexio-oauth/index.ts`
-- [ ] T026 [US3] Apply the shared active-owner/admin mutation check to the preserved legacy contract in `supabase/functions/generate-invoice-pdf/index.ts`, keeping existing JWT ownership, PDF, numbering, and response behavior unchanged
+- [X] T020 [US3] Implement shared profile role/activity parsing and active-mutation/admin decisions without logging PII in `supabase/functions/_shared/profile-access.ts`
+- [X] T021 [P] [US3] Require an active owner or active admin before invoice issuance while preserving retry/idempotency behavior in `supabase/functions/billing-issue-invoice/index.ts`
+- [X] T022 [P] [US3] Require an active owner or active admin before booking/invoice cancellation while preserving paid/unpaid conflict behavior in `supabase/functions/billing-cancel-invoice/index.ts`
+- [X] T023 [P] [US3] Preserve inactive-owner document retrieval but remove admin-wide access for inactive admins in `supabase/functions/billing-invoice-document/index.ts`
+- [X] T024 [P] [US3] Require active-admin status for manual reconciliation while preserving scheduler-secret execution in `supabase/functions/bexio-reconcile/index.ts`
+- [X] T025 [P] [US3] Require active-admin status for every authenticated OAuth administration action/callback continuation in `supabase/functions/bexio-oauth/index.ts`
+- [X] T026 [US3] Apply the shared active-owner/admin mutation check to the preserved legacy contract in `supabase/functions/generate-invoice-pdf/index.ts`, keeping existing JWT ownership, PDF, numbering, and response behavior unchanged
 - [ ] T027 [US3] Deploy `billing-issue-invoice`, `billing-cancel-invoice`, `billing-invoice-document`, `bexio-reconcile`, `bexio-oauth`, and `generate-invoice-pdf` from `supabase/functions/` to the separate test project, verify each deployed version/configuration, and do not begin direct authorization checks until all deployments succeed
-- [ ] T028 [P] [US3] Map inactive booking/cancellation failures to a stable client message without changing active booking/invoice behavior in `src/lib/bookings.js`
-- [ ] T029 [US3] Check profile activity before completeness/confirmation, disable inactive booking actions, and retain the final server-enforced insert in `src/pages/LessonsPage.jsx`
-- [ ] T030 [P] [US3] Fail closed when a stale flow opens profile completion for an inactive profile while preserving active completion behavior in `src/components/modals/ProfileCompletionModal.jsx`
+- [X] T028 [P] [US3] Map inactive booking/cancellation failures to a stable client message without changing active booking/invoice behavior in `src/lib/bookings.js`
+- [X] T029 [US3] Check profile activity before completeness/confirmation, disable inactive booking actions, and retain the final server-enforced insert in `src/pages/LessonsPage.jsx`
+- [X] T030 [P] [US3] Fail closed when a stale flow opens profile completion for an inactive profile while preserving active completion behavior in `src/components/modals/ProfileCompletionModal.jsx`
 - [ ] T031 [US3] Execute the inactive-client, active/inactive-admin, admin self-deactivation, last-admin, history-retention, stale-session, deployed-Edge-Function, and reactivation checks in `specs/features/009-client-management/quickstart.md` §§4–6, fix failures in the US3 files above, and record results in the quickstart completion section
 
 **Checkpoint**: US3 is independently demonstrable; deactivation changes authorization state only and no historical row or identity is deleted.

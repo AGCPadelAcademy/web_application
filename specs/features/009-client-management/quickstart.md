@@ -207,14 +207,19 @@ wrapped in an explicit transaction ending in `ROLLBACK`.
 | Coach scope | PASS — active coach helper true, unrelated profiles hidden, and every returned roster row remained assignment-scoped |
 | Production data restoration | PASS — after rollback checks, 62/62 profiles active and the single active admin unchanged |
 | Supabase advisors | PASS for F1.04 — no feature-introduced security issue; the introduced duplicate-policy warning was fixed. Remaining findings predate F1.04. |
+| Production Edge Functions | PASS — `generate-invoice-pdf` v31, `bexio-oauth` v22, `billing-issue-invoice` v18, `billing-cancel-invoice` v6, `billing-invoice-document` v9, and `bexio-reconcile` v9 are ACTIVE with their preserved JWT settings |
 | Vitest | PASS — 65 passed, 2 credential-dependent integration tests skipped |
 | Deno | PASS — 65 passed, including four profile-access tests |
 | ESLint | PASS |
 | Vite production build | PASS — existing CSS import, browser-data, and bundle-size warnings remain |
 
-Role-specific browser mutation journeys were not run because no test credentials
+Role-specific browser mutation journeys were attempted but could not be run because no test credentials
 were available and creating accounts or changing real client data solely for a
 test would be inappropriate on production. The production-backed public UI was
 still smoke-tested locally; screenshots/artifacts are recorded with the delivery.
 The three-minute admin find/edit/toggle measurement therefore remains
 unmeasured in a real authenticated browser.
+
+Walkthrough evidence: `/opt/cursor/artifacts/f104_production_lessons_smoke.mp4`
+shows the production-backed public calendar, time slots, memberships, and
+individual sessions without submitting any production mutation.

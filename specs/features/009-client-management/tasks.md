@@ -63,7 +63,7 @@
 - [X] T009 [US1] Refactor session handling in `src/contexts/SupabaseAuthContext.jsx` to use the create-or-exact-Auth-email-sync profile operation, load `role` and `is_active` together, expose activity state through `useAuth()`, and never overwrite profile-controlled or academy-controlled fields from Auth metadata on sign-in
 - [X] T010 [US1] Update `src/hooks/useProfile.js` to preserve inactive profile reads, expose read-only state, and refuse/save-map owner mutations through the new `profileService.js` contract
 - [X] T011 [US1] Add optional DOB editing plus read-only email/role/status and inactive save state to `src/pages/ProfileManagementPage.jsx` without adding DOB/status to the existing completeness requirement
-- [ ] T012 [US1] Execute the Student S1 direct-request and browser checks in `specs/features/009-client-management/quickstart.md` §§4–5, fix story-specific failures in `src/lib/profileService.js` or `src/pages/ProfileManagementPage.jsx`, and record the verified cases in the quickstart completion section
+- [X] T012 [US1] Execute the Student S1 direct-request and browser checks in `specs/features/009-client-management/quickstart.md` §§4–5, fix story-specific failures in `src/lib/profileService.js` or `src/pages/ProfileManagementPage.jsx`, and record the verified cases in the quickstart completion section
 
 **Checkpoint**: US1 works independently; existing students sign in and manage permitted own-profile data without gaining protected-field or cross-client access.
 
@@ -84,7 +84,7 @@
 - [X] T014 [US2] Implement paginated list/search/filter and explicit personal/role/status update operations in `src/lib/clientManagement.js`, exposing only `student`/`coach`/`admin` assignment and mapping own-role/self-deactivation/`accounting`/last-admin errors from `contracts/authorization.md` §§2–3
 - [X] T015 [US2] Create `src/components/admin/ClientManagementPanel.jsx` with bounded directory loading, role/status filters, client edit form reusing existing profile controls, separate role/status actions, own-role/self-deactivation/`accounting` safeguards, loading/empty/error states, and no create-login action
 - [X] T016 [US2] Add a Client management tab to `src/pages/AdminDashboardPage.jsx` while preserving the Bexio integration and Coach assignment tabs and the existing admin route guard
-- [ ] T017 [US2] Execute the Admin A and non-admin direct/browser matrix in `specs/features/009-client-management/quickstart.md` §§4–5, measure and record find → edit → toggle elapsed time (must be under three minutes), fix story-specific failures in `src/lib/clientManagement.js` or `src/components/admin/ClientManagementPanel.jsx`, and record results in the quickstart completion section
+- [X] T017 [US2] Execute the Admin A and non-admin direct/browser matrix in `specs/features/009-client-management/quickstart.md` §§4–5, measure and record find → edit → toggle elapsed time (must be under three minutes), fix story-specific failures in `src/lib/clientManagement.js` or `src/components/admin/ClientManagementPanel.jsx`, and record results in the quickstart completion section
 
 **Checkpoint**: US2 works independently after Foundation; admin profile management is available without weakening student/coach/accounting access.
 
@@ -110,11 +110,11 @@
 - [X] T024 [P] [US3] Require active-admin status for manual reconciliation while preserving scheduler-secret execution in `supabase/functions/bexio-reconcile/index.ts`
 - [X] T025 [P] [US3] Require active-admin status for every authenticated OAuth administration action/callback continuation in `supabase/functions/bexio-oauth/index.ts`
 - [X] T026 [US3] Apply the shared active-owner/admin mutation check to the preserved legacy contract in `supabase/functions/generate-invoice-pdf/index.ts`, keeping existing JWT ownership, PDF, numbering, and response behavior unchanged
-- [ ] T027 [US3] Deploy `billing-issue-invoice`, `billing-cancel-invoice`, `billing-invoice-document`, `bexio-reconcile`, `bexio-oauth`, and `generate-invoice-pdf` from `supabase/functions/` to the separate test project, verify each deployed version/configuration, and do not begin direct authorization checks until all deployments succeed
+- [X] T027 [US3] Deploy `billing-issue-invoice`, `billing-cancel-invoice`, `billing-invoice-document`, `bexio-reconcile`, `bexio-oauth`, and `generate-invoice-pdf` from `supabase/functions/` to the separate test project, verify each deployed version/configuration, and do not begin direct authorization checks until all deployments succeed
 - [X] T028 [P] [US3] Map inactive booking/cancellation failures to a stable client message without changing active booking/invoice behavior in `src/lib/bookings.js`
 - [X] T029 [US3] Check profile activity before completeness/confirmation, disable inactive booking actions, and retain the final server-enforced insert in `src/pages/LessonsPage.jsx`
 - [X] T030 [P] [US3] Fail closed when a stale flow opens profile completion for an inactive profile while preserving active completion behavior in `src/components/modals/ProfileCompletionModal.jsx`
-- [ ] T031 [US3] Execute the inactive-client, active/inactive-admin, admin self-deactivation, last-admin, history-retention, stale-session, deployed-Edge-Function, and reactivation checks in `specs/features/009-client-management/quickstart.md` §§4–6, fix failures in the US3 files above, and record results in the quickstart completion section
+- [X] T031 [US3] Execute the inactive-client, active/inactive-admin, admin self-deactivation, last-admin, history-retention, stale-session, deployed-Edge-Function, and reactivation checks in `specs/features/009-client-management/quickstart.md` §§4–6, fix failures in the US3 files above, and record results in the quickstart completion section
 
 **Checkpoint**: US3 is independently demonstrable; deactivation changes authorization state only and no historical row or identity is deleted.
 
@@ -134,7 +134,7 @@
 
 - [X] T033 [US4] Extend the exact `SESSION_ROSTER_COLUMNS` query contract with participant id/phone and preserve assignment ordering/error behavior in `src/lib/sessionRoster.js`
 - [X] T034 [US4] Display assigned participant phone accessibly in the existing roster table/empty/error states without adding profile navigation in `src/pages/CoachRosterPage.jsx`
-- [ ] T035 [US4] Execute assigned/unassigned/inactive-coach direct and browser checks in `specs/features/009-client-management/quickstart.md` §§4–5, fix story-specific failures in `src/lib/sessionRoster.js` or `src/pages/CoachRosterPage.jsx`, and record results in the quickstart completion section
+- [X] T035 [US4] Execute assigned/unassigned/inactive-coach direct and browser checks in `specs/features/009-client-management/quickstart.md` §§4–5, fix story-specific failures in `src/lib/sessionRoster.js` or `src/pages/CoachRosterPage.jsx`, and record results in the quickstart completion section
 
 **Checkpoint**: US4 works independently after Foundation; the coach receives only assigned operational data.
 
@@ -148,7 +148,7 @@
 - [X] T037 Run the Deno test task from `supabase/functions/deno.json`, rerun `tests/sql/0011_f104_client_management.test.sql` plus Supabase advisors on the separate test project, and resolve every F1.04 regression in `supabase/functions/` or `supabase/migrations/0011_f104_client_management.sql`
 - [X] T038 [P] Update shipped schema, policies, client lifecycle, API projections, and implementation inventory in `specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, and `specs/baseline-system/supabase-backend.md`
 - [X] T039 [P] Refresh the living as-is profile and authorization behavior after rollout in `specs/features/005-auth-and-profile-completion/spec.md` and `specs/features/006-roles-and-permissions/spec.md`, keeping `009` as the forward change record
-- [ ] T040 Run every scenario in `specs/features/009-client-management/quickstart.md`, record pass/fail and test-project limitations in that file, and save the minimal successful admin/inactive-client and coach-roster walkthrough artifacts under `/opt/cursor/artifacts/`
+- [X] T040 Run every scenario in `specs/features/009-client-management/quickstart.md`, record pass/fail and test-project limitations in that file, and save the minimal successful admin/inactive-client and coach-roster walkthrough artifacts under `/opt/cursor/artifacts/`
 
 ---
 

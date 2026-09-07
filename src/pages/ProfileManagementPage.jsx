@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, User, Mail, Phone, MapPin, Map, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, User, Mail, Phone, MapPin, Map, ShieldCheck, AlertCircle, CalendarDays } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useProfile } from '@/hooks/useProfile';
 import { profileToFormData } from '@/lib/profileService';
@@ -19,13 +19,16 @@ const EMPTY_FORM = {
   address: '',
   postal_code: '',
   city: '',
-  country_code: ''
+  country_code: '',
+  date_of_birth: '',
+  role: 'student',
+  is_active: true,
 };
 
 const ProfileManagementPage = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const { profile, loading: profileLoading, error: profileError, saveProfile } = useProfile();
+  const { profile, isActive, loading: profileLoading, error: profileError, saveProfile } = useProfile();
 
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -97,6 +100,16 @@ const ProfileManagementPage = () => {
             <div>
               <h3 className="font-bold text-lg mb-1">Not Logged In</h3>
               <p>Please sign in to securely save and access your profile data.</p>
+            </div>
+          </div>
+        )}
+
+        {!isLoadingData && profile && !isActive && (
+          <div className="mb-8 p-5 bg-amber-500/10 border border-amber-500/50 rounded-lg flex items-start gap-4 text-amber-300">
+            <AlertCircle className="w-6 h-6 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-lg mb-1">Profile inactive</h3>
+              <p>Your details and history remain available, but changes and new bookings are disabled. Contact the academy.</p>
             </div>
           </div>
         )}
@@ -173,6 +186,32 @@ const ProfileManagementPage = () => {
                 />
               </div>
 
+              <div className="space-y-3">
+                <Label htmlFor="date_of_birth" className="flex items-center gap-2 text-gray-200 text-base font-semibold">
+                  <CalendarDays className="w-4 h-4 text-green-500" /> Date of birth (optional)
+                </Label>
+                <Input
+                  id="date_of_birth"
+                  name="date_of_birth"
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={formData.date_of_birth}
+                  onChange={handleChange}
+                  disabled={!isActive}
+                  className="bg-gray-900 border-gray-600 text-white focus-visible:ring-green-500 text-base py-6"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="role" className="text-gray-200 text-base font-semibold">Role</Label>
+                <Input id="role" value={formData.role} readOnly className="bg-gray-900/80 border-gray-700 text-gray-400 capitalize cursor-not-allowed text-base py-6" />
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="profile_status" className="text-gray-200 text-base font-semibold">Status</Label>
+                <Input id="profile_status" value={formData.is_active ? 'Active' : 'Inactive'} readOnly className="bg-gray-900/80 border-gray-700 text-gray-400 cursor-not-allowed text-base py-6" />
+              </div>
+
               {/* Address Field */}
               <div className="space-y-3">
                 <Label htmlFor="address" className="flex items-center gap-2 text-gray-200 text-base font-semibold">
@@ -228,7 +267,7 @@ const ProfileManagementPage = () => {
             <Button 
               onClick={handleSave} 
               className="bg-green-500 text-black hover:bg-green-400 font-bold px-10 py-6 text-lg shadow-lg transition-all" 
-              disabled={saving || (!user && !authLoading)}
+              disabled={saving || !isActive || (!user && !authLoading)}
               size="lg"
             >
               {saving ? <Loader2 className="w-6 h-6 mr-3 animate-spin" /> : null} 

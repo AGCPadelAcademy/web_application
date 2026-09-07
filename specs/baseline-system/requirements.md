@@ -27,7 +27,11 @@ This file describes **what the live system already does**: existing features, ac
 >
 > **ACT-002** The system MUST identify a student as the owner of a booking via `bookings.user_id = auth.uid()`.
 >
-> **ACT-003** The system MUST treat an admin as any authenticated user whose profile role equals `admin`. Client-side, `/admin/payment-verification` is guarded by `ProtectedRoute requireAdmin`. Server-side, RLS (`is_admin()`) and Edge Function checks enforce the same rule.
+> **ACT-003** The system MUST treat an admin as an authenticated user whose profile has `role=admin` and `is_active=true`. Client-side route guards are UX; active-aware RLS, triggers, and Edge Function checks are authoritative.
+>
+> **ACT-006** Inactive profiles MUST retain access to their own profile and historical booking/invoice reads, while profile, booking, cancellation, invoice-issuance, admin, and coach mutations are denied.
+>
+> **ACT-007** Active admins MAY manage another profile's personal fields, supported role, and activity state. They MUST NOT change their own role/status, assign `accounting`, change profile email, or remove the last active admin.
 >
 > **ACT-004** Unauthenticated visitors MUST be redirected to `/login` when they request a protected route (`/profile`, `/payments`, `/admin/*`).
 >
@@ -35,7 +39,7 @@ This file describes **what the live system already does**: existing features, ac
 >
 > ⚠️ The header does **not** expose an Admin link. Admins reach the panel by URL (`/admin` redirects to `/admin/payment-verification`).
 >
-> **Decision 2026-08-19:** `coach` and `accounting` remain schema-only. Do **not** invent a permission matrix until `class-assignment` / `memberships-credits` are specified. Live actors are **student** and **admin** only. Accounting MUST NOT get `/admin/payment-verification` (or other admin writes) in the meantime. Future spec: `coach-accounting-matrix`.
+> **Decision 2026-09-07 (F1.04):** coach is live only through the assignment-scoped roster. `accounting` remains legacy data with no application privileges because accounting is managed in Bexio.
 
 ---
 

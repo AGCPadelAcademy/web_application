@@ -15,7 +15,7 @@ Read:
 /src
 
 Git workflow:
-- Never implement a feature spec on `main`. Use `sdd/<feature-folder>` (e.g. `sdd/007-bexio-integration`).
+- Never implement a feature spec on `main`. Use a dedicated feature branch: `sdd/<feature-folder>` locally (e.g. `sdd/007-bexio-integration`), or the platform-required `cursor/<feature>-<suffix>` format in a managed Cloud Agent.
 - Create that branch before `/speckit-implement` (or before the first code/migration change).
 - Push the feature branch only during specify / plan / tasks / implement.
 - Do **not** open a pull request into `main` until the feature’s implementation and quickstart verification are complete **and** the user asks for a PR. Do not auto-open a draft PR after every push.

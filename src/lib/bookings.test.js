@@ -143,6 +143,11 @@ describe('createBooking', () => {
     mockSupabase.from.mockReturnValue(makeChain({ data: null, error: new Error('insert failed') }));
     await expect(createBooking({})).rejects.toThrow('insert failed');
   });
+
+  it('refuses an inactive profile before inserting', async () => {
+    await expect(createBooking({}, { isActive: false })).rejects.toThrow('inactive');
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+  });
 });
 
 describe('requestInvoice', () => {
@@ -212,6 +217,16 @@ describe('requestInvoice', () => {
     expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
   });
 
+  it('refuses invoice issuance for an inactive owner before invoking', async () => {
+    await expect(requestInvoice({
+      booking: { id: 'booking-1' },
+      lesson,
+      profile: { ...profile, is_active: false },
+      userId: 'user-1',
+    })).rejects.toThrow('inactive');
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
   it('uses billing-issue-invoice when the Bexio cutover flag is on (Q1-A)', async () => {
     mockSupabase.from.mockReturnValue(makeChain({ data: { integration_enabled: true }, error: null }));
     mockSupabase.functions.invoke.mockResolvedValue({
@@ -270,5 +285,11 @@ describe('cancelBooking', () => {
       body: { booking_id: 'booking-1', idempotency_key: 'booking:booking-1:invoice_cancel:v1' },
     });
     expect(result.outcome).toBe('cancelled');
+  });
+
+  it('refuses cancellation for an inactive owner before any mutation', async () => {
+    await expect(cancelBooking('booking-1', { isActive: false })).rejects.toThrow('inactive');
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+    expect(mockSupabase.functions.invoke).not.toHaveBeenCalled();
   });
 });

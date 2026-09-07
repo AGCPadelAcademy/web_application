@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { format, parseISO } from 'date-fns';
-import { Calendar, Clock, Loader2, Users } from 'lucide-react';
+import { Calendar, Clock, Loader2, Phone, Users } from 'lucide-react';
 import { fetchSessionRoster } from '@/lib/sessionRoster';
 
 function formatRosterDate(value) {
@@ -78,6 +78,7 @@ const CoachRosterPage = () => {
               <thead className="bg-gray-900 text-gray-400">
                 <tr>
                   <th className="px-4 py-3 font-medium">Participant</th>
+                  <th className="px-4 py-3 font-medium">Phone</th>
                   <th className="px-4 py-3 font-medium">Lesson</th>
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Time</th>
@@ -87,6 +88,14 @@ const CoachRosterPage = () => {
                 {rows.map((row) => (
                   <tr key={row.booking_id} className="border-t border-gray-800">
                     <td className="px-4 py-3 text-white">{row.participant_full_name}</td>
+                    <td className="px-4 py-3 text-gray-300">
+                      {row.participant_phone ? (
+                        <a className="inline-flex items-center gap-2 hover:text-green-400" href={`tel:${row.participant_phone}`}>
+                          <Phone className="h-4 w-4 text-green-500" />
+                          {row.participant_phone}
+                        </a>
+                      ) : 'Not provided'}
+                    </td>
                     <td className="px-4 py-3 text-gray-200">{row.lesson_name}</td>
                     <td className="px-4 py-3 text-gray-300">
                       <span className="inline-flex items-center gap-2">

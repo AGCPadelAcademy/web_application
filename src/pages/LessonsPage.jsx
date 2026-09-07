@@ -72,7 +72,7 @@ const translations = {
 
 const LessonsPage = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isActive } = useAuth();
   const navigate = useNavigate();
   const [lang] = useState("EN");
   const t = translations[lang];
@@ -115,6 +115,14 @@ const LessonsPage = () => {
     setSelectedLesson(lesson);
 
     const profile = await fetchProfile(user.id);
+    if (profile?.is_active === false) {
+        toast({
+          title: 'Booking unavailable',
+          description: 'This client profile is inactive. Contact the academy.',
+          variant: 'destructive',
+        });
+        return;
+    }
     if (!isProfileComplete(profile)) {
         setProfileModalOpen(true);
         return;
@@ -143,7 +151,7 @@ const LessonsPage = () => {
             selectedTime: null,
             profile: profileData,
             comments: questionnaire.comments,
-        }));
+        }), { isActive: profileData?.is_active });
 
         // 2. Invoice: Bexio when enabled, otherwise legacy PDF.
         // FR-030: a billing failure must not present as a failed booking —

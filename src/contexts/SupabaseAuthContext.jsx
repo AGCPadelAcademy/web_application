@@ -1,56 +1,23 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { getOrCreateProfile } from '@/lib/profileService';
 
 const AuthContext = createContext(undefined);
 
 const AUTH_REDIRECT_URL =
   typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'https://agcpadelacademy.com/auth/callback';
 
-/**
- * Single source of truth for keeping `public.profiles` in sync with the
- * Supabase auth user. Called on session restore, onAuthStateChange and from
- * `signUp`. Includes `email` (the previous version omitted it on session
- * sync) and never overwrites existing profile fields with null.
- */
 const ensureProfile = async (user) => {
-  if (!user) return;
-  const metadata = user.user_metadata || {};
-  const { error } = await supabase.from('profiles').upsert(
-    {
-      id: user.id,
-      email: user.email,
-      full_name: metadata.full_name || user.email,
-      phone: metadata.phone ?? null,
-      updated_at: new Date(),
-    },
-    { onConflict: 'id' }
-  );
-  if (error) {
-    // Log but never throw — auth state should not break because of a profile sync issue.
-    console.error('ensureProfile: failed to upsert profile:', error);
+  if (!user) return null;
+  try {
+    return await getOrCreateProfile(user);
+  } catch (error) {
+    // Authentication remains available when profile synchronization is
+    // temporarily unavailable; route authorization still fails closed.
+    console.error('ensureProfile: profile bootstrap failed:', error);
+    return null;
   }
-};
-
-/**
- * Fetch the application role stored on `public.profiles`. Falls back to
- * `student` if the row is missing or the column does not exist yet (e.g.
- * before the roles migration has been applied).
- */
-const fetchRole = async (userId) => {
-  if (!userId) return 'student';
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) {
-    // Most likely the `role` column does not exist yet (migration not applied).
-    console.warn('fetchRole: could not load role, defaulting to student:', error.message);
-    return 'student';
-  }
-  return data?.role || 'student';
 };
 
 export const AuthProvider = ({ children }) => {
@@ -60,6 +27,7 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [role, setRole] = useState('student');
+  const [isActive, setIsActive] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const handleSession = useCallback(async (session) => {
@@ -68,12 +36,14 @@ export const AuthProvider = ({ children }) => {
     setUser(currentUser);
 
     if (currentUser) {
-      await ensureProfile(currentUser);
-      const userRole = await fetchRole(currentUser.id);
+      const currentProfile = await ensureProfile(currentUser);
+      const userRole = currentProfile?.role || 'student';
       setRole(userRole);
-      setProfile({ id: currentUser.id, email: currentUser.email, role: userRole });
+      setIsActive(currentProfile?.is_active !== false && Boolean(currentProfile));
+      setProfile(currentProfile);
     } else {
       setRole('student');
+      setIsActive(false);
       setProfile(null);
     }
     // Loading ends only after the role is resolved — otherwise route guards
@@ -297,6 +267,7 @@ export const AuthProvider = ({ children }) => {
     session,
     profile,
     role,
+    isActive,
     loading,
     signUp,
     signIn,
@@ -305,7 +276,7 @@ export const AuthProvider = ({ children }) => {
     resendConfirmation,
     resetPassword,
     updatePassword,
-  }), [user, session, profile, role, loading, signUp, signIn, signInWithOAuth, signOut, resendConfirmation, resetPassword, updatePassword]);
+  }), [user, session, profile, role, isActive, loading, signUp, signIn, signInWithOAuth, signOut, resendConfirmation, resetPassword, updatePassword]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

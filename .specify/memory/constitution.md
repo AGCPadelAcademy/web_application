@@ -71,7 +71,7 @@ Start with the smallest change that satisfies the spec. Defer generalization unt
 1. **Specify** — produce `specs/features/<feature>/spec.md` from a prompt. Review gate: user approves.
 2. **Plan** — produce `specs/features/<feature>/plan.md`. Review gate: user approves.
 3. **Tasks** — produce `specs/features/<feature>/tasks.md`. Review gate: user approves.
-4. **Implement** — execute tasks one by one, marking each complete as it ships. **Must run on a dedicated git branch** `sdd/<feature-folder>` (never on `main`). Spec Kit does not create this branch; the agent creates it from `main` before the first implementation change. Push the feature branch only. Merge to `main` only after quickstart verification and an explicit user request (PR). Reverse-engineered live specs (`spec.md` only) do not require a branch.
+4. **Implement** — execute tasks one by one, marking each complete as it ships. **Must run on a dedicated feature branch** (never on `main`). Local/unmanaged agents use `sdd/<feature-folder>`. Managed Cloud Agents MAY use the platform-required `cursor/<feature>-<suffix>` format; that branch is equivalent for isolation and MUST remain scoped to the same feature. Spec Kit does not create this branch; the agent creates it from up-to-date `main` before the first implementation change. Push the feature branch only. Merge to `main` only after quickstart verification and an explicit user request (PR). Reverse-engineered live specs (`spec.md` only) do not require a branch.
 
 ### Testing
 - **Runner:** Vitest 4 (`npm test`), configured in `vite.config.js` (`environment: 'node'`, `src/**/*.test.{js,jsx}`). Unit tests cover `src/lib/` services with a mocked Supabase client.
@@ -101,8 +101,9 @@ No PR may add a hardcoded credential. Reviews must reject any commit that introd
 | 2026-08-12 | 1.1.0 | Deployment moved to Vercel (long-term production host, replacing Apache); Hostinger Horizons and Stripe removed from constraints; testing (Vitest + CI), secrets, role-system, and RLS/Edge Function auth open decisions resolved to their implemented state. | SDD session |
 | 2026-08-19 | 1.1.1 | Documented `docs/sdd-brownfield/` as the SDD navigation layer; `specs/baseline-system/tasks.md` renamed to `implementation-inventory.md` to avoid collision with Spec-Kit feature `tasks.md`. | SDD session |
 | 2026-08-21 | 1.1.2 | Feature-spec implementation must use a dedicated `sdd/<feature-folder>` git branch (never `main`). Spec Kit does not create the branch. | SDD session |
+| 2026-09-04 | 1.1.3 | Kept dedicated feature-branch isolation while allowing managed Cloud Agents to use the platform-required `cursor/<feature>-<suffix>` naming convention. | User-approved F1.04 remediation |
 
-**Version**: 1.1.2 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-08-21
+**Version**: 1.1.3 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-09-04
 
 ---
 

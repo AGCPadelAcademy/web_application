@@ -38,6 +38,14 @@ describe('isProfileComplete', () => {
   it('returns false when a field is not a string', () => {
     expect(isProfileComplete({ ...completeProfile, postal_code: 1000 })).toBe(false);
   });
+
+  it('does not require date of birth or activity state for billing completeness', () => {
+    expect(isProfileComplete({ ...completeProfile, date_of_birth: null, is_active: false })).toBe(true);
+  });
+
+  it('keeps future DOB validation independent from completeness', () => {
+    expect(isProfileComplete({ ...completeProfile, date_of_birth: '2999-01-01' })).toBe(true);
+  });
 });
 
 describe('getProfileCompletionStatus', () => {

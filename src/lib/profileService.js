@@ -8,8 +8,31 @@ function splitFullName(fullName) {
   return { first_name: parts.slice(0, -1).join(' '), last_name: parts[parts.length - 1] };
 }
 
-// Editable billing fields — `email` is managed by Supabase Auth and never written here.
-// F1.02: `role` is intentionally omitted; PostgREST also rejects role changes via trigger.
+export const PROFILE_MESSAGES = {
+  inactive: 'This client profile is inactive. Contact the academy.',
+  protected: 'You are not allowed to change this field.',
+  futureDob: 'Date of birth cannot be in the future.',
+};
+
+export function mapProfileError(error) {
+  const detail = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+  if (detail.includes('inactive')) return new Error(PROFILE_MESSAGES.inactive);
+  if (detail.includes('date of birth') || detail.includes('22007')) {
+    return new Error(PROFILE_MESSAGES.futureDob);
+  }
+  if (
+    detail.includes('protected profile')
+    || detail.includes('managed by authentication')
+    || detail.includes('not permitted')
+    || detail.includes('42501')
+  ) {
+    return new Error(PROFILE_MESSAGES.protected);
+  }
+  return error instanceof Error ? error : new Error(error?.message || 'Profile operation failed.');
+}
+
+// Owner forms can write only these client-controlled fields. Email comes from
+// the signed Auth identity; role and activity are academy-controlled.
 export const EDITABLE_PROFILE_FIELDS = [
   'first_name',
   'last_name',
@@ -20,6 +43,7 @@ export const EDITABLE_PROFILE_FIELDS = [
   'city',
   'country',
   'country_code',
+  'date_of_birth',
 ];
 
 export function profileToFormData(profile, user) {
@@ -36,6 +60,9 @@ export function profileToFormData(profile, user) {
     city: profile?.city || '',
     country: profile?.country || '',
     country_code: countryCode,
+    date_of_birth: profile?.date_of_birth || '',
+    role: profile?.role || 'student',
+    is_active: profile?.is_active !== false,
   };
 }
 
@@ -53,6 +80,7 @@ export function formDataToProfilePayload(formData) {
     city: formData.city,
     country_code: countryCode || null,
     country: countryCode ? countryLabel(countryCode, 'en') : (formData.country || ''),
+    date_of_birth: formData.date_of_birth || null,
   };
 }
 
@@ -74,7 +102,19 @@ export async function fetchProfile(userId) {
 // Fetch-or-insert for users whose profile row was never created (legacy accounts).
 export async function getOrCreateProfile(user) {
   const existing = await fetchProfile(user.id);
-  if (existing) return existing;
+  if (existing) {
+    if (user.email && existing.email !== user.email) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ email: user.email, updated_at: new Date().toISOString() })
+        .eq('id', user.id)
+        .select()
+        .single();
+      if (error) throw mapProfileError(error);
+      return data;
+    }
+    return existing;
+  }
 
   const { data, error } = await supabase
     .from('profiles')
@@ -86,7 +126,7 @@ export async function getOrCreateProfile(user) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapProfileError(error);
   return data;
 }
 
@@ -103,6 +143,6 @@ export async function updateProfile(userId, formData) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapProfileError(error);
   return data;
 }

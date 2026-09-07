@@ -201,11 +201,13 @@ Profile read/write goes through `src/lib/profileService.js` (single owner of que
 | Operation | Caller | Filter / payload | Response shape |
 |---|---|---|---|
 | SELECT | `Header.jsx:26` | `.select('full_name').eq('id', user.id).single()` | `{ full_name }` |
-| SELECT | `SupabaseAuthContext.jsx:43` | `.select('role').eq('id', userId).maybeSingle()` | `{ role } \| null` |
+| SELECT/bootstrap | `SupabaseAuthContext` via `profileService.getOrCreateProfile` | fetch own row; insert if missing; otherwise synchronize only a mismatched exact signed Auth email | full own profile including `role`, `is_active` |
 | SELECT (full) | `profileService.fetchProfile` (used by `ProfileCompletionModal`, `LessonsPage`) | `.select('*').eq('id', userId).single()` | full profile row or `null` (PGRST116) |
-| SELECT or INSERT | `profileService.getOrCreateProfile` (used by `useProfile` → `ProfileManagementPage`) | fetch, then insert `{ id, full_name, email }` if missing | profile row |
-| UPSERT | `SupabaseAuthContext.jsx:19` | `{ id, email, full_name, phone, updated_at }` | upserted row |
-| UPDATE | `profileService.updateProfile` (used by `ProfileManagementPage`, `ProfileCompletionModal`) | `{ full_name, phone, address, postal_code, city, country, updated_at }` | updated row |
+| UPDATE own | `profileService.updateProfile` | explicit client-controlled allow-list including optional `date_of_birth`; excludes email, role, and activity | updated row; inactive/protected/future-DOB writes fail |
+| SELECT directory | `clientManagement.listClients` | bounded page, stable name/id order, optional name/email search and role/status filters | active-admin-authorized profile page |
+| UPDATE managed client | `clientManagement` | separate personal, supported-role, and activity payloads | active admin only; own role/status, accounting assignment, email, and last-admin removal fail |
+
+`public.session_roster` exposes exactly booking/session fields plus `participant_id`, current `participant_full_name`, `participant_phone`, and `coach_id`. Active coaches receive only assigned rows; active admins receive all rows. It excludes email, address, DOB, role/status, and financial data.
 
 ### 2.2 `lessons`
 

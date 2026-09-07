@@ -11,9 +11,10 @@ import { fetchProfile, updateProfile, profileToFormData } from '@/lib/profileSer
 import CountrySelect from '@/components/profile/CountrySelect';
 
 const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel }) => {
-  const { user } = useAuth();
+  const { user, isActive } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [inactive, setInactive] = useState(false);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -28,7 +29,10 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
   useEffect(() => {
     if (!user?.id || !open) return;
     fetchProfile(user.id).then((data) => {
-      if (data) setFormData(profileToFormData(data, user));
+      if (data) {
+        setInactive(data.is_active === false);
+        setFormData(profileToFormData(data, user));
+      }
     });
   }, [user, open]);
 
@@ -38,6 +42,10 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
   };
 
   const handleSave = async () => {
+    if (inactive || !isActive) {
+      toast({ title: 'Profile inactive', description: 'This client profile is inactive. Contact the academy.', variant: 'destructive' });
+      return;
+    }
     // Validation
     if (!formData.first_name.trim() || !formData.last_name.trim()) {
       toast({ title: 'Validation Error', description: 'First and last name are required for the invoice.', variant: 'destructive' });
@@ -86,7 +94,7 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
         <DialogHeader>
           <DialogTitle className="text-2xl text-green-400">Complete Your Profile</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Please fill in your details to continue with the booking.
+            {inactive ? 'This client profile is inactive. Contact the academy.' : 'Please fill in your details to continue with the booking.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -128,7 +136,7 @@ const ProfileCompletionModal = ({ open, onOpenChange, onSaveSuccess, onCancel })
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={onCancel} disabled={loading} className="border-gray-600 hover:bg-gray-800 text-white">Cancel</Button>
-          <Button onClick={handleSave} disabled={loading} className="bg-green-500 hover:bg-green-600 text-black font-bold">
+          <Button onClick={handleSave} disabled={loading || inactive || !isActive} className="bg-green-500 hover:bg-green-600 text-black font-bold">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Save Profile
           </Button>
         </DialogFooter>

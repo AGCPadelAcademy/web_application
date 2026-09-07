@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { getOrCreateProfile, updateProfile } from '@/lib/profileService';
+import { getOrCreateProfile, PROFILE_MESSAGES, updateProfile } from '@/lib/profileService';
 
 export function useProfile() {
   const { user, loading: authLoading } = useAuth();
@@ -30,10 +30,20 @@ export function useProfile() {
   }, [authLoading, refresh]);
 
   const saveProfile = useCallback(async (formData) => {
+    if (profile?.is_active === false) {
+      throw new Error(PROFILE_MESSAGES.inactive);
+    }
     const updated = await updateProfile(user.id, formData);
     setProfile(updated);
     return updated;
-  }, [user]);
+  }, [profile, user]);
 
-  return { profile, loading: authLoading || loading, error, refresh, saveProfile };
+  return {
+    profile,
+    isActive: profile?.is_active !== false,
+    loading: authLoading || loading,
+    error,
+    refresh,
+    saveProfile,
+  };
 }

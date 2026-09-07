@@ -156,7 +156,7 @@ Observed unless marked intended.
 
 - `/login` — tabs login/register; forgot password; resend confirmation; no OAuth buttons (`OAUTH_PROVIDERS` empty).
 - `/auth/callback`, `/reset-password`.
-- `/profile` — `ProfileManagementPage.jsx`.
+- `/profile` — `ProfileManagementPage.jsx`, including optional DOB and read-only email/role/activity; inactive profiles remain readable but cannot save.
 - `ProfileCompletionModal` on `/lessons`.
 - Header: profile, payments, sign out.
 
@@ -166,7 +166,7 @@ Observed unless marked intended.
 
 - Live Google (or other) OAuth.
 - Server-side profile-completeness constraint.
-- Changing email from the app.
+- Arbitrary email changes from the app (session bootstrap may synchronize only the exact signed Auth email).
 - Role assignment UI (006).
 - `plan.md` / `tasks.md` / production code changes.
 
@@ -176,7 +176,7 @@ Observed unless marked intended.
 
 - Phone validation inconsistent (9 digits vs modal string length 10) until the prefix+digits rule is implemented.
 - OAuth code exists but is not enabled.
-- `profiles` public SELECT.
+- ~~`profiles` public SELECT.~~ Resolved by 008; F1.04 retains owner/inactive-owner reads and active-admin directory access.
 - Confirmation callback drops `return_to`.
 - Completeness not re-checked in modal `handleSave` beyond phone/postal.
 - Only `profileValidation.test.js` covers this area (no LoginPage tests).
@@ -195,6 +195,7 @@ Observed unless marked intended.
 
 - Email confirmation is on in the live Supabase project (code handles both confirmed-immediately and needs-confirmation).
 - Default role `student` on new profiles is owned by 006 / DB default.
+- F1.04 keeps DOB and activity outside profile completeness and prevents session bootstrap from overwriting profile-controlled fields.
 
 ---
 

@@ -159,7 +159,8 @@ Live matrix (after `0008`):
 
 - `ProtectedRoute` on `/profile`, `/payments`, `/admin/integrations`, `/coach/roster`.
 - Header: profile, payments, sign out; **Session roster** when `role === 'coach'`. Still no admin Header link.
-- Admin Dashboard: Bexio integration + Coach assignment tabs.
+- Admin Dashboard: Client management, Bexio integration, and Coach assignment tabs.
+- Active coaches see assigned participant identity and current phone only; inactive coaches receive no roster rows.
 
 ---
 
@@ -185,7 +186,8 @@ Live matrix (after `0008`):
 ## Assumptions
 
 - One role per user is enough.
-- Role changes happen outside the SPA and take effect on next `fetchRole`.
+- F1.04 active admins manage another profile's supported role/status in the SPA; own-role/status, `accounting`, and last-admin changes remain server-denied.
+- `is_admin()` and `is_coach()` require `profiles.is_active=true`; role/activity refresh on the next session/profile load.
 - Session occurrence is the current `bookings` row until a later class-assignment feature.
 
 ---

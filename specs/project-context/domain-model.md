@@ -50,12 +50,16 @@
 | `address`, `postal_code`, `city`, `country` | text | ⚠️ nullable | Billing address (26 profiles still null — incomplete profiles) |
 | `first_name`, `last_name` | text | ⚠️ nullable | Split name for Bexio person contacts (`name_2` / `name_1`) — 007 |
 | `country_code` | text | ⚠️ nullable | ISO 3166-1 alpha-2 for Bexio `country_id` — 007 |
-| `role` | text | **yes** (NOT NULL, CHECK constraint) | Authorization role. Allowed values: `student`, `coach`, `accounting`, `admin`. Current distribution: `student` (43), `admin` (1). The `coach` role maps to the "trainer" concept referenced by `availability.trainer_id`. |
+| `date_of_birth` | date | no | Optional client-controlled DOB; database rejects future dates; excluded from booking completeness and downstream billing |
+| `is_active` | boolean | **yes** (default `true`) | Non-destructive client lifecycle; inactive owners keep history reads but lose mutations and role-derived privileges |
+| `role` | text | **yes** (NOT NULL, CHECK constraint) | Canonical authorization role: `student`, `coach`, `accounting`, `admin`. Client management assigns only student/coach/admin; accounting is legacy and managed in Bexio. |
 | `updated_at` | timestamptz | **yes** (NOT NULL) | Last profile update |
 
 > **Role source of truth:** `profiles.role` is the canonical role field (CHECK constraint: `student`, `coach`, `accounting`, `admin`; default `student`). The legacy `users` table has been **deleted** (2026-08-06). `profiles` is linked 1:1 to Supabase Auth via `auth.users.id`. The admin panel's commented-out email guard (`ProtectedRoute.jsx`) must be replaced with a check against `profiles.role = 'admin'` — this is the critical security gap tracked in `architecture.md §5`. Note: the `availability.trainer_id` column name uses "trainer", but the corresponding role value is `coach`.
 >
 > **Profile completion:** `email`, `phone`, and address fields remain nullable because 20–27 existing profiles are incomplete (users who never finished profile completion). The domain invariant "profile must be complete before booking" is enforced only in the UI layer (`ProfileCompletionModal` + `src/lib/profileValidation.js`), not in the DB.
+>
+> **F1.04 lifecycle:** Deactivation updates only `profiles.is_active`; it does not delete or re-key profiles, bookings, invoices, memberships, credits, or assignments. Auth email synchronization may update only the same profile to the exact signed Auth email.
 >
 > TODO: Business rules should define which fields are **mandatory before booking** (the frontend enforces this via `ProfileCompletionModal` + `src/lib/profileValidation.js`, but the DB allows nulls everywhere except `id` and `role` — domain invariants live only in the UI layer today).
 

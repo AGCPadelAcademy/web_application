@@ -188,3 +188,33 @@ Capture:
 - one roster screenshot/recording proving assigned phone visibility and unrelated-client denial
 
 Update baseline docs (`requirements`, domain model, API contracts, backend inventory) only after implementation and test-project verification match this guide.
+
+## 8. Implementation verification — 2026-09-07
+
+The owner explicitly authorized the only accessible Supabase project
+(`jokjxpogvwxbwdaroqkc`) as the deployment and verification target because no
+isolated project/branch exists. All production checks below were read-only or
+wrapped in an explicit transaction ending in `ROLLBACK`.
+
+| Check | Result |
+|---|---|
+| Migration history and `0011` naming | PASS — remote history ended at `0010`; F1.04 applied as `0011` plus two review-driven corrective migrations |
+| Schema/default/backfill | PASS — nullable `date_of_birth`, default-true non-null `is_active`; 62/62 existing profiles remained active |
+| Helpers, trigger, policies, roster grants/columns | PASS — active-aware helpers; mutation guard; owner/admin update policy; nine-column security-invoker roster; no profile DELETE policy |
+| Student horizontal isolation | PASS — own row visible, another student hidden, admin/coach helpers false |
+| Admin directory and protected actions | PASS — directory visible; self-deactivation, own-role change, and `accounting` assignment rejected in rollback-only JWT checks |
+| Inactive lifecycle | PASS — rollback-only inactive owner retained own profile/booking reads, lost role privileges, and could not update profile/booking |
+| Coach scope | PASS — active coach helper true, unrelated profiles hidden, and every returned roster row remained assignment-scoped |
+| Production data restoration | PASS — after rollback checks, 62/62 profiles active and the single active admin unchanged |
+| Supabase advisors | PASS for F1.04 — no feature-introduced security issue; the introduced duplicate-policy warning was fixed. Remaining findings predate F1.04. |
+| Vitest | PASS — 65 passed, 2 credential-dependent integration tests skipped |
+| Deno | PASS — 65 passed, including four profile-access tests |
+| ESLint | PASS |
+| Vite production build | PASS — existing CSS import, browser-data, and bundle-size warnings remain |
+
+Role-specific browser mutation journeys were not run because no test credentials
+were available and creating accounts or changing real client data solely for a
+test would be inappropriate on production. The production-backed public UI was
+still smoke-tested locally; screenshots/artifacts are recorded with the delivery.
+The three-minute admin find/edit/toggle measurement therefore remains
+unmeasured in a real authenticated browser.

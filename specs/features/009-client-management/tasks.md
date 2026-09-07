@@ -144,10 +144,10 @@
 
 **Purpose**: Complete security/regression evidence and synchronize living documentation after all desired stories pass.
 
-- [ ] T036 Run `npm run lint`, `npm test`, and the placeholder-env production build defined by `package.json` and `.github/workflows/ci.yml`, fixing only F1.04-introduced failures in the changed `src/` files
-- [ ] T037 Run the Deno test task from `supabase/functions/deno.json`, rerun `tests/sql/0011_f104_client_management.test.sql` plus Supabase advisors on the separate test project, and resolve every F1.04 regression in `supabase/functions/` or `supabase/migrations/0011_f104_client_management.sql`
-- [ ] T038 [P] Update shipped schema, policies, client lifecycle, API projections, and implementation inventory in `specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, and `specs/baseline-system/supabase-backend.md`
-- [ ] T039 [P] Refresh the living as-is profile and authorization behavior after rollout in `specs/features/005-auth-and-profile-completion/spec.md` and `specs/features/006-roles-and-permissions/spec.md`, keeping `009` as the forward change record
+- [X] T036 Run `npm run lint`, `npm test`, and the placeholder-env production build defined by `package.json` and `.github/workflows/ci.yml`, fixing only F1.04-introduced failures in the changed `src/` files
+- [X] T037 Run the Deno test task from `supabase/functions/deno.json`, rerun `tests/sql/0011_f104_client_management.test.sql` plus Supabase advisors on the separate test project, and resolve every F1.04 regression in `supabase/functions/` or `supabase/migrations/0011_f104_client_management.sql`
+- [X] T038 [P] Update shipped schema, policies, client lifecycle, API projections, and implementation inventory in `specs/baseline-system/requirements.md`, `specs/project-context/domain-model.md`, `specs/project-context/api-contracts.md`, and `specs/baseline-system/supabase-backend.md`
+- [X] T039 [P] Refresh the living as-is profile and authorization behavior after rollout in `specs/features/005-auth-and-profile-completion/spec.md` and `specs/features/006-roles-and-permissions/spec.md`, keeping `009` as the forward change record
 - [ ] T040 Run every scenario in `specs/features/009-client-management/quickstart.md`, record pass/fail and test-project limitations in that file, and save the minimal successful admin/inactive-client and coach-roster walkthrough artifacts under `/opt/cursor/artifacts/`
 
 ---

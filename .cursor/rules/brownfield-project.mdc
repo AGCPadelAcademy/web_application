@@ -121,3 +121,16 @@ After making changes:
 2. Run linting/type checks when applicable.
 3. Verify that existing functionality remains intact.
 4. Report any assumptions, unresolved TODOs, or risks introduced by the change.
+
+### Manual acceptance by the user
+
+- Implementation verification = the automated quality gate only
+  (lint, unit tests, build, Deno tests, SQL assertions where a test
+  project exists).
+- Once that gate passes, the agent MUST NOT run agent-driven
+  manual/browser walkthroughs (computer-use sessions, screen
+  recordings, click-throughs) unless the user explicitly asks for them.
+- Final acceptance is performed manually by the user in the live
+  environment. The user gives the final approval.
+- The agent still reports what the automated gate covered and lists
+  the quickstart.md scenarios that remain for the user to check.

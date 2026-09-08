@@ -20,7 +20,7 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | Step | Action | Expected |
 |---|---|---|
 | 1.1 | Admin opens Admin → Camps, creates a Camp with dates, schedule, age range, price, capacity, extras, practical info, publishes | Camp saved; appears on `/camps` |
-| 1.2 | Visitor opens `/camps` | Published Camp shows name, dates, hours, ages, price, description, deadline, CTA; unpublished Camp absent |
+| 1.2 | Visitor opens `/camps`, including at a 375px-wide mobile viewport | Published Camp shows name, dates, hours, ages, price, description, deadline, CTA; unpublished Camp absent; layout readable with no horizontal-only desktop chrome |
 | 1.3 | Admin unpublishes | Camp no longer bookable; existing registrations still attached |
 | 1.4 | Non-admin calls `camp-admin` | `403` |
 
@@ -38,7 +38,7 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 
 | Step | Action | Expected |
 |---|---|---|
-| 3.1 | Parent A opens Camp → Register → select child X → select Lunch → accept terms → submit | One registration, total = base + 25 |
+| 3.1 | Parent A opens Camp → Register → select child X → select Lunch → accept terms → submit (repeat at a 375px-wide mobile viewport) | One registration, total = base + 25; fields, validation, extras, and CTAs usable on mobile |
 | 3.2 | Retry submit (double-click/reload) | Still one registration; no duplicate invoice |
 | 3.3 | In Bexio | One contact for A; one issued invoice with Camp + Lunch lines, correct CHF total, 0% VAT |
 | 3.4 | Registration status | `pending_payment` / awaiting payment — not paid |

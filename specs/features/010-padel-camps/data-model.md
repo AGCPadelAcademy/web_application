@@ -96,6 +96,8 @@ Parent-owned dependents (FR-006/FR-006a). Not logins.
 
 **RLS**: `SELECT/INSERT/UPDATE` where `parent_id = auth.uid()` and the parent profile is active; `SELECT` for admins. No `DELETE` policy (FR-006d).
 
+**Emergency contact (analysis A2)**: `emergency_contact_*` may stay empty on the child record; `register_camp_child` rejects a submission without a usable emergency contact (FR-007), so the snapshot on `camp_registrations` is always populated for chargeable registrations.
+
 ### `camp_registrations`
 
 One saved child on one Camp, submitted by a parent (FR-007). Place-holding states consume capacity (research R-04).
@@ -112,7 +114,7 @@ One saved child on one Camp, submitted by a parent (FR-007). Place-holding state
 | `child_date_of_birth` | date | NULL | snapshot |
 | `padel_level` | text | NULL | snapshot |
 | `allergies` | text | NULL | snapshot |
-| `emergency_contact_name` / `emergency_contact_phone` | text | NULL | snapshot |
+| `emergency_contact_name` / `emergency_contact_phone` | text | NULL | snapshot; REQUIRED at submit time (validated by `register_camp_child`, FR-007) even though the stored child record may leave them empty |
 | `parent_full_name` | text | NOT NULL | snapshot from profile |
 | `parent_email` | text | NOT NULL | snapshot |
 | `parent_phone` | text | NULL | snapshot |
@@ -122,7 +124,7 @@ One saved child on one Camp, submitted by a parent (FR-007). Place-holding state
 | `extras_total` | numeric(10,2) | NOT NULL DEFAULT 0 | snapshot |
 | `total_amount` | numeric(10,2) | NOT NULL | `base_price + extras_total` |
 | `currency` | text | NOT NULL DEFAULT `'CHF'` | |
-| `terms_version` | text | NULL | consistent with existing reservation convention |
+| `terms_version` | text | NULL | deploy-time constant matching the current `/terms` copy (e.g. `YYYY-MM` of the terms publication), consistent with the existing reservation convention |
 | `terms_accepted_at` | timestamptz | NULL | |
 | `payment_confirmation_source` | text | NULL CHECK IN (`'bexio_reconciliation'`) | attribution (mirrors `bookings`) |
 | `payment_confirmed_at` | timestamptz | NULL | |
@@ -165,7 +167,22 @@ Interest in a full Camp (FR-024/FR-025). Not a place.
 
 **Uniqueness**: partial UNIQUE on `(parent_id, child_id, camp_id) WHERE status = 'active'`.
 
+**Join guard (analysis U1)**: a `guard_camp_waitlist_join` BEFORE INSERT trigger raises `camp_waitlist_unavailable` unless the Camp is published, `waitlist_enabled`, and currently full (active registrations ≥ `max_capacity`). This enforces FR-024/US8 for direct PostgREST inserts, not only UI joins.
+
 **RLS**: `SELECT/INSERT` own active parent; admin `SELECT/UPDATE` for conversion/management. No place capacity consumed.
+
+### `camp_funnel_events`
+
+PII-free conversion funnel events (FR-039; research R-13; analysis A1).
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | bigint | PK, generated always as identity | |
+| `camp_id` | uuid | NULL, FK → `camps(id)` ON DELETE SET NULL | NULL for the `/camps` page-level visit |
+| `event` | text | NOT NULL, CHECK IN (`'camps_page_view'`, `'camp_registration_started'`, `'camp_registration_completed'`, `'camp_payment_confirmed'`) | |
+| `created_at` | timestamptz | NOT NULL DEFAULT `now()` | |
+
+No name/contact/DOB/allergy columns exist by design, so PII cannot be recorded. **RLS**: `INSERT` for `anon` and `authenticated`; `SELECT` admin-only.
 
 ## Additive extensions to existing billing tables
 
@@ -185,7 +202,7 @@ RLS owner clause extended: owner = `bookings.user_id` **or** the registration’
 |---|---|---|---|
 | `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` | subject for camp retries |
 
-`kind` CHECK extended with `camp_invoice_issue`, `camp_invoice_cancel` (or reuse `invoice_issue`/`invoice_cancel` keyed by the camp registration id; the deterministic idempotency key is `camp-registration:{id}:invoice:v1`).
+**Decision (2026-09-08, analysis I1):** the existing `kind` CHECK from migration `0003` is **altered** to add `camp_invoice_issue` and `camp_invoice_cancel`. Deterministic idempotency keys: `camp-registration:{id}:invoice:v1` (issue) and `camp-registration:{id}:invoice_cancel:v1` (cancel). Lesson kinds are unchanged.
 
 ### `billing_events`
 

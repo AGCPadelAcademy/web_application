@@ -72,13 +72,19 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 - `POST { "action": "upsert_camp", "camp": {…} }` — create/update Camp configuration; publish/unpublish.
 - `POST { "action": "upsert_extra", "camp_id", "extra": {…} }` / `{ "action": "remove_extra", "extra_id" }` — extras management.
 - `POST { "action": "list_registrations", "camp_id", "status"? }` — returns registrations with Camp, child, age, parent, phone, email, level, extras, total, payment status, registration date, and remaining places.
-- `POST { "action": "export_registrations", "camp_id" }` — CSV/Excel-compatible export of the authorized registration fields only.
+- `POST { "action": "export_registrations", "camp_id" }` — returns the authorized registration rows as JSON (the FR-035 field set only); the frontend serializes them to CSV/Excel-compatible output in `src/lib/camps.js` (analysis A4).
 - `POST { "action": "list_waitlist", "camp_id" }` — deterministic order (`created_at` asc).
 - `POST { "action": "convert_waitlist", "entry_id" }` — revalidates eligibility and capacity via `register_camp_child`, then issues the invoice; refuses when full/ineligible.
 
 ### Responses
 
 Action-specific `200 { … }`; `401/403` for non-admins; `409 camp_full | age_out_of_range | duplicate_registration` on invalid conversion.
+
+---
+
+## 3a. Waitlist join — direct insert, trigger-guarded (US8, FR-024/FR-025)
+
+Joining a Camp waitlist needs **no Edge Function**: the frontend inserts into `camp_waitlist_entries` under owner-scoped RLS (`parent_id = auth.uid()`, active parent). The `guard_camp_waitlist_join` BEFORE INSERT trigger (data-model.md) rejects the insert with `camp_waitlist_unavailable` unless the Camp is published, `waitlist_enabled`, and currently full — so direct API calls cannot join a waitlist for an open or waitlist-disabled Camp, and can never obtain a place-holding registration through this path. Duplicate active entries are refused by the partial UNIQUE index. Leave/remove is an owner-scoped `UPDATE` of `status` to `removed`.
 
 ---
 

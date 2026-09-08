@@ -90,7 +90,7 @@ Sources: spec `010-padel-camps/spec.md`, constitution, F1.03 (`007-bexio-integra
 
 ## R-13. Analytics are first-party, PII-free funnel events
 
-- **Decision**: Four funnel events (`camps_page_view`, `camp_registration_started`, `camp_registration_completed`, `camp_payment_confirmed`) recorded with non-PII properties only (camp id, funnel step, timestamp). No analytics vendor is added. Events can be stored as sanitized `billing_events`-style audit rows or a minimal analytics table; the contract is the event names and the PII ban.
+- **Decision**: Four funnel events (`camps_page_view`, `camp_registration_started`, `camp_registration_completed`, `camp_payment_confirmed`) recorded in a dedicated `camp_funnel_events` table (data-model.md) whose columns are deliberately PII-free: `camp_id`, `event`, `created_at` only. `INSERT` is allowed for `anon`/`authenticated` (page view/start come from the browser); `SELECT` is admin-only. `camp_payment_confirmed` is written server-side from the reconciliation path. No analytics vendor is added; a later vendor maps these event names without Camps depending on it.
 - **Rationale**: FR-039 and spec tracking section require measurable funnel steps without child/parent PII and without coupling Camps to a vendor. F1.24 will later assert these events exist.
 - **Alternatives considered**: *GA4/segment now* — rejected: no existing infrastructure and would couple the domain to a vendor. *Include child age in events* — rejected: unnecessary PII.
 

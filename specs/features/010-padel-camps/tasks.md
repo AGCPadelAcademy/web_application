@@ -39,8 +39,8 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Write `supabase/migrations/0014_f125_padel_camps.sql` creating `camps`, `camp_extras`, `children`, `camp_registrations`, `camp_registration_extras`, and `camp_waitlist_entries` with all columns, CHECK constraints, and indexes from data-model.md (including the partial UNIQUE index for duplicate-active-registration prevention on `camp_registrations` and the active-waitlist uniqueness on `camp_waitlist_entries`)
-- [ ] T005 In the same migration, add `camp_registration_id uuid NULL` to `billing_documents` (UNIQUE, FK ON DELETE RESTRICT), `billing_operations`, and `billing_events`; add the exactly-one-subject CHECK on `billing_documents`; extend the `billing_documents` owner RLS clause to the registration’s `parent_id` (research R-02)
+- [ ] T004 Write `supabase/migrations/0014_f125_padel_camps.sql` creating `camps`, `camp_extras`, `children`, `camp_registrations`, `camp_registration_extras`, `camp_waitlist_entries`, and `camp_funnel_events` with all columns, CHECK constraints, and indexes from data-model.md (including the partial UNIQUE index for duplicate-active-registration prevention on `camp_registrations`, the active-waitlist uniqueness on `camp_waitlist_entries`, and the `guard_camp_waitlist_join` BEFORE INSERT trigger that requires published + `waitlist_enabled` + full)
+- [ ] T005 In the same migration, add `camp_registration_id uuid NULL` to `billing_documents` (UNIQUE, FK ON DELETE RESTRICT), `billing_operations`, and `billing_events`; add the exactly-one-subject CHECK on `billing_documents`; extend the `billing_documents` owner RLS clause to the registration’s `parent_id`; alter the `billing_operations.kind` CHECK from migration `0003` to add `camp_invoice_issue` and `camp_invoice_cancel` (research R-02; data-model.md §billing_operations)
 - [ ] T006 In the same migration, create the `camp_public_list` security-invoker view (published Camps only, derived `is_full` / `places_remaining`, no parent/child columns) and grant `SELECT` to `anon` and `authenticated` (research R-08)
 - [ ] T007 In the same migration, create `public.register_camp_child(...)` and `public.cancel_camp_registration(...)` as SECURITY DEFINER service-role-only functions implementing the atomic lock + window/eligibility/age/capacity revalidation + snapshot insert from data-model.md §Transactional capacity function (research R-04/R-05)
 - [ ] T008 In the same migration, enable RLS and create policies per data-model.md: public read of published `camps`/`camp_extras`, owner-or-admin `children` (no DELETE policy), owner-or-admin `camp_registrations`/`camp_registration_extras`/`camp_waitlist_entries`, admin-only Camp writes
@@ -87,7 +87,7 @@
 ### Implementation for User Story 2
 
 - [ ] T019 [US2] Implement public read helpers `fetchPublicCamps` and `fetchPublicCamp(slug)` in `src/lib/camps.js` reading `camp_public_list` (anon-safe, no PII)
-- [ ] T020 [US2] Create `src/pages/CampsPage.jsx` rendering published Camps with name, dates, schedule/hours, eligibility/ages, price, description, registration status/deadline, availability, and CTA; full Camps show `Complet / Ausgebucht`
+- [ ] T020 [US2] Create `src/pages/CampsPage.jsx` rendering published Camps with name, dates, schedule/hours, eligibility/ages, price, description, registration status/deadline, availability, and CTA; full Camps show `Complet / Ausgebucht`; verify readability at a 375px-wide mobile viewport (quickstart §1.2)
 - [ ] T021 [US2] Create `src/pages/CampDetailPage.jsx` showing one Camp’s detail and status, with the registration CTA that sends unauthenticated visitors through `/login?return_to=…` (same pattern as `LessonsPage.handleBookNow`)
 - [ ] T022 [US2] Register the `/camps` and `/camps/:slug` routes in `src/App.jsx` and add a Camps link to `src/components/layout/Header.jsx` and `src/components/layout/Footer.jsx` (additive; `/trips` unchanged)
 
@@ -208,11 +208,11 @@
 
 ### Tests for User Story 8
 
-- [ ] T048 [P] [US8] Write Deno unit tests for waitlist join/convert authorization and ordering in `supabase/functions/camp-admin/index.test.ts` and extend SQL tests in `tests/sql/0014_f125_padel_camps.test.sql` for the active-entry uniqueness
+- [ ] T048 [P] [US8] Write Deno unit tests for waitlist join/convert authorization and ordering in `supabase/functions/camp-admin/index.test.ts` and extend SQL tests in `tests/sql/0014_f125_padel_camps.test.sql` for the active-entry uniqueness and the `guard_camp_waitlist_join` trigger (join refused when the Camp is not full or waitlist is disabled)
 
 ### Implementation for User Story 8
 
-- [ ] T049 [US8] Implement `joinCampWaitlist` in `src/lib/camps.js` and the join UI on the full-Camp state in `src/pages/CampDetailPage.jsx` (only when `waitlist_enabled`)
+- [ ] T049 [US8] Implement `joinCampWaitlist` in `src/lib/camps.js` as a direct owner-scoped insert into `camp_waitlist_entries` (guarded server-side by the `guard_camp_waitlist_join` trigger, contracts/edge-functions.md §3a) and the join UI on the full-Camp state in `src/pages/CampDetailPage.jsx` (only when `waitlist_enabled`)
 - [ ] T050 [US8] Add `list_waitlist` and `convert_waitlist` actions to `supabase/functions/camp-admin/index.ts` per contract §3 (conversion calls `register_camp_child` then the camp invoice issuance)
 - [ ] T051 [US8] Add the waitlist management view (deterministic order, convert action) to `src/components/admin/CampManagementPanel.jsx`
 
@@ -232,7 +232,7 @@
 
 ### Implementation for User Story 9
 
-- [ ] T053 [US9] Add `list_registrations` and `export_registrations` actions to `supabase/functions/camp-admin/index.ts` returning Camp, child, age, parent/guardian, phone, email, level, extras, total, payment status, registration date, and remaining places
+- [ ] T053 [US9] Add `list_registrations` and `export_registrations` actions to `supabase/functions/camp-admin/index.ts` returning Camp, child, age, parent/guardian, phone, email, level, extras, total, payment status, registration date, and remaining places as authorized JSON rows (CSV serialization happens in the frontend per contracts/edge-functions.md §3)
 - [ ] T054 [US9] Add the Registrations tab (list, pending-vs-paid distinction, remaining places, CSV download) to `src/components/admin/CampManagementPanel.jsx`
 
 **Checkpoint**: Admin can operate the Camp roster and export it
@@ -251,7 +251,7 @@
 
 ### Implementation for User Story 10
 
-- [ ] T056 [US10] Implement `trackCampFunnelEvent` in `src/lib/camps.js` recording the four events from research R-13 (page view in `CampsPage.jsx`, started in `CampDetailPage.jsx`, completed after successful submit, payment confirmed emitted server-side from the reconciliation path)
+- [ ] T056 [US10] Implement `trackCampFunnelEvent` in `src/lib/camps.js` inserting into `camp_funnel_events` (data-model.md): page view in `CampsPage.jsx`, started in `CampDetailPage.jsx`, completed after successful submit; `camp_payment_confirmed` is written server-side from the reconciliation path (research R-13)
 
 **Checkpoint**: Funnel measurable without PII
 
@@ -294,7 +294,7 @@
 
 ### Parallel Opportunities
 
-- After Foundational: US1, US2, and US3 can proceed in parallel (different files)
+- After Foundational: US1, US2, and US3 can start in parallel, but note the **shared files**: `src/lib/camps.js` is touched by US1 (T014), US2 (T019), US4 (T031), US6 (T042), US8 (T049), US9 (T052), and US10 (T056), and `src/components/admin/CampManagementPanel.jsx` by US1 (T016), US8 (T051), and US9 (T054). Parallel work on different stories must sequence edits to those two files (or split them) to avoid conflicts.
 - Within stories: test tasks marked [P] run in parallel; lib tests [P] run alongside function tests
 - T058/T059 in Polish can run in parallel after T057 passes
 
@@ -303,7 +303,8 @@
 ## Parallel Example: After Foundational
 
 ```bash
-# Three stories start together (disjoint files):
+# Three stories start together (disjoint entry points; sequence edits to the
+# shared src/lib/camps.js and CampManagementPanel.jsx across stories):
 Task: "US1 — camp-admin function + CampManagementPanel"
 Task: "US2 — camps.js public reads + CampsPage/CampDetailPage"
 Task: "US3 — children.js + ChildrenPage"

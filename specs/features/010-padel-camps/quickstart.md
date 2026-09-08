@@ -101,3 +101,13 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 ## Acceptance mapping
 
 Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+
+## Validation log (2026-09-08)
+
+| Check | Result |
+|---|---|
+| T001 migration number vs remote | PASS — remote last is `0013_f104_inactive_auth_email_sync`; file is `0014_f125_padel_camps.sql` |
+| T009 apply to isolated test project | NOT RUN — MCP lists only production `jokjxpogvwxbwdaroqkc`; constitution forbids production DDL |
+| T011 last-place concurrency | NOT RUN — requires the isolated test project after T009 |
+| T057 lint / vitest / build / deno unit tests | PASS — `npm run lint`, `npm test` (76 passed, 2 skipped), `npm run build`, `deno test --allow-env --allow-net=none supabase/functions` (86 passed) |
+| T058 / T060 live test-project deploy + Bexio demo | NOT RUN — no isolated test project + demo company in this agent; constitution forbids production DDL/deploy |

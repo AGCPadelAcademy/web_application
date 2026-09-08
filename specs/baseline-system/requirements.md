@@ -33,7 +33,7 @@ This file describes **what the live system already does**: existing features, ac
 >
 > **ACT-007** Active admins MAY manage another profile's personal fields, supported role, and activity state. They MUST NOT change their own role/status, assign `accounting`, change profile email, or remove the last active admin.
 >
-> **ACT-004** Unauthenticated visitors MUST be redirected to `/login` when they request a protected route (`/profile`, `/payments`, `/admin/*`).
+> **ACT-004** Unauthenticated visitors MUST be redirected to `/login` when they request a protected route (`/profile`, `/payments`, `/children`, `/admin/*`).
 >
 > **ACT-005** Non-admin authenticated users MUST be redirected to `/` when they request `/admin/payment-verification`.
 >
@@ -301,7 +301,17 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 
 ---
 
-## 8. Assumptions and TODOs
+## 8. Camps (F1.25 — BC addition)
+
+> **BC-CAMP-001** Published Camps MUST be discoverable at `/camps` (and `/camps/:slug`) without authentication. Unpublished Camps MUST NOT appear on the public list.
+>
+> **BC-CAMP-002** A parent MUST register a saved child (not a second login) through `camp-submit-registration`. Capacity is enforced atomically by `register_camp_child`. Invoices reuse the F1.03 `billing_*` spine via `camp_registration_id`.
+>
+> **BC-CAMP-003** Child records live on `/children`. Parents MAY add/edit/archive their children; there is no DELETE policy. Per-child Camp invoices are listed there. `/trips` is unchanged.
+
+---
+
+## 9. Assumptions and TODOs
 
 > **Assumption:** Bank transfer details live on the invoice PDF / QR page; the web UI does not duplicate IBAN copy on My Payments.
 >
@@ -326,7 +336,7 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 
 ---
 
-## 9. Relationship to other specs
+## 10. Relationship to other specs
 
 | Spec | Role vs. this file |
 |---|---|

@@ -1,5 +1,12 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+
+function loginPathWithReturnTo(pathname, search) {
+  const returnTo = `${pathname}${search || ''}`;
+  const safe = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/';
+  if (safe === '/' || safe.startsWith('/login')) return '/login';
+  return `/login?return_to=${encodeURIComponent(safe)}`;
+}
 
 /**
  * Client-side route guard. Authorization for actual data writes is enforced
@@ -12,6 +19,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
  */
 const ProtectedRoute = ({ children, requireAdmin = false, allowedRoles = [] }) => {
   const { user, role, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -22,7 +30,7 @@ const ProtectedRoute = ({ children, requireAdmin = false, allowedRoles = [] }) =
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={loginPathWithReturnTo(location.pathname, location.search)} replace />;
   }
 
   const isAdmin = role === 'admin';

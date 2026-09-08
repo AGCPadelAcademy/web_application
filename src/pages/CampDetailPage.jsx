@@ -32,6 +32,7 @@ const CampDetailPage = () => {
   const { user, isActive } = useAuth();
   const { toast } = useToast();
   const [camp, setCamp] = useState(null);
+  const [campLoadError, setCampLoadError] = useState('');
   const [children, setChildren] = useState([]);
   const [childId, setChildId] = useState('');
   const [selectedExtras, setSelectedExtras] = useState([]);
@@ -41,10 +42,19 @@ const CampDetailPage = () => {
   const [newChild, setNewChild] = useState({ first_name: '', last_name: '', date_of_birth: '', emergency_contact_name: '', emergency_contact_phone: '' });
 
   useEffect(() => {
+    setCamp(null);
+    setCampLoadError('');
     fetchPublicCamp(slug).then((row) => {
+      if (!row) {
+        setCampLoadError('This camp is not published or does not exist.');
+        return;
+      }
       setCamp(row);
-      if (row?.id) trackCampFunnelEvent(FUNNEL_EVENTS.STARTED, row.id);
-    }).catch((error) => toast({ title: 'Camp unavailable', description: error.message, variant: 'destructive' }));
+      if (row.id) trackCampFunnelEvent(FUNNEL_EVENTS.STARTED, row.id);
+    }).catch((error) => {
+      setCampLoadError(error.message || 'Camp unavailable');
+      toast({ title: 'Camp unavailable', description: error.message, variant: 'destructive' });
+    });
   }, [slug, toast]);
 
   useEffect(() => {
@@ -136,6 +146,15 @@ const CampDetailPage = () => {
       toast({ title: 'Waitlist failed', description: mapCampError(error.message), variant: 'destructive' });
     }
   };
+
+  if (campLoadError) {
+    return (
+      <div className="px-6 py-24 text-center max-w-xl mx-auto">
+        <p className="text-red-400 mb-4">{campLoadError}</p>
+        <Link to="/camps" className="text-sm text-green-400">← All camps</Link>
+      </div>
+    );
+  }
 
   if (!camp) {
     return <div className="px-6 py-24 text-center text-gray-400">Loading camp…</div>;

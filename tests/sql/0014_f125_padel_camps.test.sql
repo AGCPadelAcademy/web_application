@@ -3,10 +3,12 @@
 -- T001: remote last applied migration is 0013_f104_inactive_auth_email_sync;
 -- this file is 0014.
 --
--- T009: MCP list_projects exposes only production
--- (`jokjxpogvwxbwdaroqkc` / AGC Padel Academy DDBB). Constitution forbids
--- applying DDL to production. Apply 0014 on an isolated test project, then
--- run the static assertions below. Do not run actor-matrix writes on production.
+-- T009 (2026-09-08): applied to the single Supabase project
+-- (`jokjxpogvwxbwdaroqkc` / AGC Padel Academy DDBB) per constitution 1.2.0
+-- (user-approved; no separate test project exists). All static assertions
+-- below returned true. Follow-up migration 0015 granted anon EXECUTE on
+-- public.is_admin() — 0014's public camps policies call it and anon reads
+-- of camp_public_list failed with 42501 before the grant.
 --
 -- T011 capacity concurrency (quickstart §4.3): run on the test project after
 -- apply. Recorded result: NOT RUN here — no isolated test project is linked

@@ -29,6 +29,9 @@ const CampsPage = () => {
         <h1 className="text-3xl md:text-5xl font-bold font-serif mb-3">Padel Camps</h1>
         <p className="text-gray-400 mb-10 max-w-2xl">Holiday camps for children. Choose a camp, register a saved child, and pay by bank transfer after the invoice is issued.</p>
         {error && <p className="text-red-400 mb-6">{error}</p>}
+        {!error && camps.length === 0 && (
+          <p className="text-gray-400">No published camps right now. Check back soon.</p>
+        )}
         <div className="grid gap-6 md:grid-cols-2">
           {camps.map((camp) => {
             const status = deriveCampStatus(camp);

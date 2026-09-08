@@ -91,10 +91,17 @@ function memoryRepo(mem: Memory): ReconcileRepo {
       booking.payment_confirmed_at = now.toISOString();
       return true;
     },
+    confirmCampRegistrationIfPending: async () => false,
     hasEvent: async (eventType, bookingId, kind) =>
       mem.events.some((e) =>
         e.event_type === eventType &&
         e.booking_id === bookingId &&
+        (kind ? e.details?.kind === kind : true)
+      ),
+    hasCampEvent: async (eventType, campRegistrationId, kind) =>
+      mem.events.some((e) =>
+        e.event_type === eventType &&
+        e.camp_registration_id === campRegistrationId &&
         (kind ? e.details?.kind === kind : true)
       ),
     insertEvent: async (event) => {
@@ -130,6 +137,11 @@ function stubBillingRepo(): BillingRepo {
     upsertOperation: async () => {},
     insertEvent: async () => {},
     cancelBooking: async () => {},
+    getCampRegistration: async () => null,
+    getCampRegistrationExtras: async () => [],
+    findDocumentByCampRegistration: async () => null,
+    upsertCampDocument: async (row) => row,
+    cancelCampRegistration: async () => {},
   };
 }
 

@@ -79,13 +79,22 @@ async function loadConfig(): Promise<BexioConfig> {
   return (row.config ?? {}) as unknown as BexioConfig;
 }
 
-async function readBookingId(req: Request): Promise<string | null> {
+async function readSubjectIds(req: Request): Promise<{ bookingId: string | null; campRegistrationId: string | null }> {
   const url = new URL(req.url);
-  const fromQuery = url.searchParams.get("booking_id");
-  if (fromQuery) return fromQuery;
-  if (req.method === "GET") return null;
-  const body = (await req.json().catch(() => ({}))) as { booking_id?: string };
-  return body.booking_id ?? null;
+  const bookingFromQuery = url.searchParams.get("booking_id");
+  const campFromQuery = url.searchParams.get("camp_registration_id");
+  if (bookingFromQuery || campFromQuery) {
+    return { bookingId: bookingFromQuery, campRegistrationId: campFromQuery };
+  }
+  if (req.method === "GET") return { bookingId: null, campRegistrationId: null };
+  const body = (await req.json().catch(() => ({}))) as {
+    booking_id?: string;
+    camp_registration_id?: string;
+  };
+  return {
+    bookingId: body.booking_id ?? null,
+    campRegistrationId: body.camp_registration_id ?? null,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -98,25 +107,36 @@ Deno.serve(async (req: Request) => {
     const caller = await resolveCaller(req);
     if (!caller) return json({ error: "unauthenticated" }, 401);
 
-    const bookingId = await readBookingId(req);
-    if (!bookingId) return json({ error: "booking_id required" }, 422);
+    const { bookingId, campRegistrationId } = await readSubjectIds(req);
+    if (!bookingId && !campRegistrationId) {
+      return json({ error: "booking_id or camp_registration_id required" }, 422);
+    }
 
-    const bookings = await dbSelect("bookings", `id=eq.${bookingId}&select=user_id`);
-    const booking = bookings[0];
-    if (!booking) return json({ error: "no_document", message: "booking not found" }, 404);
+    let ownerId: string | null = null;
+    let documentQuery = "";
+    if (campRegistrationId) {
+      const regs = await dbSelect("camp_registrations", `id=eq.${campRegistrationId}&select=parent_id`);
+      const registration = regs[0];
+      if (!registration) return json({ error: "no_document", message: "registration not found" }, 404);
+      ownerId = String(registration.parent_id);
+      documentQuery = `camp_registration_id=eq.${campRegistrationId}&select=external_id,document_nr`;
+    } else {
+      const bookings = await dbSelect("bookings", `id=eq.${bookingId}&select=user_id`);
+      const booking = bookings[0];
+      if (!booking) return json({ error: "no_document", message: "booking not found" }, 404);
+      ownerId = String(booking.user_id);
+      documentQuery = `booking_id=eq.${bookingId}&select=external_id,document_nr`;
+    }
     if (
       !canReadOwnedResource(
         { role: caller.role, isActive: caller.isActive, exists: caller.exists },
-        booking.user_id === caller.userId,
+        ownerId === caller.userId,
       )
     ) {
       return json({ error: "forbidden" }, 403);
     }
 
-    const documents = await dbSelect(
-      "billing_documents",
-      `booking_id=eq.${bookingId}&select=external_id,document_nr`,
-    );
+    const documents = await dbSelect("billing_documents", documentQuery);
     const document = documents[0];
     if (!document?.external_id) return json({ error: "no_document" }, 404);
 
@@ -133,7 +153,7 @@ Deno.serve(async (req: Request) => {
     const pdf = await provider.getInvoicePdf({ externalId: String(document.external_id) });
     const fileName = pdf.fileName || `${document.document_nr ?? "invoice"}.pdf`;
 
-    log({ event: "pdf_served", bookingId, fileName });
+    log({ event: "pdf_served", bookingId, campRegistrationId, fileName });
     return new Response(pdf.bytes, {
       status: 200,
       headers: {

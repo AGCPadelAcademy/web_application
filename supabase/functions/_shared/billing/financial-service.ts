@@ -26,9 +26,18 @@ import {
   type AgcProfileRow,
   type BexioConfig,
 } from './bexio/bexio-mappers.ts';
+import {
+  campRegistrationToInvoiceInput,
+  type CampRegistrationExtraRow,
+  type CampRegistrationRow,
+} from './camp-mapper.ts';
 
 export class BookingNotBillableError extends Error {
   override readonly name = 'BookingNotBillableError';
+}
+
+export class CampNotBillableError extends Error {
+  override readonly name = 'CampNotBillableError';
 }
 
 /** Paid invoices and provider refusals must not be forced cancelled (US5). */
@@ -44,7 +53,8 @@ export class InvoiceCancelConflictError extends Error {
 
 export interface BillingDocumentRow {
   id?: string;
-  booking_id: string;
+  booking_id?: string | null;
+  camp_registration_id?: string | null;
   provider: string;
   external_id: string;
   document_nr: string | null;
@@ -58,6 +68,7 @@ export interface BillingOperationRow {
   kind: string;
   idempotency_key: string;
   booking_id?: string | null;
+  camp_registration_id?: string | null;
   billing_document_id?: string | null;
   status: string;
   attempts: number;
@@ -86,10 +97,16 @@ export interface BillingRepo {
     event_type: string;
     actor_user_id?: string | null;
     booking_id?: string | null;
+    camp_registration_id?: string | null;
     billing_document_id?: string | null;
     details?: Record<string, unknown>;
   }): Promise<void>;
   cancelBooking(bookingId: string): Promise<void>;
+  getCampRegistration(registrationId: string): Promise<CampRegistrationRow | null>;
+  getCampRegistrationExtras(registrationId: string): Promise<CampRegistrationExtraRow[]>;
+  findDocumentByCampRegistration(registrationId: string): Promise<BillingDocumentRow | null>;
+  upsertCampDocument(row: BillingDocumentRow & { camp_registration_id: string }): Promise<BillingDocumentRow>;
+  cancelCampRegistration(registrationId: string): Promise<void>;
 }
 
 export interface FinancialServiceDeps {
@@ -357,6 +374,236 @@ export async function cancelInvoiceForBooking(
   }
 }
 
+export async function issueInvoiceForCampRegistration(
+  deps: FinancialServiceDeps,
+  registrationId: string,
+): Promise<IssueInvoiceResult> {
+  const { provider, repo, config } = deps;
+  const now = deps.now?.() ?? new Date();
+  const idempotencyKey = `camp-registration:${registrationId}:invoice:v1`;
+
+  const existingDoc = await repo.findDocumentByCampRegistration(registrationId);
+  if (existingDoc) return { document: existingDoc, reused: true };
+
+  const existingOp = await repo.findOperation(idempotencyKey);
+  if (existingOp?.status === 'succeeded') {
+    const doc = await repo.findDocumentByCampRegistration(registrationId);
+    if (doc) return { document: doc, reused: true };
+  }
+
+  const registration = await repo.getCampRegistration(registrationId);
+  if (
+    !registration ||
+    registration.status === 'cancelled' ||
+    registration.payment_status === 'cancelled'
+  ) {
+    throw new CampNotBillableError(`camp registration ${registrationId} is not in a billable state`);
+  }
+  const [profile, extras] = await Promise.all([
+    repo.getProfile(registration.parent_id),
+    repo.getCampRegistrationExtras(registrationId),
+  ]);
+  if (!profile?.email) {
+    throw new CampNotBillableError(`camp registration ${registrationId} has no billable profile`);
+  }
+
+  try {
+    let contactRef: ExternalContactRef | null = null;
+    const storedContact = await repo.findContactByUser(registration.parent_id);
+    const contactInput = billingContactInput(profile, config);
+    if (storedContact) {
+      contactRef = { externalId: storedContact.external_id };
+      try {
+        await provider.updateContact(contactRef, contactInput);
+      } catch (err) {
+        log({ event: 'contact_update_failed', error: (err as Error).name });
+      }
+    } else {
+      contactRef = await provider.findContactByEmail(profile.email);
+      if (!contactRef) {
+        contactRef = await provider.createContact(contactInput);
+      }
+      await repo.upsertContact({
+        user_id: registration.parent_id,
+        provider: provider.name,
+        external_id: contactRef.externalId,
+        email_snapshot: profile.email,
+      });
+      await repo.insertEvent({
+        event_type: 'contact.linked',
+        camp_registration_id: registrationId,
+        details: { provider: provider.name },
+      });
+    }
+
+    const apiReference = `agc:camp-registration:${registrationId}`;
+    let invoice = await provider.findInvoiceByApiReference(apiReference);
+    if (!invoice) {
+      const input = campRegistrationToInvoiceInput(registration, extras, contactRef, config, now);
+      const draft = await provider.createInvoice(input);
+      invoice = await provider.issueInvoice({ externalId: draft.externalId });
+    }
+
+    const document = await repo.upsertCampDocument({
+      camp_registration_id: registrationId,
+      booking_id: null,
+      provider: provider.name,
+      external_id: invoice.externalId,
+      document_nr: invoice.documentNr,
+      api_reference: apiReference,
+      status: invoice.status === 'unknown' ? 'issued' : invoice.status,
+      total: invoice.total,
+      currency: 'CHF',
+    });
+
+    await repo.upsertOperation({
+      kind: 'camp_invoice_issue',
+      idempotency_key: idempotencyKey,
+      camp_registration_id: registrationId,
+      billing_document_id: document.id ?? null,
+      status: 'succeeded',
+      attempts: (existingOp?.attempts ?? 0) + 1,
+      next_retry_at: null,
+      last_error: null,
+    });
+    await repo.insertEvent({
+      event_type: 'camp.invoice.issued',
+      camp_registration_id: registrationId,
+      billing_document_id: document.id ?? null,
+      details: { provider: provider.name, document_nr: invoice.documentNr, total: invoice.total },
+    });
+    log({ event: 'camp_invoice_issued', registrationId, documentNr: invoice.documentNr });
+    return { document, reused: false };
+  } catch (err) {
+    if (err instanceof ProviderAuthError || err instanceof ProviderUnavailableError) {
+      const attempts = (existingOp?.attempts ?? 0) + 1;
+      await repo.upsertOperation({
+        kind: 'camp_invoice_issue',
+        idempotency_key: idempotencyKey,
+        camp_registration_id: registrationId,
+        status: 'pending',
+        attempts,
+        next_retry_at: nextRetryAt(attempts, now),
+        last_error: err.name,
+      });
+      log({ event: 'camp_invoice_issue_enqueued', registrationId, error: err.name, attempts });
+    }
+    throw err;
+  }
+}
+
+export async function cancelInvoiceForCampRegistration(
+  deps: FinancialServiceDeps,
+  registrationId: string,
+  options: { persistRetryQueue?: boolean } = {},
+): Promise<CancelInvoiceResult> {
+  const persistRetryQueue = options.persistRetryQueue ?? true;
+  const { provider, repo } = deps;
+  const now = deps.now?.() ?? new Date();
+  const idempotencyKey = `camp-registration:${registrationId}:invoice_cancel:v1`;
+
+  const existingOp = await repo.findOperation(idempotencyKey);
+  if (existingOp?.status === 'succeeded') {
+    const existing = await repo.findDocumentByCampRegistration(registrationId);
+    await repo.cancelCampRegistration(registrationId);
+    return { document: existing, reused: true, outcome: 'cancelled' };
+  }
+
+  const document = await repo.findDocumentByCampRegistration(registrationId);
+  if (!document || document.status === 'cancelled') {
+    await repo.cancelCampRegistration(registrationId);
+    await repo.upsertOperation({
+      kind: 'camp_invoice_cancel',
+      idempotency_key: idempotencyKey,
+      camp_registration_id: registrationId,
+      billing_document_id: document?.id ?? null,
+      status: 'succeeded',
+      attempts: (existingOp?.attempts ?? 0) + 1,
+      next_retry_at: null,
+      last_error: null,
+    });
+    if (document?.status !== 'cancelled') {
+      await repo.insertEvent({
+        event_type: 'invoice.cancelled',
+        camp_registration_id: registrationId,
+        billing_document_id: document?.id ?? null,
+        details: { reason: document ? 'already_cancelled' : 'no_document' },
+      });
+    }
+    return {
+      document: document ?? null,
+      reused: document?.status === 'cancelled',
+      outcome: 'cancelled',
+    };
+  }
+
+  if (document.status === 'paid' || document.status === 'partially_paid') {
+    throw new InvoiceCancelConflictError(
+      'This invoice is already paid. Cancellation after payment is not available here yet.',
+      'paid',
+    );
+  }
+
+  try {
+    await provider.cancelInvoice({ externalId: document.external_id });
+    const cancelled = await repo.upsertCampDocument({
+      ...document,
+      camp_registration_id: registrationId,
+      status: 'cancelled',
+    });
+    await repo.cancelCampRegistration(registrationId);
+    await repo.upsertOperation({
+      kind: 'camp_invoice_cancel',
+      idempotency_key: idempotencyKey,
+      camp_registration_id: registrationId,
+      billing_document_id: cancelled.id ?? document.id ?? null,
+      status: 'succeeded',
+      attempts: (existingOp?.attempts ?? 0) + 1,
+      next_retry_at: null,
+      last_error: null,
+    });
+    await repo.insertEvent({
+      event_type: 'invoice.cancelled',
+      camp_registration_id: registrationId,
+      billing_document_id: cancelled.id ?? document.id ?? null,
+      details: { provider: provider.name, document_nr: cancelled.document_nr },
+    });
+    log({ event: 'camp_invoice_cancelled', registrationId, documentNr: cancelled.document_nr });
+    return { document: cancelled, reused: false, outcome: 'cancelled' };
+  } catch (err) {
+    if (err instanceof ProviderClientError) {
+      await repo.insertEvent({
+        event_type: 'invoice.cancel_refused',
+        camp_registration_id: registrationId,
+        billing_document_id: document.id ?? null,
+        details: { status: err.status },
+      });
+      throw new InvoiceCancelConflictError(
+        'Bexio refused to cancel this invoice. It was not marked cancelled in AGC.',
+        'cancel_refused',
+      );
+    }
+    if (err instanceof ProviderAuthError || err instanceof ProviderUnavailableError) {
+      await repo.cancelCampRegistration(registrationId);
+      if (persistRetryQueue) {
+        const attempts = (existingOp?.attempts ?? 0) + 1;
+        await repo.upsertOperation({
+          kind: 'camp_invoice_cancel',
+          idempotency_key: idempotencyKey,
+          camp_registration_id: registrationId,
+          billing_document_id: document.id ?? null,
+          status: 'pending',
+          attempts,
+          next_retry_at: nextRetryAt(attempts, now),
+          last_error: err.name,
+        });
+        log({ event: 'camp_invoice_cancel_enqueued', registrationId, error: err.name, attempts });
+      }
+    }
+    throw err;
+  }
+}
+
 // --- PostgREST repository (service role; Edge Functions are the only writers) ---
 
 export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string): BillingRepo {
@@ -414,7 +661,7 @@ export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string)
     findOperation: (key) =>
       selectOne(
         'billing_operations',
-        `idempotency_key=eq.${encodeURIComponent(key)}&select=kind,idempotency_key,booking_id,billing_document_id,status,attempts,next_retry_at,last_error`,
+        `idempotency_key=eq.${encodeURIComponent(key)}&select=kind,idempotency_key,booking_id,camp_registration_id,billing_document_id,status,attempts,next_retry_at,last_error`,
       ),
     upsertOperation: (row) => upsert('billing_operations', 'idempotency_key', { ...row }),
     insertEvent: async (event) => {
@@ -435,6 +682,43 @@ export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string)
         },
       );
       if (!res.ok) throw new Error(`db cancel booking failed: ${res.status}`);
+    },
+    getCampRegistration: (registrationId) =>
+      selectOne(
+        'camp_registrations',
+        `id=eq.${registrationId}&select=id,camp_id,child_id,parent_id,status,payment_status,camp_name,camp_start_date,camp_end_date,camp_schedule_text,child_first_name,child_last_name,parent_full_name,parent_email,base_price,extras_total,total_amount,currency`,
+      ),
+    getCampRegistrationExtras: async (registrationId) => {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/camp_registration_extras?camp_registration_id=eq.${registrationId}&select=name,price_amount`,
+        { headers },
+      );
+      if (!res.ok) throw new Error(`db select camp_registration_extras failed: ${res.status}`);
+      return (await res.json()) as CampRegistrationExtraRow[];
+    },
+    findDocumentByCampRegistration: (registrationId) =>
+      selectOne(
+        'billing_documents',
+        `camp_registration_id=eq.${registrationId}&select=id,booking_id,camp_registration_id,provider,external_id,document_nr,api_reference,status,total,currency`,
+      ),
+    upsertCampDocument: async (row) => {
+      await upsert('billing_documents', 'camp_registration_id', { ...row, booking_id: row.booking_id ?? null });
+      const saved = await selectOne<BillingDocumentRow>(
+        'billing_documents',
+        `camp_registration_id=eq.${row.camp_registration_id}&select=id,booking_id,camp_registration_id,provider,external_id,document_nr,api_reference,status,total,currency`,
+      );
+      return saved ?? row;
+    },
+    cancelCampRegistration: async (registrationId) => {
+      const res = await fetch(`${supabaseUrl}/rest/v1/rpc/cancel_camp_registration`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ p_registration_id: registrationId }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`db cancel camp registration failed: ${res.status} ${body}`);
+      }
     },
   };
 }

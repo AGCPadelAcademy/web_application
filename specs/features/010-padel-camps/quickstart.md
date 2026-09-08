@@ -3,7 +3,7 @@
 **Feature**: `specs/features/010-padel-camps/spec.md` | **Date**: 2026-09-08
 **Artifacts**: [research.md](research.md) · [data-model.md](data-model.md) · [contracts/edge-functions.md](contracts/edge-functions.md) · [contracts/camp-billing.md](contracts/camp-billing.md)
 
-This guide proves the feature end-to-end after implementation (from `tasks.md`). Use a Supabase test project and the Bexio demo company; never production data.
+This guide proves the feature end-to-end after implementation (from `tasks.md`). As of constitution 1.2.0 (2026-09-08) there is a single Supabase project (production), which is also the live-verification target; mark and clean up any test data you create.
 
 ---
 
@@ -107,8 +107,9 @@ Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance cri
 | Check | Result |
 |---|---|
 | T001 migration number vs remote | PASS — remote last is `0013_f104_inactive_auth_email_sync`; file is `0014_f125_padel_camps.sql` |
-| T009 apply to isolated test project | NOT RUN — MCP lists only production `jokjxpogvwxbwdaroqkc`; constitution forbids production DDL |
-| T011 last-place concurrency | NOT RUN — requires the isolated test project after T009 |
+| T009 apply migration | PASS (2026-09-08) — `0014` applied to the single (production) project per constitution 1.2.0; 23/23 static assertions from `tests/sql/0014_f125_padel_camps.test.sql` pass. Follow-up `0015` granted anon `EXECUTE` on `is_admin()` (0014's public policies reference it; anon reads returned 42501 before the grant) |
+| T011 last-place concurrency | NOT RUN — requires seeded camp/children data; left for manual live testing (§4.3) |
 | T057 lint / vitest / build / deno unit tests | PASS — `npm run lint`, `npm test` (76 passed, 2 skipped), `npm run build`, `deno test --allow-env --allow-net=none supabase/functions` (86 passed) |
-| Browser `/camps` `/trips` `/children` | PASS against local Vite — routes, 375px layout, `return_to` on `/children`; live camp rows unavailable until `0014` is applied (production schema cache has no `camp_public_list`) |
-| T058 / T060 live test-project deploy + Bexio demo | NOT RUN — no isolated test project + demo company in this agent; constitution forbids production DDL/deploy |
+| T060 deploy + auth smoke | PASS (2026-09-08) — `camp-submit-registration` / `camp-cancel-registration` / `camp-admin` v1, `billing-invoice-document` v10, `bexio-reconcile` v10 (verify_jwt unchanged: on for camp-*/invoice-document, off for reconcile's scheduler secret). Unauthenticated calls → 401; anon `camp_public_list` → 200; anon `children` → empty; `register_camp_child` not callable by anon |
+| Browser `/camps` `/trips` `/children` | PASS against local Vite — routes, 375px layout, `return_to` on `/children` |
+| T058 live registration → Bexio invoice → reconcile → confirmation email | NOT RUN by the agent — manual acceptance by the user per the updated verification rule |

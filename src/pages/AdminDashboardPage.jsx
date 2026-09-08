@@ -5,6 +5,7 @@ import CoachAssignmentPanel from '@/components/admin/CoachAssignmentPanel';
 import { isCoachAssignmentAvailable } from '@/lib/coachAssignments';
 import IntegrationsPanel from '@/components/admin/IntegrationsPanel';
 import ClientManagementPanel from '@/components/admin/ClientManagementPanel';
+import CampManagementPanel from '@/components/admin/CampManagementPanel';
 
 const AdminDashboard = () => {
   const [coachAssignmentReady, setCoachAssignmentReady] = useState(false);
@@ -27,12 +28,15 @@ const AdminDashboard = () => {
       <div className="px-6 py-12 md:py-24 max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold font-serif mb-2">Admin Dashboard</h1>
-          <p className="text-gray-400">Manage clients, coach assignments, and the Bexio accounting integration.</p>
+          <p className="text-gray-400">Manage clients, camps, coach assignments, and the Bexio accounting integration.</p>
         </div>
           <Tabs defaultValue="clients" className="w-full">
             <TabsList className="bg-gray-900 border border-gray-800 mb-8 p-1 rounded-xl">
               <TabsTrigger value="clients" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Client management
+              </TabsTrigger>
+              <TabsTrigger value="camps" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
+                Camps
               </TabsTrigger>
               <TabsTrigger value="integrations" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Bexio integration
@@ -46,6 +50,9 @@ const AdminDashboard = () => {
             
             <TabsContent value="clients" className="mt-0">
               <ClientManagementPanel />
+            </TabsContent>
+            <TabsContent value="camps" className="mt-0">
+              <CampManagementPanel />
             </TabsContent>
             <TabsContent value="integrations" className="mt-0">
               <IntegrationsPanel />

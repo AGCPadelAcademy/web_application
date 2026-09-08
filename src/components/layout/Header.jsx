@@ -10,6 +10,7 @@ import {
   CreditCard,
   ClipboardList,
   SlidersHorizontal,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -68,6 +69,7 @@ const Header = () => {
       <nav className="hidden md:flex items-center space-x-8 font-medium">
         <NavLink to="/" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`} end>Home</NavLink>
         <NavLink to="/lessons" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Lessons</NavLink>
+        <NavLink to="/camps" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Camps</NavLink>
         <NavLink to="/trips" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Trips</NavLink>
         <NavLink to="/tournaments" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Tournaments</NavLink>
         <NavLink to="/contact" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Contact</NavLink>
@@ -98,6 +100,13 @@ const Header = () => {
                 <DropdownMenuItem className="cursor-pointer focus:bg-gray-800">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>My Profile</span>
+                </DropdownMenuItem>
+              </Link>
+
+              <Link to="/children">
+                <DropdownMenuItem className="cursor-pointer focus:bg-gray-800">
+                  <Users className="mr-2 h-4 w-4" />
+                  <span>My Children</span>
                 </DropdownMenuItem>
               </Link>
 

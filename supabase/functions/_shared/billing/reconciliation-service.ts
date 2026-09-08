@@ -13,9 +13,12 @@ import {
 } from './accounting-provider.ts';
 import {
   BookingNotBillableError,
+  CampNotBillableError,
   cancelInvoiceForBooking,
+  cancelInvoiceForCampRegistration,
   InvoiceCancelConflictError,
   issueInvoiceForBooking,
+  issueInvoiceForCampRegistration,
   nextRetryAt,
   type BillingDocumentRow,
   type BillingOperationRow,
@@ -34,6 +37,7 @@ export interface ReconcileBookingRow {
 export interface ReconcileEventRow {
   event_type: string;
   booking_id?: string | null;
+  camp_registration_id?: string | null;
   billing_document_id?: string | null;
   details: Record<string, unknown>;
 }
@@ -45,7 +49,9 @@ export interface ReconcileRepo {
   getBooking(bookingId: string): Promise<ReconcileBookingRow | null>;
   /** Guarded R-08 write. Returns true when the row actually changed. */
   confirmBookingIfPending(bookingId: string, now: Date): Promise<boolean>;
+  confirmCampRegistrationIfPending(registrationId: string, now: Date): Promise<boolean>;
   hasEvent(eventType: string, bookingId: string, kind?: string): Promise<boolean>;
+  hasCampEvent(eventType: string, campRegistrationId: string, kind?: string): Promise<boolean>;
   insertEvent(event: ReconcileEventRow): Promise<void>;
   listDueOperations(now: Date): Promise<BillingOperationRow[]>;
   upsertOperation(row: BillingOperationRow): Promise<void>;
@@ -58,6 +64,7 @@ export interface ReconcileDeps {
   billingRepo: BillingRepo;
   config: BexioConfig;
   now?: () => Date;
+  onCampConfirmed?: (registrationId: string) => Promise<void>;
 }
 
 export interface ReconcileResult {
@@ -83,6 +90,16 @@ async function emitOnce(
   return true;
 }
 
+async function emitCampOnce(
+  repo: ReconcileRepo,
+  event: ReconcileEventRow & { camp_registration_id: string },
+  kind?: string,
+): Promise<boolean> {
+  if (await repo.hasCampEvent(event.event_type, event.camp_registration_id, kind)) return false;
+  await repo.insertEvent(event);
+  return true;
+}
+
 async function reconcileDocument(
   deps: ReconcileDeps,
   doc: BillingDocumentRow,
@@ -100,12 +117,55 @@ async function reconcileDocument(
 
   if (invoice.status === 'paid') {
     await deps.repo.updateDocument(doc.id!, syncedPatch);
-    const didConfirm = await deps.repo.confirmBookingIfPending(doc.booking_id, now);
+    if (doc.camp_registration_id) {
+      const didConfirm = await deps.repo.confirmCampRegistrationIfPending(doc.camp_registration_id, now);
+      if (didConfirm) {
+        counts.confirmed += 1;
+        if (deps.onCampConfirmed) {
+          try {
+            await deps.onCampConfirmed(doc.camp_registration_id);
+          } catch (err) {
+            log({
+              event: 'camp_confirmation_failed',
+              registrationId: doc.camp_registration_id,
+              error: (err as Error).name,
+            });
+          }
+        }
+      }
+      if (previousStatus !== 'paid') {
+        await emitCampOnce(deps.repo, {
+          event_type: 'camp.payment.reconciled',
+          camp_registration_id: doc.camp_registration_id,
+          billing_document_id: doc.id ?? null,
+          details: {
+            document_nr: invoice.documentNr,
+            already_confirmed: !didConfirm,
+            received: invoice.received,
+            remaining: invoice.remaining,
+          },
+        });
+      }
+      if (isOverpaid(invoice.received, invoice.total)) {
+        if (await emitCampOnce(deps.repo, {
+          event_type: 'reconciliation.discrepancy',
+          camp_registration_id: doc.camp_registration_id,
+          billing_document_id: doc.id ?? null,
+          details: { kind: 'overpayment', received: invoice.received, total: invoice.total },
+        }, 'overpayment')) {
+          counts.discrepancies += 1;
+        }
+      }
+      return;
+    }
+    const bookingId = doc.booking_id;
+    if (!bookingId) return;
+    const didConfirm = await deps.repo.confirmBookingIfPending(bookingId, now);
     if (didConfirm) counts.confirmed += 1;
     if (previousStatus !== 'paid') {
       await emitOnce(deps.repo, {
         event_type: 'payment.reconciled',
-        booking_id: doc.booking_id,
+        booking_id: bookingId,
         billing_document_id: doc.id ?? null,
         details: {
           document_nr: invoice.documentNr,
@@ -118,7 +178,7 @@ async function reconcileDocument(
     if (isOverpaid(invoice.received, invoice.total)) {
       if (await emitOnce(deps.repo, {
         event_type: 'reconciliation.discrepancy',
-        booking_id: doc.booking_id,
+        booking_id: bookingId,
         billing_document_id: doc.id ?? null,
         details: { kind: 'overpayment', received: invoice.received, total: invoice.total },
       }, 'overpayment')) {
@@ -136,9 +196,20 @@ async function reconcileDocument(
   if (invoice.status === 'cancelled') {
     await deps.repo.updateDocument(doc.id!, syncedPatch);
     const kind = invoice.received > 0 ? 'payment_on_cancelled' : 'invoice_cancelled';
+    if (doc.camp_registration_id) {
+      if (await emitCampOnce(deps.repo, {
+        event_type: 'reconciliation.discrepancy',
+        camp_registration_id: doc.camp_registration_id,
+        billing_document_id: doc.id ?? null,
+        details: { kind, received: invoice.received },
+      }, kind)) {
+        counts.discrepancies += 1;
+      }
+      return;
+    }
     if (await emitOnce(deps.repo, {
       event_type: 'reconciliation.discrepancy',
-      booking_id: doc.booking_id,
+      booking_id: doc.booking_id!,
       billing_document_id: doc.id ?? null,
       details: { kind, received: invoice.received },
     }, kind)) {
@@ -171,6 +242,23 @@ async function processRetries(deps: ReconcileDeps, now: Date, counts: ReconcileR
         counts.retried += 1;
         continue;
       }
+      if (op.kind === 'camp_invoice_cancel' && op.camp_registration_id) {
+        await cancelInvoiceForCampRegistration({
+          provider: deps.provider,
+          repo: deps.billingRepo,
+          config: deps.config,
+          now: () => now,
+        }, op.camp_registration_id, { persistRetryQueue: false });
+        await deps.repo.upsertOperation({
+          ...op,
+          status: 'succeeded',
+          attempts: op.attempts + 1,
+          next_retry_at: null,
+          last_error: null,
+        });
+        counts.retried += 1;
+        continue;
+      }
       if (op.kind === 'invoice_issue' && op.booking_id) {
         await issueInvoiceForBooking({
           provider: deps.provider,
@@ -178,6 +266,23 @@ async function processRetries(deps: ReconcileDeps, now: Date, counts: ReconcileR
           config: deps.config,
           now: () => now,
         }, op.booking_id);
+        await deps.repo.upsertOperation({
+          ...op,
+          status: 'succeeded',
+          attempts: op.attempts + 1,
+          next_retry_at: null,
+          last_error: null,
+        });
+        counts.retried += 1;
+        continue;
+      }
+      if (op.kind === 'camp_invoice_issue' && op.camp_registration_id) {
+        await issueInvoiceForCampRegistration({
+          provider: deps.provider,
+          repo: deps.billingRepo,
+          config: deps.config,
+          now: () => now,
+        }, op.camp_registration_id);
         await deps.repo.upsertOperation({
           ...op,
           status: 'succeeded',
@@ -197,7 +302,7 @@ async function processRetries(deps: ReconcileDeps, now: Date, counts: ReconcileR
       counts.failed_operations += 1;
     } catch (err) {
       if (err instanceof ProviderAuthError) throw err;
-      if (err instanceof BookingNotBillableError || err instanceof InvoiceCancelConflictError) {
+      if (err instanceof BookingNotBillableError || err instanceof CampNotBillableError || err instanceof InvoiceCancelConflictError) {
         await deps.repo.upsertOperation({
           ...op,
           status: 'failed',
@@ -221,6 +326,7 @@ async function processRetries(deps: ReconcileDeps, now: Date, counts: ReconcileR
         await deps.repo.insertEvent({
           event_type: 'operation.retry_exhausted',
           booking_id: op.booking_id ?? null,
+          camp_registration_id: op.camp_registration_id ?? null,
           billing_document_id: op.billing_document_id ?? null,
           details: { kind: op.kind, attempts },
         });
@@ -254,7 +360,8 @@ export async function runReconciliation(deps: ReconcileDeps): Promise<ReconcileR
         if (err instanceof ProviderAuthError) throw err;
         log({
           event: 'document_sync_failed',
-          bookingId: doc.booking_id,
+          bookingId: doc.booking_id ?? null,
+          campRegistrationId: doc.camp_registration_id ?? null,
           error: (err as Error).name,
         });
       }
@@ -321,12 +428,12 @@ export function createPostgrestReconcileRepo(
     listOpenDocuments: () =>
       select<BillingDocumentRow>(
         'billing_documents',
-        'status=in.(issued,partially_paid)&select=id,booking_id,provider,external_id,document_nr,api_reference,status,total,currency',
+        'status=in.(issued,partially_paid)&select=id,booking_id,camp_registration_id,provider,external_id,document_nr,api_reference,status,total,currency',
       ),
     getDocument: async (id) => {
       const rows = await select<BillingDocumentRow>(
         'billing_documents',
-        `id=eq.${id}&select=id,booking_id,provider,external_id,document_nr,api_reference,status,total,currency`,
+        `id=eq.${id}&select=id,booking_id,camp_registration_id,provider,external_id,document_nr,api_reference,status,total,currency`,
       );
       return rows[0] ?? null;
     },
@@ -355,10 +462,33 @@ export function createPostgrestReconcileRepo(
       ) as unknown[];
       return Array.isArray(updated) && updated.length > 0;
     },
+    confirmCampRegistrationIfPending: async (registrationId, now) => {
+      const updated = await patch(
+        'camp_registrations',
+        `id=eq.${registrationId}&payment_status=neq.confirmed`,
+        {
+          status: 'confirmed',
+          payment_status: 'confirmed',
+          payment_confirmation_source: 'bexio_reconciliation',
+          payment_confirmed_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        },
+        'return=representation',
+      ) as unknown[];
+      return Array.isArray(updated) && updated.length > 0;
+    },
     hasEvent: async (eventType, bookingId, kind) => {
       const rows = await select<{ id: number; details: Record<string, unknown> }>(
         'billing_events',
         `event_type=eq.${encodeURIComponent(eventType)}&booking_id=eq.${bookingId}&select=id,details`,
+      );
+      if (!kind) return rows.length > 0;
+      return rows.some((r) => r.details?.kind === kind);
+    },
+    hasCampEvent: async (eventType, campRegistrationId, kind) => {
+      const rows = await select<{ id: number; details: Record<string, unknown> }>(
+        'billing_events',
+        `event_type=eq.${encodeURIComponent(eventType)}&camp_registration_id=eq.${campRegistrationId}&select=id,details`,
       );
       if (!kind) return rows.length > 0;
       return rows.some((r) => r.details?.kind === kind);
@@ -374,7 +504,7 @@ export function createPostgrestReconcileRepo(
     listDueOperations: (now) =>
       select<BillingOperationRow>(
         'billing_operations',
-        `status=eq.pending&or=(next_retry_at.is.null,next_retry_at.lte.${encodeURIComponent(now.toISOString())})&select=kind,idempotency_key,booking_id,billing_document_id,status,attempts,max_attempts,next_retry_at,last_error`,
+        `status=eq.pending&or=(next_retry_at.is.null,next_retry_at.lte.${encodeURIComponent(now.toISOString())})&select=kind,idempotency_key,booking_id,camp_registration_id,billing_document_id,status,attempts,max_attempts,next_retry_at,last_error`,
       ),
     upsertOperation: async (row) => {
       const res = await fetch(

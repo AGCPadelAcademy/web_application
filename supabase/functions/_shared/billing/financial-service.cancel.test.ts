@@ -131,7 +131,7 @@ function makeRepo(overrides: Partial<MockRepo> = {}): MockRepo {
     upsertContact: () => Promise.resolve(),
     upsertDocument: (row) => {
       const saved = { ...issuedDoc(), ...row, id: row.id ?? 'doc-1' };
-      documents.set(row.booking_id, saved);
+      documents.set(row.booking_id ?? BOOKING_ID, saved);
       return Promise.resolve(saved);
     },
     findOperation: (key) => Promise.resolve((operations.get(key) as never) ?? null),
@@ -147,6 +147,11 @@ function makeRepo(overrides: Partial<MockRepo> = {}): MockRepo {
       cancelledBookings.push(id);
       return Promise.resolve();
     },
+    getCampRegistration: () => Promise.resolve(null),
+    getCampRegistrationExtras: () => Promise.resolve([]),
+    findDocumentByCampRegistration: () => Promise.resolve(null),
+    upsertCampDocument: (row) => Promise.resolve(row),
+    cancelCampRegistration: () => Promise.resolve(),
     ...overrides,
   };
 }

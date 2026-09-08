@@ -16,6 +16,9 @@ import ProfileManagementPage from '@/pages/ProfileManagementPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import AuthCallbackPage from '@/pages/AuthCallbackPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import CampsPage from '@/pages/CampsPage';
+import CampDetailPage from '@/pages/CampDetailPage';
+import ChildrenPage from '@/pages/ChildrenPage';
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
@@ -41,6 +44,8 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="trips" element={<TripsPage />} />
+            <Route path="camps" element={<CampsPage />} />
+            <Route path="camps/:slug" element={<CampDetailPage />} />
             <Route path="tournaments" element={<TournamentsPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="login" element={<LoginPage />} />
@@ -55,10 +60,10 @@ function App() {
             } />
 
             <Route
-              path="payments"
+              path="children"
               element={
                 <ProtectedRoute>
-                  <PaymentsPage />
+                  <ChildrenPage />
                 </ProtectedRoute>
               }
             />

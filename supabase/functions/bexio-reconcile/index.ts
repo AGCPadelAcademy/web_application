@@ -22,6 +22,11 @@ import {
   runReconciliation,
 } from "../_shared/billing/reconciliation-service.ts";
 import { canAdminister, parseProfileAccess } from "../_shared/profile-access.ts";
+import {
+  campConfirmationHtml,
+  campConfirmationSubject,
+} from "../_shared/billing/camp-confirmation.ts";
+import { sendTransactionalEmail } from "../_shared/billing/mailer.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -96,6 +101,101 @@ async function loadConfig(): Promise<BexioConfig> {
   return (row.config ?? {}) as unknown as BexioConfig;
 }
 
+async function sendCampConfirmation(registrationId: string): Promise<void> {
+  const regs = await dbSelect(
+    "camp_registrations",
+    `id=eq.${registrationId}&select=id,camp_id,camp_name,camp_start_date,camp_end_date,camp_schedule_text,child_first_name,child_last_name,parent_full_name,parent_email,total_amount,currency`,
+  );
+  const registration = regs[0];
+  if (!registration) return;
+  const subject = campConfirmationSubject(String(registration.camp_name));
+  const already = await dbSelect(
+    "notifications_log",
+    `camp_registration_id=eq.${registrationId}&status=eq.sent&message_subject=eq.${encodeURIComponent(subject)}&select=id`,
+  );
+  if (already.length > 0) {
+    log({ event: "camp_confirmation_skipped", registrationId, reason: "already_sent" });
+    return;
+  }
+
+  const extras = await dbSelect(
+    "camp_registration_extras",
+    `camp_registration_id=eq.${registrationId}&select=name,price_amount`,
+  );
+  const camps = await dbSelect("camps", `id=eq.${registration.camp_id}&select=practical_info`);
+  const to = typeof registration.parent_email === "string" ? registration.parent_email : "";
+  if (!to) return;
+
+  const result = await sendTransactionalEmail({
+    to,
+    subject,
+    html: campConfirmationHtml({
+      to,
+      parentName: (registration.parent_full_name as string) || null,
+      childFirstName: String(registration.child_first_name ?? ""),
+      childLastName: String(registration.child_last_name ?? ""),
+      campName: String(registration.camp_name),
+      startDate: String(registration.camp_start_date),
+      endDate: String(registration.camp_end_date),
+      scheduleText: (registration.camp_schedule_text as string) || null,
+      total: Number(registration.total_amount),
+      currency: "CHF",
+      extras: extras.map((e) => ({ name: String(e.name), price_amount: Number(e.price_amount) })),
+      practicalInfo: (camps[0]?.practical_info as string) || null,
+    }),
+  });
+
+  await fetch(`${SUPABASE_URL}/rest/v1/notifications_log`, {
+    method: "POST",
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      camp_registration_id: registrationId,
+      notification_type: "email",
+      recipient_type: "client",
+      recipient_email: to,
+      message_subject: subject,
+      status: result.sent ? "sent" : "failed",
+      error_message: result.error ?? null,
+      sent_at: result.sent ? new Date().toISOString() : null,
+    }),
+  });
+
+  if (result.sent) {
+    await fetch(`${SUPABASE_URL}/rest/v1/billing_events`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        event_type: "camp.confirmation.sent",
+        camp_registration_id: registrationId,
+        details: {},
+      }),
+    });
+  }
+
+  if (registration.camp_id) {
+    await fetch(`${SUPABASE_URL}/rest/v1/camp_funnel_events`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        camp_id: registration.camp_id,
+        event: "camp_payment_confirmed",
+      }),
+    });
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
@@ -119,6 +219,7 @@ Deno.serve(async (req: Request) => {
       repo: createPostgrestReconcileRepo(SUPABASE_URL, SERVICE_ROLE_KEY),
       billingRepo: createPostgrestRepo(SUPABASE_URL, SERVICE_ROLE_KEY),
       config,
+      onCampConfirmed: sendCampConfirmation,
     });
 
     if (result.requires_reauth) {

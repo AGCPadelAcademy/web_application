@@ -49,6 +49,10 @@ corresponding to the current F1.xx feature.
 Do not modify another feature's specification, plan,
 or task files.
 
+<!-- SPECKIT START -->
+Active plan: `specs/features/010-padel-camps/plan.md`
+<!-- SPECKIT END -->
+
 ## Hooks
 
 Allow configured Spec Kit extension hooks to execute

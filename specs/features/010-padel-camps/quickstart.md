@@ -110,4 +110,5 @@ Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance cri
 | T009 apply to isolated test project | NOT RUN — MCP lists only production `jokjxpogvwxbwdaroqkc`; constitution forbids production DDL |
 | T011 last-place concurrency | NOT RUN — requires the isolated test project after T009 |
 | T057 lint / vitest / build / deno unit tests | PASS — `npm run lint`, `npm test` (76 passed, 2 skipped), `npm run build`, `deno test --allow-env --allow-net=none supabase/functions` (86 passed) |
+| Browser `/camps` `/trips` `/children` | PASS against local Vite — routes, 375px layout, `return_to` on `/children`; live camp rows unavailable until `0014` is applied (production schema cache has no `camp_public_list`) |
 | T058 / T060 live test-project deploy + Bexio demo | NOT RUN — no isolated test project + demo company in this agent; constitution forbids production DDL/deploy |

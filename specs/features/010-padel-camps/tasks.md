@@ -511,3 +511,33 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 ### Mobile flyer visibility (added 2026-09-09)
 
 - [X] T111 Diagnose and fix `/camps` flyers that do not appear on a mobile-width viewport (~375px). Evidence in `src/pages/CampsPage.jsx` + `src/components/camps/CampFlyer.jsx` after C3 T098: the `<img>` is `w-full h-full object-contain` inside an `overflow-hidden` control that only has `min-h-[16rem]` on small screens (`md:self-stretch` / `md:min-h-[22rem]` give a definite height from `md` up, which is why desktop still paints). Percentage `h-full` does not resolve against `min-height`, so the flyer can collapse to zero height on mobile; the `flex-col` card also places the flyer after the copy and CTA. Make published flyers visible and tappable at 375px without clipping to zero, keep aspect ratio (`object-contain`), keep the lightbox, and verify quickstart 11.4 / 12.1 per FR-001b / US2 (partial)
+
+---
+
+## Phase 18: Convergence (round 5)
+
+**Source**: `/speckit-converge` run 2026-09-09 against the Convergence #5 request (`/camps` listing order Mini → Junior → Competition within each week; My Payments card date N/A / incorrect). Baseline: post-Convergence-#4 state (invoice preview after Camp submit, Camp rows on My Payments, mobile flyer height + 0019 signed-URL policy).
+
+**Baseline assessment (current spec vs code)**: `fetchPublicCamps` orders only by `start_date` (`src/lib/camps.js`). Live published Herbstferien rows share a start date per week, so within Week 1 / Week 2 Postgres currently returns Competition → Junior → Mini (name/id), not Mini → Junior → Competition. Week 1 then Week 2 grouping is already correct and MUST be kept. Filter chips still use `localeCompare` (Competition first). My Payments lesson cards render `booking.booking_date` or `'N/A'` (`PaymentsPage.jsx`). `/lessons` has inserted `booking_date: null` since the 2026-09-02 calendar removal (`LessonsPage.jsx` → `buildBookingPayload`, FEAT-BKG-004). Live `bookings`: 6 rows with null `booking_date`, earliest of those created 2026-09-06 — matches the client check. Camp payment cards currently show `camp_start_date` (the camp week), not the invoice/created date. Do not invent a lesson slot or backfill `booking_date`. FR-002 still forbids treating Mini/Junior/Competition as the only supported Camps; listing **sort rank** for those configured type labels is the new request.
+
+**Decisions 2026-09-09 (user-confirmed, round 5)**:
+
+1. `/camps` lists published Camps by week (`start_date` ascending: Week 1 then Week 2, as today), and within each week Mini → Junior → Competition. Other/empty types sort after those three. Filter chips stay derived from distinct types (not the only allowed values); they SHOULD follow the same type rank.
+2. My Payments card date is the payment/invoice date (`created_at`), never `'N/A'` when that timestamp exists. Do not restore a self-serve `booking_date` / calendar. Historical rows that still have `booking_date` may keep it as a secondary lesson-slot date only if implement chooses; the visible card date MUST work for null-`booking_date` bookings from 2026-09-06 onward.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [ ] T112 Amend `spec.md` Clarifications (new Session), US2/FR-003: `/camps` sort is `start_date` then Mini → Junior → Competition (other configured types after); this is a listing rank, not a type enum and not hardcoded filter chips (FR-002). Amend Compatibility / payment-card date so My Payments shows `created_at` (invoice/booking created) and does not depend on nullable `booking_date` per convergence-5 request §1–§2 (contradicts)
+- [ ] T113 Update `plan.md` and baseline docs (`requirements.md` FEAT-PAY-001 / BC-CAMP): listing sort helper; payment-card date = `created_at` fallback; no schema change and no `booking_date` backfill per convergence-5 request §1–§2 (partial)
+
+### `/camps` listing order
+
+- [ ] T114 Add a `sortPublicCamps` (or equivalent) helper in `src/lib/camps.js` and apply it in `src/pages/CampsPage.jsx` after `fetchPublicCamps` / before render: Week 1 then Week 2 by `start_date`; within a week Mini → Junior → Competition using `camp_type`; unknown/empty types after. Do not change filter derivation to a hardcoded-only Mini/Junior/Competition enum. Keep type filters working on the sorted list per convergence-5 request §1 and FR-002/FR-003 (contradicts)
+
+### My Payments card date
+
+- [ ] T115 Fix the My Payments card date in `src/pages/PaymentsPage.jsx` / `src/lib/payments.js`: do not show `'N/A'` when `booking_date` is null. Evidence: `LessonsPage.jsx` passes `bookingDate: null` since 2026-09-02; live bookings from 2026-09-06 have null `booking_date`. Display `created_at` as the payment-card date for lesson and Camp rows (Camp cards currently use `camp_start_date`, which is the camp week, not the payment). Do not backfill or require `booking_date` per convergence-5 request §2 and FEAT-BKG-004 / FEAT-PAY-001 (contradicts)
+
+### Tests and documentation
+
+- [ ] T116 Update automated coverage (FR-040): Vitest for week-then-Mini-Junior-Competition sort (and other types after); payment-card date uses `created_at` when `booking_date` is null and does not render N/A. Add quickstart scenarios for `/camps` Week 1 Mini/Junior/Competition then Week 2 same order, and My Payments date on a null-`booking_date` lesson row per convergence-5 request §1–§2 (missing)

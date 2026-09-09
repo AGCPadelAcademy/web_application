@@ -30,10 +30,13 @@ const { mockSupabase, makeChain } = vi.hoisted(() => {
 vi.mock('@/lib/customSupabaseClient', () => ({ supabase: mockSupabase }));
 
 import {
+  campDisplayTotal,
   clearCampDraft,
   CSV_REGISTRATION_FIELDS,
   deriveCampStatus,
+  distinctCampTypes,
   extrasTotal,
+  filterCampsByType,
   funnelEventPayload,
   FUNNEL_EVENTS,
   readCampDraft,
@@ -71,6 +74,34 @@ describe('deriveCampStatus', () => {
 describe('extras total display', () => {
   it('adds extra prices to the camp base', () => {
     expect(extrasTotal([{ price_amount: 25 }, { price_amount: 10 }])).toBe(35);
+  });
+
+  it('switches the registration total to the member price with and without extras', () => {
+    const camp = { price_amount: 199, member_price_amount: 179 };
+    expect(campDisplayTotal(camp, [], null)).toBe(199);
+    expect(campDisplayTotal(camp, [], 179)).toBe(179);
+    expect(campDisplayTotal(camp, [{ price_amount: 25 }], 179)).toBe(204);
+    expect(campDisplayTotal(camp, [{ price_amount: 25 }], null)).toBe(224);
+  });
+});
+
+describe('camp type filters', () => {
+  const camps = [
+    { id: '1', camp_type: 'Mini' },
+    { id: '2', camp_type: 'Junior' },
+    { id: '3', camp_type: 'Mini' },
+    { id: '4', camp_type: null },
+    { id: '5', camp_type: '  ' },
+  ];
+
+  it('lists distinct non-empty types and excludes empty type from chips', () => {
+    expect(distinctCampTypes(camps)).toEqual(['Junior', 'Mini']);
+  });
+
+  it('filters to one type and restores the full list for All', () => {
+    expect(filterCampsByType(camps, 'Mini').map((c) => c.id)).toEqual(['1', '3']);
+    expect(filterCampsByType(camps, null)).toEqual(camps);
+    expect(filterCampsByType(camps, '')).toEqual(camps);
   });
 });
 

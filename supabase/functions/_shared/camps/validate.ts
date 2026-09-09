@@ -13,6 +13,7 @@ export interface CampUpsertInput {
   eligibility_text: string | null;
   price_amount: number;
   member_price_amount: number | null;
+  camp_type: string | null;
   currency: 'CHF';
   max_capacity: number;
   registration_opens_at: string | null;
@@ -101,6 +102,7 @@ export function validateCampPayload(
       eligibility_text: asString(raw.eligibility_text),
       price_amount: price,
       member_price_amount: memberPrice,
+      camp_type: asString(raw.camp_type),
       currency: 'CHF',
       max_capacity: capacity,
       registration_opens_at: asString(raw.registration_opens_at),

@@ -82,6 +82,23 @@ export function campDisplayTotal(camp, selectedExtras = [], basePrice = null) {
   return base + extrasTotal(selectedExtras);
 }
 
+/** Distinct non-empty camp_type values among published camps (FR-003). */
+export function distinctCampTypes(camps = []) {
+  const seen = [];
+  for (const camp of camps) {
+    const type = typeof camp?.camp_type === 'string' ? camp.camp_type.trim() : '';
+    if (type && !seen.includes(type)) seen.push(type);
+  }
+  return seen.sort((a, b) => a.localeCompare(b));
+}
+
+/** Filter published camps by type. Null/empty selectedType returns the full list. */
+export function filterCampsByType(camps = [], selectedType) {
+  const wanted = typeof selectedType === 'string' ? selectedType.trim() : '';
+  if (!wanted) return camps;
+  return camps.filter((camp) => (typeof camp?.camp_type === 'string' ? camp.camp_type.trim() : '') === wanted);
+}
+
 export async function fetchPublicCamps() {
   const { data, error } = await supabase
     .from('camp_public_list')

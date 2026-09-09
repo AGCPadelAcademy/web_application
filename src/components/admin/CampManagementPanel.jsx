@@ -44,6 +44,7 @@ const emptyCamp = {
   is_published: false,
   waitlist_enabled: false,
   practical_info: '',
+  camp_type: '',
 };
 
 const emptyExtra = { name: '', description: '', price_amount: '', sort_order: 0, is_active: true };
@@ -111,6 +112,7 @@ const CampManagementPanel = () => {
       price_amount: camp.price_amount ?? '',
       member_price_amount: camp.member_price_amount ?? '',
       max_capacity: camp.max_capacity ?? '',
+      camp_type: camp.camp_type ?? '',
       daily_start_time: camp.daily_start_time ?? '',
       daily_end_time: camp.daily_end_time ?? '',
       registration_opens_at: camp.registration_opens_at ? String(camp.registration_opens_at).slice(0, 16) : '',
@@ -171,6 +173,7 @@ const CampManagementPanel = () => {
         max_age: form.max_age === '' ? null : Number(form.max_age),
         price_amount: Number(form.price_amount),
         member_price_amount: form.member_price_amount === '' ? null : Number(form.member_price_amount),
+        camp_type: (form.camp_type || '').trim() === '' ? null : form.camp_type.trim(),
         max_capacity: Number(form.max_capacity),
         registration_opens_at: form.registration_opens_at || null,
         registration_deadline_at: form.registration_deadline_at || null,
@@ -304,6 +307,7 @@ const CampManagementPanel = () => {
               <form onSubmit={saveCamp} className="grid gap-4 md:grid-cols-2">
                 {field('name', 'Name')}
                 {field('slug', 'Slug')}
+                {field('camp_type', 'Camp type (optional)')}
                 {field('start_date', 'Start date', 'date')}
                 {field('end_date', 'End date', 'date')}
                 {field('daily_start_time', 'Daily start', 'time')}

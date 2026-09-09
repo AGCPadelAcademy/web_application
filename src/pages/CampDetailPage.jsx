@@ -65,8 +65,8 @@ const CampDetailPage = () => {
     listChildren().then(setChildren).catch(() => setChildren([]));
   }, [user]);
 
-  // Restore a preserved draft (terms / + Add new Child navigation), then
-  // apply ?select_child= coming back from child creation.
+  // Restore a preserved draft (terms navigation), then
+  // apply ?select_child= if returning from the Children page.
   useEffect(() => {
     if (!camp) return;
     const draft = readCampDraft(camp.id, sessionStorage);
@@ -198,14 +198,6 @@ const CampDetailPage = () => {
         {camp.schedule_text && <p className="mb-2">{camp.schedule_text}</p>}
         {(camp.min_age != null || camp.max_age != null) && <p className="mb-2 text-sm">Ages {camp.min_age ?? '—'}–{camp.max_age ?? '—'}</p>}
         {camp.eligibility_text && <p className="mb-2 text-sm text-gray-300">{camp.eligibility_text}</p>}
-        <p className="text-2xl font-bold text-green-400 mb-4">
-          {formatCampPrice(camp.price_amount, camp.currency)}
-          {camp.member_price_amount != null && (
-            <span className="text-base text-gray-300 font-normal">
-              {' '}· members {formatCampPrice(camp.member_price_amount, camp.currency)}
-            </span>
-          )}
-        </p>
         {camp.description && <p className="text-gray-300 mb-6">{camp.description}</p>}
         <p className="font-semibold mb-6">{status === 'full' ? CAMP_FULL_LABEL : status === 'open' ? 'Registration open' : 'Registration closed'}</p>
 
@@ -232,38 +224,40 @@ const CampDetailPage = () => {
                     ))}
                   </select>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-gray-700 w-full"
-                  onClick={() => navigate(`/children?new=1&return_to=${encodeURIComponent(`/camps/${slug}`)}`)}
-                >
-                  + Add new Child
-                </Button>
+              </>
+            )}
 
-                {status === 'open' && camp.member_price_amount != null && (
-                  <label className="flex items-start gap-2 text-sm">
-                    <Checkbox checked={memberClaimed} onCheckedChange={(value) => setMemberClaimed(Boolean(value))} />
-                    <span>
-                      I have an active academy membership ({formatCampPrice(camp.member_price_amount, camp.currency)}
-                      {' '}instead of {formatCampPrice(camp.price_amount, camp.currency)}).
-                    </span>
+            {status === 'open' && camp.member_price_amount != null && (
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox checked={memberClaimed} onCheckedChange={(value) => setMemberClaimed(Boolean(value))} />
+                <span>
+                  I have an active academy membership ({formatCampPrice(camp.member_price_amount, camp.currency)}
+                  {' '}instead of {formatCampPrice(camp.price_amount, camp.currency)}).
+                </span>
+              </label>
+            )}
+
+            {user && status === 'open' && extras.length > 0 && (
+              <div>
+                <p className="font-medium mb-2">Extras</p>
+                {extras.map((extra) => (
+                  <label key={extra.id} className="flex items-center gap-2 text-sm mb-2">
+                    <Checkbox checked={selectedExtras.includes(extra.id)} onCheckedChange={() => toggleExtra(extra.id)} />
+                    {extra.name} · {formatCampPrice(extra.price_amount, camp.currency)}
                   </label>
-                )}
+                ))}
+              </div>
+            )}
 
-                {status === 'open' && extras.length > 0 && (
-                  <div>
-                    <p className="font-medium mb-2">Extras</p>
-                    {extras.map((extra) => (
-                      <label key={extra.id} className="flex items-center gap-2 text-sm mb-2">
-                        <Checkbox checked={selectedExtras.includes(extra.id)} onCheckedChange={() => toggleExtra(extra.id)} />
-                        {extra.name} · {formatCampPrice(extra.price_amount, camp.currency)}
-                      </label>
-                    ))}
-                    <p className="text-green-400 font-semibold">Total: {formatCampPrice(total, camp.currency)}</p>
-                  </div>
-                )}
+            {status === 'open' && (
+              <div>
+                <p className="text-sm text-gray-400">Registration total</p>
+                <p className="text-2xl font-bold text-green-400">{formatCampPrice(total, camp.currency)}</p>
+              </div>
+            )}
 
+            {user && (
+              <>
                 {status === 'open' && (
                   <label className="flex items-start gap-2 text-sm">
                     <Checkbox checked={termsAccepted} onCheckedChange={(value) => setTermsAccepted(Boolean(value))} />

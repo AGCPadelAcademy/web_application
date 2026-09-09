@@ -71,7 +71,7 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 
 ### Actions
 
-- `POST { "action": "upsert_camp", "camp": {…} }` — create/update Camp configuration; publish/unpublish.
+- `POST { "action": "upsert_camp", "camp": {…} }` — create/update Camp configuration; publish/unpublish. **(Amended 2026-09-09, C3)** Payload may include optional `camp_type` (trimmed text or null). No new Edge Function.
 - `POST { "action": "upsert_extra", "camp_id", "extra": {…} }` / `{ "action": "remove_extra", "extra_id" }` — extras management.
 - `POST { "action": "list_registrations", "camp_id", "status"? }` — returns registrations with Camp, child, age, parent, phone, email, level, extras, total, payment status, registration date, and remaining places.
 - `POST { "action": "export_registrations", "camp_id" }` — returns the authorized registration rows as JSON (the FR-035 field set only); the frontend serializes them to CSV/Excel-compatible output in `src/lib/camps.js` (analysis A4).
@@ -90,7 +90,7 @@ Joining a Camp waitlist needs **no Edge Function**: the frontend inserts into `c
 
 ## 3b. Child removal and profile images — direct PostgREST/Storage (evolution 2026-09-09)
 
-The 2026-09-09 children evolution adds **no Edge Function changes**. Child removal is a direct owner-scoped `DELETE` on `children` under RLS; the `camp_registrations.child_id` `ON DELETE RESTRICT` FK refuses removal (23503) when the child has history, and the UI maps that to an explanation (FR-006d/FR-006f). Profile images go directly to the private `child-avatars` Storage bucket under owner-path-or-admin policies and are read back via signed URLs. Registration draft preservation and the terms `return_to` flow are client-side only.
+The 2026-09-09 children evolution adds **no Edge Function changes**. Child removal is a direct owner-scoped `DELETE` on `children` under RLS; the `camp_registrations.child_id` `ON DELETE RESTRICT` FK refuses removal (23503) when the child has history, and the UI maps that to an explanation (FR-006d/FR-006f). Profile images go directly to the private `child-avatars` Storage bucket under owner-path-or-admin policies and are read back via signed URLs. Registration draft preservation and the terms `return_to` flow are client-side only. **(Amended 2026-09-09 C3)** The registration form no longer offers `+ Add new Child`; child creation stays on `/children`.
 
 ---
 

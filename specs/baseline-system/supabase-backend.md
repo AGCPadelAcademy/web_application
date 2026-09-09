@@ -476,7 +476,7 @@ Admin-managed padel camps with parent/child registration. All RLS enabled; all c
 
 | Table | Purpose | Access summary |
 |---|---|---|
-| `camps` | Camp configuration (slug, dates, capacity, usual price, optional `member_price_amount`, optional `flyer_path`, `is_published`, waitlist flag) | SELECT published-or-admin (anon OK); writes admin-only |
+| `camps` | Camp configuration (slug, dates, capacity, usual price, optional `member_price_amount`, optional `flyer_path`, optional `camp_type`, `is_published`, waitlist flag) | SELECT published-or-admin (anon OK); writes admin-only |
 | `camp_extras` | Priced optional extras per camp | SELECT for published camps or admin; writes admin-only |
 | `children` | Parent-owned child profiles (PII: DOB, allergies, emergency contact); optional `avatar_path`; `archived_at` retained; DELETE allowed only with no registrations/invoices | owner (active parent) or admin |
 | `camp_registrations` | Registration with denormalized child/camp/parent snapshots, `status` (`pending_payment`/`confirmed`/`cancelled`), `payment_status`, totals, `member_price_claimed` | SELECT owner-or-admin; writes via `camp-submit-registration` / `camp-cancel-registration` (service role) |
@@ -497,8 +497,8 @@ Operational roster projection over `bookings` ⨝ `profiles`: `booking_id`, `boo
 #### `billing_public_config` — **ADDED 2026-08-25 (007 migration `0003`)**
 One boolean: `integration_enabled` (true when a `billing_integrations` row for `bexio` is `connected` or `degraded`). SECURITY INVOKER barrier over unexposed `private.billing_public_config_row()`; granted SELECT to `authenticated`. Powers the frontend invoice cutover. Does not expose tokens, config IDs, or status strings.
 
-#### `camp_public_list` — **ADDED 2026-09-08 (010 migration `0014`)**; **extended 2026-09-09 (`0017`)**
-Public catalogue projection over `camps` (`WHERE is_published`): schedule/eligibility/pricing fields (including `member_price_amount` and `flyer_path` since `0017`) plus computed `places_remaining` / `is_full` (via SECURITY DEFINER `camp_active_registration_count(uuid)` — fixed-output count, no PII) and an aggregated `extras` jsonb array of active `camp_extras`. Granted SELECT to `anon` + `authenticated`; powers the public `/camps` page. Unlike the other views it reads RLS-protected tables directly (published-or-admin policies) rather than a `private` reader function.
+#### `camp_public_list` — **ADDED 2026-09-08 (010 migration `0014`)**; **extended 2026-09-09 (`0017`, `0018`)**
+Public catalogue projection over `camps` (`WHERE is_published`): schedule/eligibility/pricing fields (including `member_price_amount`, `flyer_path` since `0017`, and `camp_type` since `0018`) plus computed `places_remaining` / `is_full` (via SECURITY DEFINER `camp_active_registration_count(uuid)` — fixed-output count, no PII) and an aggregated `extras` jsonb array of active `camp_extras`. Granted SELECT to `anon` + `authenticated`; powers the public `/camps` page. Unlike the other views it reads RLS-protected tables directly (published-or-admin policies) rather than a `private` reader function.
 
 ---
 

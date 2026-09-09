@@ -41,6 +41,18 @@ Deno.test('accepts an optional non-negative member price', () => {
   assertEquals(validateCampPayload({ ...validCamp, member_price_amount: 'abc' }).ok, true);
 });
 
+Deno.test('accepts an optional camp type', () => {
+  const withType = validateCampPayload({ ...validCamp, camp_type: 'Mini' });
+  assertEquals(withType.ok, true);
+  if (withType.ok) assertEquals(withType.camp.camp_type, 'Mini');
+  const blank = validateCampPayload({ ...validCamp, camp_type: '  ' });
+  assertEquals(blank.ok, true);
+  if (blank.ok) assertEquals(blank.camp.camp_type, null);
+  const missing = validateCampPayload({ ...validCamp, camp_type: null });
+  assertEquals(missing.ok, true);
+  if (missing.ok) assertEquals(missing.camp.camp_type, null);
+});
+
 Deno.test('maps waitlist and register SQL errors', () => {
   assertEquals(mapCampDbError('camp_waitlist_unavailable'), 'camp_waitlist_unavailable');
   assertEquals(mapCampDbError('{"message":"camp_full"}'), 'camp_full');

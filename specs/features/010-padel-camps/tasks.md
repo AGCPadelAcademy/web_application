@@ -432,3 +432,46 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 - [X] T089 Update automated coverage (FR-040): Vitest for dual-price validation (optional, non-negative), flyer payload/helpers, shared image validator, membership checkbox totals, CSV claim column; Deno tests for `validateCampPayload` accepting `member_price_amount` and the `member_price_unavailable` mapping per convergence-2 request §1–§2 (missing)
 - [X] T090 [P] Add quickstart §11 scenarios (flyer upload/replace/preview/larger-view/close, responsive + accessibility checks, unpublished-flyer access denial, both prices shown publicly, member claim switches the total, admin sees the claim flag, registration unchanged without the claim) and sync baseline docs (`requirements.md` BC-CAMP, `api-contracts.md`, `domain-model.md`) per convergence-2 request §5.15 (partial)
+
+---
+
+## Phase 16: Convergence (round 3)
+
+**Source**: `/speckit-converge` run 2026-09-09 against the Convergence #3 request (Camp type filters, `/camps` layout, flyer size, price placement, membership option visibility, remove `+ Add new Child` from registration). Baseline: post-Convergence-#2 state (flyers + dual pricing + self-declared membership claim; FR-012 still one registration/invoice per child).
+
+**Baseline assessment (current spec vs code)**: C2 schema, flyer lightbox, dual-price admin/CSV, and `membership_claimed` submit path are present. Remaining C2 UI gap: the registration running total is rendered only when extras exist (`CampDetailPage.jsx`), so a membership claim does not visibly update a price when the Camp has no extras. Live catalogue check (production): six published Herbstferien Camps; only Mini Week 1 has `member_price_amount` set — the membership checkbox is therefore hidden on the other five Camps by the existing FR-017a gate (`member_price_amount != null`).
+
+**Decisions 2026-09-09 (user-confirmed, round 3)**:
+
+1. `/camps` offers a filter for each available Camp type, placed **below** the Padel Camps description, plus a control to show all Camps again. There is **no** existing `camp_type` column or type enum (FR-002 treats Mini / Junior / Competition as configuration names, not application types). Introduce an admin-configured `camps.camp_type` text value; filters are derived from distinct types among the published Camps on the page. Do **not** hardcode Mini / Junior / Competition in UI logic.
+2. The Padel Camps description uses the same width as the Camp-card container and aligns with it.
+3. `/camps` shows **one Camp card per row**, using the row width. Flyers on those cards are larger, keep aspect ratio (`object-contain`, no extra crop/stretch), and keep the existing lightbox.
+4. Usual and academy-member prices are **removed from `/camps` cards**. On the individual Camp page they appear **only** inside the Submit registration card. Changing the membership option updates that displayed price; the displayed amount is the amount submitted, invoiced, and paid (existing FR-017a claim path). Membership remains the C2 self-declared checkbox, shown when the Camp defines a member price (do not invent a new membership product).
+5. Remove `+ Add new Child` from the Camp registration flow only (UX: it reads as adding several children to one Camp). Keep child create/manage on the Children page. Keep FR-012: multiple children still means multiple separate registrations. Terms-draft restore (FR-008a minus the add-child clause) stays.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [X] T093 Amend `spec.md` Clarifications (new Session), US1/US2/US4 acceptance, FR-001/FR-001b/FR-002/FR-003/FR-008a/FR-017a: Camp type as admin configuration + `/camps` type filters with an All-Camps reset; description width aligned to the card container; one card per row; larger contain-fit flyer; no prices on `/camps` cards; prices only in the Submit registration card and live-updated with the membership option; `+ Add new Child` removed from registration while Children-page create remains per convergence-3 request §1–§2 (contradicts)
+- [X] T094 Update `plan.md`, `data-model.md`, and `contracts/edge-functions.md`: `camps.camp_type` (text, nullable), `camp_public_list` + `validateCampPayload`/`upsert_camp` carry-through; no new Edge Function; record that membership pricing stays the C2 claim path and that registration no longer offers inline child creation per convergence-3 request §1.1/§2.2 (partial)
+
+### Schema
+
+- [X] T095 Write `supabase/migrations/0018_f125_camp_type_filters.sql`: nullable `camps.camp_type` text; `CREATE OR REPLACE` `camp_public_list` adding `camp_type`; one-time data backfill of current published Herbstferien names into type labels is allowed as **data** only (not UI hardcoding). Preserve service-role and public-read grants per convergence-3 request §1.1 and FR-002 (missing)
+- [X] T096 [P] Write SQL tests in `tests/sql/0018_f125_camp_type_filters.test.sql`: column present, view exposes `camp_type`, no Mini/Junior/Competition CHECK/enum constraint on the column per data-model.md (missing)
+
+### Public `/camps` page
+
+- [X] T097 Add Camp-type filter controls in `src/pages/CampsPage.jsx` **below** the Padel Camps description: one filter per distinct non-empty `camp_type` among the loaded published Camps, plus an All-Camps / clear control that restores the full list; filtering is client-side on the existing `fetchPublicCamps` result; camps with a null/empty type appear only in the All view per convergence-3 request §1.1 (missing)
+- [X] T098 Restyle `src/pages/CampsPage.jsx` and `src/components/camps/CampFlyer.jsx`: description width and alignment match the Camp-card container; `md:grid-cols-2` replaced by one card per row using the row width; flyer larger than the current `md:w-44 h-44` box; `object-cover` replaced with aspect-ratio-preserving `object-contain`; lightbox behaviour unchanged per convergence-3 request §1.2–§1.4 (contradicts)
+- [X] T099 Remove usual and academy-member price display from `/camps` cards in `src/pages/CampsPage.jsx` (no `formatCampPrice` on the listing) per convergence-3 request §1.5 (contradicts)
+
+### Individual Camp page / registration
+
+- [X] T100 Relocate Camp price in `src/pages/CampDetailPage.jsx`: delete the header price block; show the applicable price (usual vs academy-member) **only** inside the Submit registration card; always render that price (not only when extras exist); show the C2 “I have an active academy membership” checkbox in that card whenever `member_price_amount` is set and registration is open; changing the checkbox updates the displayed total; submit still sends `membership_claimed` and the invoice uses the same amount (FR-017a) per convergence-3 request §2.1–§2.2 (partial)
+- [X] T101 Remove the `+ Add new Child` button and its `/children?new=1&return_to=` navigation from `src/pages/CampDetailPage.jsx`. Keep the child `<select>` of saved children, the Children page create/manage flow, FR-012 separate per-child registrations, and FR-008a terms-draft restore. Amend FR-008a so add-child-during-registration is no longer required per convergence-3 request §2.3 (contradicts)
+
+### Admin, tests, and documentation
+
+- [X] T102 Extend `src/components/admin/CampManagementPanel.jsx` and `src/lib/camps.js` / `supabase/functions/_shared/camps/validate.ts` so admins can set `camp_type` on create/edit; empty type remains valid per convergence-3 request §1.1 (missing)
+- [X] T103 Update automated coverage (FR-040): Vitest for type-filter helpers (All vs one type, empty type excluded from chips), listing cards without prices, registration total switching on membership with and without extras, and absence of the add-child CTA helper if extracted; Deno `validateCampPayload` accepts `camp_type` per convergence-3 request §1–§2 (missing)
+- [X] T104 [P] Add quickstart scenarios for type filters + All reset, one-card-per-row + larger contain-fit flyer, no listing prices, price-only-in-submit-card + membership total update, and no `+ Add new Child` on registration (Children page create still works); sync baseline docs (`requirements.md` BC-CAMP, `api-contracts.md`, `domain-model.md`) per convergence-3 request §1–§2 (partial)

@@ -50,6 +50,7 @@ Admin-managed reusable Camp configuration (FR-001/FR-002).
 | `price_amount` | numeric(10,2) | NOT NULL, CHECK `price_amount >= 0` | base CHF (usual price) |
 | `member_price_amount` | numeric(10,2) | NULL, CHECK `member_price_amount >= 0` | **added 2026-09-09 (C2)** — optional academy-member price |
 | `flyer_path` | text | NULL | **added 2026-09-09 (C2)** — object path inside the private `camp-flyers` bucket (`{camp_id}/{file}`) |
+| `camp_type` | text | NULL | **added 2026-09-09 (C3)** — admin-configured type label for `/camps` filters; not an enum of Mini/Junior/Competition |
 | `currency` | text | NOT NULL DEFAULT `'CHF'` | |
 | `max_capacity` | integer | NOT NULL, CHECK `max_capacity > 0` | |
 | `registration_opens_at` | timestamptz | NULL | when NULL, open immediately while published |
@@ -64,6 +65,8 @@ Admin-managed reusable Camp configuration (FR-001/FR-002).
 **Flyer storage (2026-09-09, C2)**: private `camp-flyers` bucket; object path `{camp_id}/{file}`; images ≤ 5 MB. `storage.objects` policies: `SELECT` for anon/authenticated when the first path segment is a **published** Camp id, or the caller is an admin; `INSERT/UPDATE/DELETE` admin-only. The SPA reads flyers through short-lived signed URLs. Unpublished Camps' flyers are never publicly readable (convergence-2 §4).
 
 **Dual pricing (2026-09-09, C2)**: `member_price_amount` is optional. Interim (until F1.09): the parent self-declares an active membership at registration (`register_camp_child.p_member_price_claimed`); when claimed and a member price exists, the registration snapshots the member price as `base_price` and sets `member_price_claimed = true` (admin-visible); a claim on a Camp without a member price fails with `member_price_unavailable`. F1.09 handover: automatic active-at-registration membership check, member-only price display for members, and a pending-membership-payment admin flag.
+
+**Camp type (2026-09-09, C3)**: `camp_type` is optional free text set by the admin. `/camps` derives filter chips from distinct non-empty types among the loaded published Camps; Camps with a null/empty type appear only when All Camps is selected. The SPA MUST NOT hardcode Mini / Junior / Competition as the only filter values. `camp_public_list` exposes `camp_type`.
 
 ### `camp_registrations` — C2 addition
 
@@ -229,7 +232,7 @@ New event types: `camp.registration_submitted`, `camp.invoice.issued`, `camp.pay
 
 ### `camp_public_list` (view)
 
-Security-invoker view over published Camps exposing: `slug`, `name`, `description`, `start_date`, `end_date`, `daily_start_time`, `daily_end_time`, `schedule_text`, `min_age`, `max_age`, `eligibility_text`, `price_amount`, `currency`, `registration_opens_at`, `registration_deadline_at`, `waitlist_enabled`, `is_full`, `places_remaining` (derived, non-negative), plus active extras. No parent/child columns. Granted `SELECT` to `anon` and `authenticated`.
+Security-invoker view over published Camps exposing: `slug`, `name`, `description`, `start_date`, `end_date`, `daily_start_time`, `daily_end_time`, `schedule_text`, `min_age`, `max_age`, `eligibility_text`, `price_amount`, `member_price_amount`, `flyer_path`, `camp_type`, `currency`, `registration_opens_at`, `registration_deadline_at`, `waitlist_enabled`, `is_full`, `places_remaining` (derived, non-negative), plus active extras. No parent/child columns. Granted `SELECT` to `anon` and `authenticated`.
 
 ## State machines
 

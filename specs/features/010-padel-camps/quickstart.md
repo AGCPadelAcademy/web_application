@@ -138,6 +138,18 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 12.5 | Camp with a member price: toggle membership | Total in the Submit registration card switches between usual and member price (with extras too); submit uses the same amount |
 | 12.6 | Registration form | No `+ Add new Child` control; Children page still creates children; several children still means several registrations |
 
+## 13. Invoice preview after Camp registration (convergence 4, 2026-09-09)
+
+| Step | Action | Expected |
+|---|---|---|
+| 13.1 | Parent completes a valid Camp registration | Invoice preview opens immediately for **that** registration (PDF + QR). Parent is not sent to My Children first. Registration stays awaiting payment |
+| 13.2 | Invoice not yet issued (`document` null / queued) | Preview shows a pending/not-ready state; registration is kept |
+| 13.3 | Close & Proceed on the Camp invoice preview | Navigates to My Payments (same as lesson/Membership) |
+| 13.4 | Pay from the preview | Parent uses the QR/PDF bank-transfer slip; paid state still comes only from Bexio reconciliation |
+| 13.5 | Open the child’s profile | The same Camp invoice is listed and can be reopened |
+| 13.6 | Open My Payments | Camp invoice appears alongside lesson bookings, labelled with the Camp and child; lesson rows still work |
+| 13.7 | Visitor opens `/camps` at 375px | Published flyer is visible and tappable (not a collapsed/zero-height box); keep-aspect; lightbox still works |
+
 ## Acceptance mapping
 
 Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).

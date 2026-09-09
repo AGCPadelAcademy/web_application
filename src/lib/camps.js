@@ -5,6 +5,10 @@ export const CAMPS_TERMS_VERSION = '2026-09';
 export const CAMP_FULL_LABEL = 'Complet / Ausgebucht';
 export const INACTIVE_CLIENT_MESSAGE = 'This client profile is inactive. Contact the academy.';
 
+/** Explicit `h-64` on small screens so `object-contain` + `h-full` does not collapse (C4 T111). */
+export const CAMP_CARD_FLYER_FRAME_CLASS =
+  'w-full md:w-[min(42%,26rem)] h-64 md:h-auto md:min-h-[22rem] shrink-0 md:self-stretch order-first md:order-none';
+
 export const FUNNEL_EVENTS = {
   PAGE_VIEW: 'camps_page_view',
   STARTED: 'camp_registration_started',
@@ -159,6 +163,24 @@ export function submitCampRegistration({ campId, childId, extraIds, termsVersion
     terms_accepted: true,
     membership_claimed: membershipClaimed === true,
   });
+}
+
+/** Post-submit preview target. `document` may be null while issuance is queued. */
+export function campInvoicePreviewFromSubmit(result) {
+  return {
+    campRegistrationId: result?.registration?.id ?? null,
+    documentReady: Boolean(result?.document?.id || result?.document?.document_nr),
+  };
+}
+
+export async function listParentCampRegistrations(parentId) {
+  const { data, error } = await supabase
+    .from('camp_registrations')
+    .select('id, camp_name, camp_start_date, child_first_name, child_last_name, status, payment_status, total_amount, currency, created_at, billing_documents(status, document_nr)')
+    .eq('parent_id', parentId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
 
 export function cancelCampRegistration(registrationId) {

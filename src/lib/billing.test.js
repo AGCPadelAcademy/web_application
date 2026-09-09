@@ -14,7 +14,7 @@ const { mockSupabase } = vi.hoisted(() => ({
 
 vi.mock('@/lib/customSupabaseClient', () => ({ supabase: mockSupabase }));
 
-import { fetchInvoicePdfBlob } from '@/lib/billing';
+import { fetchCampInvoicePdfBlob, fetchInvoicePdfBlob } from '@/lib/billing';
 
 describe('fetchInvoicePdfBlob', () => {
   beforeEach(() => {
@@ -50,5 +50,32 @@ describe('fetchInvoicePdfBlob', () => {
       json: () => Promise.resolve({ error: 'no_document' }),
     });
     await expect(fetchInvoicePdfBlob('booking-1')).rejects.toThrow('no_document');
+  });
+});
+
+describe('fetchCampInvoicePdfBlob', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:camp-pdf') });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('posts camp_registration_id and returns a blob URL', async () => {
+    const blob = new Blob(['%PDF'], { type: 'application/pdf' });
+    fetch.mockResolvedValue({ ok: true, blob: () => Promise.resolve(blob) });
+
+    const url = await fetchCampInvoicePdfBlob('reg-1');
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/billing-invoice-document'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ camp_registration_id: 'reg-1' }),
+      }),
+    );
+    expect(url).toBe('blob:camp-pdf');
   });
 });

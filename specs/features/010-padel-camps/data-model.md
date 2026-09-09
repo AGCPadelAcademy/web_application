@@ -282,7 +282,7 @@ One additive migration `supabase/migrations/0014_f125_padel_camps.sql` (confirm 
 4. Create `register_camp_child` (and a companion `cancel_camp_registration` used by the unpaid-cancel path) with service-role-only EXECUTE.
 5. RLS enable + policies for all new tables; no client writes except owner-scoped children and owner waitlist join.
 
-**Backward compatibility**: nothing existing is altered in meaning; rollback = drop new objects and the three additive columns. Lesson bookings, My Payments, Bexio connection, and legacy invoices are untouched.
+**Backward compatibility**: nothing existing is altered in meaning; rollback = drop new objects and the three additive columns. Lesson bookings, Bexio connection, and legacy invoices are untouched. **(Amended 2026-09-09 C4)** My Payments lists Camp registration invoices alongside lesson bookings; Camps remain `camp_registrations` rows, not `bookings`.
 
 ## Validation rules mapped from requirements
 

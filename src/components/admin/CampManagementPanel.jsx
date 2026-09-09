@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import FlyerLightbox from '@/components/modals/FlyerLightbox';
+import { validateImageFile } from '@/lib/imageValidation';
 import {
+  campFlyerSignedUrl,
   convertWaitlistEntry,
   exportCampRegistrations,
   listAdminCamps,
@@ -14,7 +17,9 @@ import {
   listCampWaitlist,
   mapCampError,
   removeCampExtra,
+  removeCampFlyer,
   serializeRegistrationsCsv,
+  uploadCampFlyer,
   upsertCamp,
   upsertCampExtra,
 } from '@/lib/camps';
@@ -32,6 +37,7 @@ const emptyCamp = {
   max_age: '',
   eligibility_text: '',
   price_amount: '',
+  member_price_amount: '',
   max_capacity: '',
   registration_opens_at: '',
   registration_deadline_at: '',
@@ -53,6 +59,26 @@ const CampManagementPanel = () => {
   const [registrations, setRegistrations] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [remaining, setRemaining] = useState(null);
+  const [flyerFile, setFlyerFile] = useState(null);
+  const [flyerPreview, setFlyerPreview] = useState(null);
+  const [flyerOpen, setFlyerOpen] = useState(false);
+  const [flyerBusy, setFlyerBusy] = useState(false);
+  const flyerObjectUrl = useRef(null);
+
+  const setLocalFlyerPreview = (file) => {
+    if (flyerObjectUrl.current) {
+      URL.revokeObjectURL(flyerObjectUrl.current);
+      flyerObjectUrl.current = null;
+    }
+    if (file) {
+      flyerObjectUrl.current = URL.createObjectURL(file);
+      setFlyerPreview(flyerObjectUrl.current);
+    }
+  };
+
+  useEffect(() => () => {
+    if (flyerObjectUrl.current) URL.revokeObjectURL(flyerObjectUrl.current);
+  }, []);
 
   const selected = useMemo(
     () => camps.find((camp) => camp.id === selectedId) || null,
@@ -83,12 +109,55 @@ const CampManagementPanel = () => {
       min_age: camp.min_age ?? '',
       max_age: camp.max_age ?? '',
       price_amount: camp.price_amount ?? '',
+      member_price_amount: camp.member_price_amount ?? '',
       max_capacity: camp.max_capacity ?? '',
       daily_start_time: camp.daily_start_time ?? '',
       daily_end_time: camp.daily_end_time ?? '',
       registration_opens_at: camp.registration_opens_at ? String(camp.registration_opens_at).slice(0, 16) : '',
       registration_deadline_at: camp.registration_deadline_at ? String(camp.registration_deadline_at).slice(0, 16) : '',
     });
+    setFlyerFile(null);
+    setLocalFlyerPreview(null);
+    if (camp.flyer_path) {
+      campFlyerSignedUrl(camp.flyer_path).then((url) => setFlyerPreview(url));
+    } else {
+      setFlyerPreview(null);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedId(null);
+    setForm(emptyCamp);
+    setFlyerFile(null);
+    setLocalFlyerPreview(null);
+    setFlyerPreview(null);
+  };
+
+  const handleFlyerFile = (file) => {
+    if (!file) return;
+    const problem = validateImageFile(file);
+    if (problem) {
+      toast({ title: 'Invalid image', description: problem, variant: 'destructive' });
+      return;
+    }
+    setFlyerFile(file);
+    setLocalFlyerPreview(file);
+  };
+
+  const handleFlyerRemove = async () => {
+    if (!selected?.flyer_path) return;
+    setFlyerBusy(true);
+    try {
+      await removeCampFlyer(selected);
+      setFlyerPreview(null);
+      setFlyerFile(null);
+      toast({ title: 'Flyer removed' });
+      await load();
+    } catch (error) {
+      toast({ title: 'Remove failed', description: mapCampError(error.message), variant: 'destructive' });
+    } finally {
+      setFlyerBusy(false);
+    }
   };
 
   const saveCamp = async (event) => {
@@ -101,11 +170,21 @@ const CampManagementPanel = () => {
         min_age: form.min_age === '' ? null : Number(form.min_age),
         max_age: form.max_age === '' ? null : Number(form.max_age),
         price_amount: Number(form.price_amount),
+        member_price_amount: form.member_price_amount === '' ? null : Number(form.member_price_amount),
         max_capacity: Number(form.max_capacity),
         registration_opens_at: form.registration_opens_at || null,
         registration_deadline_at: form.registration_deadline_at || null,
       };
-      await upsertCamp(payload);
+      const result = await upsertCamp(payload);
+      const campId = selectedId || result?.camp?.id;
+      if (flyerFile && campId) {
+        try {
+          await uploadCampFlyer(campId, flyerFile);
+        } catch (error) {
+          toast({ title: 'Camp saved, flyer upload failed', description: mapCampError(error.message), variant: 'destructive' });
+        }
+      }
+      setFlyerFile(null);
       toast({ title: 'Camp saved' });
       await load();
     } catch (error) {
@@ -191,7 +270,7 @@ const CampManagementPanel = () => {
           <Button
             variant="outline"
             className="w-full border-gray-700"
-            onClick={() => { setSelectedId(null); setForm(emptyCamp); }}
+            onClick={resetForm}
           >
             <Plus className="w-4 h-4 mr-2" /> New camp
           </Button>
@@ -231,10 +310,52 @@ const CampManagementPanel = () => {
                 {field('daily_end_time', 'Daily end', 'time')}
                 {field('min_age', 'Min age', 'number')}
                 {field('max_age', 'Max age', 'number')}
-                {field('price_amount', 'Price (CHF)', 'number')}
+                {field('price_amount', 'Usual price (CHF)', 'number')}
+                {field('member_price_amount', 'Academy member price (CHF, optional)', 'number')}
                 {field('max_capacity', 'Capacity', 'number')}
                 {field('registration_opens_at', 'Registration opens', 'datetime-local')}
                 {field('registration_deadline_at', 'Registration deadline', 'datetime-local')}
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="flyer">Camp flyer (optional)</Label>
+                  <div className="flex items-start gap-4">
+                    {flyerPreview ? (
+                      <button
+                        type="button"
+                        onClick={() => setFlyerOpen(true)}
+                        aria-label="Enlarge the camp flyer preview"
+                        className="rounded-xl overflow-hidden border border-gray-800 hover:border-green-500/60 w-40 h-40 shrink-0"
+                      >
+                        <img src={flyerPreview} alt="Camp flyer preview" className="w-full h-full object-cover" />
+                      </button>
+                    ) : (
+                      <div className="w-40 h-40 rounded-xl bg-gray-950 border border-gray-800 flex items-center justify-center text-gray-600 text-sm">
+                        No flyer
+                      </div>
+                    )}
+                    <div className="space-y-2 flex-1">
+                      <Input
+                        id="flyer"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => handleFlyerFile(e.target.files?.[0] ?? null)}
+                        className="bg-gray-950 border-gray-700 text-white file:mr-3 file:rounded-md file:border-0 file:bg-gray-800 file:px-3 file:py-1 file:text-sm file:text-gray-200"
+                      />
+                      {selected?.flyer_path && !flyerFile && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-300"
+                          disabled={flyerBusy}
+                          onClick={handleFlyerRemove}
+                        >
+                          Remove flyer
+                        </Button>
+                      )}
+                      <p className="text-xs text-gray-500">PNG, JPEG, or WebP, max 5 MB. The flyer uploads when the camp is saved. Click the preview to enlarge it.</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="md:col-span-2 space-y-1">
                   <Label htmlFor="description">Description</Label>
                   <textarea id="description" value={form.description} onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))} className="w-full min-h-[80px] rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm" />
@@ -313,7 +434,12 @@ const CampManagementPanel = () => {
                     <tr key={row.registration_id} className="border-t border-gray-800">
                       <td className="py-2">{row.child_first_name} {row.child_last_name}</td>
                       <td>{row.parent_full_name}<br /><span className="text-gray-500">{row.parent_email}</span></td>
-                      <td>{row.total_amount} {row.currency}</td>
+                      <td>
+                        {row.total_amount} {row.currency}
+                        {row.member_price_claimed ? (
+                          <span className="block text-xs text-amber-400">member price claimed</span>
+                        ) : null}
+                      </td>
                       <td>{row.payment_status === 'confirmed' ? 'Paid' : 'Pending'}</td>
                     </tr>
                   ))}
@@ -359,6 +485,12 @@ const CampManagementPanel = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      <FlyerLightbox
+        open={flyerOpen}
+        imageUrl={flyerPreview}
+        title={form.name}
+        onClose={() => setFlyerOpen(false)}
+      />
     </div>
   );
 };

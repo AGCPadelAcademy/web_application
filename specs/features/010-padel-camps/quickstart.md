@@ -112,6 +112,21 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 10.8 | During registration, choose `+ Add new Child`, create the child | Return to the same registration with the draft restored and the new child pre-selected |
 | 10.9 | Register two children | Two separate registrations, one invoice per child (FR-012) |
 
+## 11. Flyers and member pricing (convergence 2, 2026-09-09)
+
+| Step | Action | Expected |
+|---|---|---|
+| 11.1 | Admin opens a Camp → uploads a flyer (PNG/JPEG/WebP ≤ 5 MB) | Immediate in-form preview before save; after save the flyer is stored and shown when editing |
+| 11.2 | Click the flyer preview | Larger view opens; Escape / close button returns to the form — no submit, no state loss |
+| 11.3 | Replace, then remove the flyer | Preview updates; after removal the "No flyer" state returns |
+| 11.4 | Visitor opens `/camps` | Flyer on the right side of the card; responsive stacking at 375px; camps without a flyer show the non-interactive fallback |
+| 11.5 | Click a card flyer | Larger view opens; closing returns to `/camps` with page state intact |
+| 11.6 | Anon requests an unpublished camp's flyer signed URL | Refused (admin-only until published) |
+| 11.7 | Admin sets both usual and member prices | Both prices shown on the card and the camp detail |
+| 11.8 | Parent registers without the membership checkbox | Usual price invoiced; registration not flagged |
+| 11.9 | Parent registers with "I have an active academy membership" | Member price invoiced; registration flagged in the admin list and CSV export |
+| 11.10 | Claim membership on a camp without a member price | Refused (`member_price_unavailable`) |
+
 ## Acceptance mapping
 
 Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).

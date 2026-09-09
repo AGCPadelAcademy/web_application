@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/customSupabaseClient';
 import { INACTIVE_CLIENT_MESSAGE } from '@/lib/camps';
+import { IMAGE_MAX_BYTES, IMAGE_TYPES, validateImageFile } from '@/lib/imageValidation';
 import { DEFAULT_PHONE_PREFIX, PHONE_PREFIXES } from '@/lib/phonePrefixes';
 
 export const CHILD_FIELDS = [
@@ -13,8 +14,10 @@ export const CHILD_FIELDS = [
 ];
 
 export const CHILD_AVATARS_BUCKET = 'child-avatars';
-export const CHILD_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
-export const CHILD_AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const CHILD_AVATAR_MAX_BYTES = IMAGE_MAX_BYTES;
+export const CHILD_AVATAR_TYPES = IMAGE_TYPES;
+/** Backwards-compatible alias of the shared image validator. */
+export const validateChildAvatarFile = validateImageFile;
 
 export const CHILD_HAS_HISTORY_MESSAGE =
   'This child has camp registrations or invoices and cannot be removed. History is kept.';
@@ -100,18 +103,6 @@ export function splitEmergencyPhone(value) {
   const match = compact.match(/^(\+[1-9]\d{0,3})(\d+)$/);
   if (match) return { prefix: match[1], national: match[2] };
   return { prefix: DEFAULT_PHONE_PREFIX, national: compact.replace(/^\+/, '') };
-}
-
-/** Returns null when the file is acceptable, otherwise a user-facing message. */
-export function validateChildAvatarFile(file) {
-  if (!file) return null;
-  if (!CHILD_AVATAR_TYPES.includes(file.type)) {
-    return 'Please choose a PNG, JPEG, or WebP image.';
-  }
-  if (file.size > CHILD_AVATAR_MAX_BYTES) {
-    return 'The image must be 5 MB or smaller.';
-  }
-  return null;
 }
 
 export async function listChildren() {

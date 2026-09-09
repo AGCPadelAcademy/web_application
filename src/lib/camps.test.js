@@ -97,6 +97,18 @@ describe('admin camp invoke', () => {
       }),
     }));
   });
+
+  it('forwards the membership claim to the submit function', async () => {
+    mockSupabase.functions.invoke.mockResolvedValue({ data: { registration: { id: 'r1' } }, error: null });
+    await submitCampRegistration({ campId: 'c1', childId: 'k1', extraIds: [], membershipClaimed: true });
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('camp-submit-registration', expect.objectContaining({
+      body: expect.objectContaining({ membership_claimed: true }),
+    }));
+    await submitCampRegistration({ campId: 'c1', childId: 'k1', extraIds: [] });
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('camp-submit-registration', expect.objectContaining({
+      body: expect.objectContaining({ membership_claimed: false }),
+    }));
+  });
 });
 
 describe('CSV serialization', () => {
@@ -113,12 +125,14 @@ describe('CSV serialization', () => {
       extras: ['Lunch'],
       total_amount: 374,
       payment_status: 'pending',
+      member_price_claimed: true,
       registration_date: '2026-09-08',
       remaining_places: 1,
       secret: 'nope',
     }]);
     expect(csv.split('\n')[0]).toBe(CSV_REGISTRATION_FIELDS.join(','));
     expect(csv).toContain('Junior Camp');
+    expect(csv).toContain('true');
     expect(csv).not.toContain('secret');
     expect(csv).not.toContain('nope');
   });
@@ -142,13 +156,14 @@ describe('registration draft preservation', () => {
     };
   };
 
-  it('round-trips child, extras, and terms state', () => {
+  it('round-trips child, extras, terms, and membership claim state', () => {
     const storage = makeStorage();
-    writeCampDraft('camp-1', { childId: 'k1', selectedExtras: ['e1', 'e2'], termsAccepted: true }, storage);
+    writeCampDraft('camp-1', { childId: 'k1', selectedExtras: ['e1', 'e2'], termsAccepted: true, memberClaimed: true }, storage);
     expect(readCampDraft('camp-1', storage)).toEqual({
       childId: 'k1',
       selectedExtras: ['e1', 'e2'],
       termsAccepted: true,
+      memberClaimed: true,
     });
   });
 
@@ -157,8 +172,8 @@ describe('registration draft preservation', () => {
     expect(readCampDraft('camp-1', storage)).toBeNull();
     storage.setItem('campRegistrationDraft:camp-1', '{not json');
     expect(readCampDraft('camp-1', storage)).toBeNull();
-    writeCampDraft('camp-1', { childId: 42, selectedExtras: 'nope', termsAccepted: 'yes' }, storage);
-    expect(readCampDraft('camp-1', storage)).toEqual({ childId: null, selectedExtras: [], termsAccepted: false });
+    writeCampDraft('camp-1', { childId: 42, selectedExtras: 'nope', termsAccepted: 'yes', memberClaimed: 'yes' }, storage);
+    expect(readCampDraft('camp-1', storage)).toEqual({ childId: null, selectedExtras: [], termsAccepted: false, memberClaimed: false });
   });
 
   it('clears the draft after submit', () => {

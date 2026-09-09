@@ -165,6 +165,7 @@ Deno.serve(async (req: Request) => {
       extra_ids?: string[];
       terms_version?: string;
       terms_accepted?: boolean;
+      membership_claimed?: boolean;
     };
     if (!body.camp_id || !body.child_id) return json({ error: "camp_id and child_id required" }, 422);
     if (body.terms_accepted !== true || !body.terms_version) {
@@ -199,6 +200,7 @@ Deno.serve(async (req: Request) => {
         p_parent_id: caller.userId,
         p_extra_ids: Array.isArray(body.extra_ids) ? body.extra_ids : [],
         p_terms_version: body.terms_version,
+        p_member_price_claimed: body.membership_claimed === true,
       }),
     });
     if (!rpc.ok) {

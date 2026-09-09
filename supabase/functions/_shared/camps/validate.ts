@@ -12,6 +12,7 @@ export interface CampUpsertInput {
   max_age: number | null;
   eligibility_text: string | null;
   price_amount: number;
+  member_price_amount: number | null;
   currency: 'CHF';
   max_capacity: number;
   registration_opens_at: string | null;
@@ -69,6 +70,10 @@ export function validateCampPayload(
   if (end < start) return { ok: false, error: 'invalid_date_order' };
   const price = asNumber(raw.price_amount);
   if (price === null || price < 0) return { ok: false, error: 'invalid_price' };
+  const memberPrice = raw.member_price_amount == null || raw.member_price_amount === ''
+    ? null
+    : asNumber(raw.member_price_amount);
+  if (memberPrice !== null && memberPrice < 0) return { ok: false, error: 'invalid_member_price' };
   const capacity = asNumber(raw.max_capacity);
   if (capacity === null || capacity <= 0 || !Number.isInteger(capacity)) {
     return { ok: false, error: 'invalid_capacity' };
@@ -95,6 +100,7 @@ export function validateCampPayload(
       max_age: maxAge,
       eligibility_text: asString(raw.eligibility_text),
       price_amount: price,
+      member_price_amount: memberPrice,
       currency: 'CHF',
       max_capacity: capacity,
       registration_opens_at: asString(raw.registration_opens_at),
@@ -141,6 +147,7 @@ export const REGISTER_ERROR_CODES = new Set([
   'child_archived',
   'emergency_contact_required',
   'extras_invalid',
+  'member_price_unavailable',
   'not_found',
   'refund_agreement_required',
   'camp_waitlist_unavailable',
@@ -183,6 +190,7 @@ export function mapSubmitError(message: string): { error: string; status: number
     'child_archived',
     'emergency_contact_required',
     'extras_invalid',
+    'member_price_unavailable',
   ]);
   if (conflict.has(code)) return { error: code, status: 409 };
   return { error: 'register_failed', status: 500 };

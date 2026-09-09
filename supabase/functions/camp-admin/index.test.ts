@@ -34,8 +34,16 @@ Deno.test('rejects extra with negative price', () => {
   assertEquals(validateExtraPayload({ name: 'Lunch', price_amount: 25 }).ok, true);
 });
 
+Deno.test('accepts an optional non-negative member price', () => {
+  assertEquals(validateCampPayload({ ...validCamp, member_price_amount: 299 }).ok, true);
+  assertEquals(validateCampPayload({ ...validCamp, member_price_amount: null }).ok, true);
+  assertEquals(validateCampPayload({ ...validCamp, member_price_amount: -1 }).ok, false);
+  assertEquals(validateCampPayload({ ...validCamp, member_price_amount: 'abc' }).ok, true);
+});
+
 Deno.test('maps waitlist and register SQL errors', () => {
   assertEquals(mapCampDbError('camp_waitlist_unavailable'), 'camp_waitlist_unavailable');
   assertEquals(mapCampDbError('{"message":"camp_full"}'), 'camp_full');
   assertEquals(mapCampDbError('duplicate_registration'), 'duplicate_registration');
+  assertEquals(mapCampDbError('member_price_unavailable'), 'member_price_unavailable');
 });

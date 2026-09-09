@@ -39,6 +39,7 @@ const CampDetailPage = () => {
   const [childId, setChildId] = useState('');
   const [selectedExtras, setSelectedExtras] = useState([]);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [memberClaimed, setMemberClaimed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,6 +74,7 @@ const CampDetailPage = () => {
       if (draft.childId) setChildId(draft.childId);
       if (draft.selectedExtras.length > 0) setSelectedExtras(draft.selectedExtras);
       if (draft.termsAccepted) setTermsAccepted(true);
+      if (draft.memberClaimed) setMemberClaimed(true);
     }
     const selectChild = searchParams.get('select_child');
     if (selectChild) {
@@ -85,8 +87,8 @@ const CampDetailPage = () => {
   // Persist the draft so leaving for /terms or child creation restores it.
   useEffect(() => {
     if (!camp) return;
-    writeCampDraft(camp.id, { childId, selectedExtras, termsAccepted }, sessionStorage);
-  }, [camp, childId, selectedExtras, termsAccepted]);
+    writeCampDraft(camp.id, { childId, selectedExtras, termsAccepted, memberClaimed }, sessionStorage);
+  }, [camp, childId, selectedExtras, termsAccepted, memberClaimed]);
 
   // Drop a restored child that no longer exists on the parent's list.
   useEffect(() => {
@@ -98,7 +100,8 @@ const CampDetailPage = () => {
   const extras = useMemo(() => Array.isArray(camp?.extras) ? camp.extras : [], [camp]);
   const chosenExtras = extras.filter((extra) => selectedExtras.includes(extra.id));
   const status = deriveCampStatus(camp);
-  const total = campDisplayTotal(camp, chosenExtras);
+  const memberBase = memberClaimed && camp?.member_price_amount != null ? Number(camp.member_price_amount) : null;
+  const total = campDisplayTotal(camp, chosenExtras, memberBase);
 
   const ensureReady = async () => {
     if (!user) {
@@ -143,6 +146,7 @@ const CampDetailPage = () => {
         childId,
         extraIds: selectedExtras,
         termsVersion: CAMPS_TERMS_VERSION,
+        membershipClaimed: memberClaimed,
       });
       trackCampFunnelEvent(FUNNEL_EVENTS.COMPLETED, camp.id);
       clearCampDraft(camp.id, sessionStorage);
@@ -194,7 +198,14 @@ const CampDetailPage = () => {
         {camp.schedule_text && <p className="mb-2">{camp.schedule_text}</p>}
         {(camp.min_age != null || camp.max_age != null) && <p className="mb-2 text-sm">Ages {camp.min_age ?? '—'}–{camp.max_age ?? '—'}</p>}
         {camp.eligibility_text && <p className="mb-2 text-sm text-gray-300">{camp.eligibility_text}</p>}
-        <p className="text-2xl font-bold text-green-400 mb-4">{formatCampPrice(camp.price_amount, camp.currency)}</p>
+        <p className="text-2xl font-bold text-green-400 mb-4">
+          {formatCampPrice(camp.price_amount, camp.currency)}
+          {camp.member_price_amount != null && (
+            <span className="text-base text-gray-300 font-normal">
+              {' '}· members {formatCampPrice(camp.member_price_amount, camp.currency)}
+            </span>
+          )}
+        </p>
         {camp.description && <p className="text-gray-300 mb-6">{camp.description}</p>}
         <p className="font-semibold mb-6">{status === 'full' ? CAMP_FULL_LABEL : status === 'open' ? 'Registration open' : 'Registration closed'}</p>
 
@@ -229,6 +240,16 @@ const CampDetailPage = () => {
                 >
                   + Add new Child
                 </Button>
+
+                {status === 'open' && camp.member_price_amount != null && (
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox checked={memberClaimed} onCheckedChange={(value) => setMemberClaimed(Boolean(value))} />
+                    <span>
+                      I have an active academy membership ({formatCampPrice(camp.member_price_amount, camp.currency)}
+                      {' '}instead of {formatCampPrice(camp.price_amount, camp.currency)}).
+                    </span>
+                  </label>
+                )}
 
                 {status === 'open' && extras.length > 0 && (
                   <div>

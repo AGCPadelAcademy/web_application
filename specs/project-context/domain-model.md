@@ -30,7 +30,7 @@
 | **Trip** | *(not yet created)* | **To be created** | A padel-trip product (flights, hotel, transfers, training in Spain). Dedicated table. |
 | **Tournament** | *(not yet created)* | **To be created** | A tournament in the AGC circuit. Dedicated table. |
 | **Contact Message** | `public.contact_messages` | Active — 12 rows | A message sent via the public contact form. Links to Profile by email when matched. |
-| **Camp** | `public.camps` | Active (F1.25) | Admin-managed reusable camp offering (dates, ages, price, capacity, publication). |
+| **Camp** | `public.camps` | Active (F1.25) | Admin-managed reusable camp offering (dates, ages, usual + optional member price, capacity, publication, optional flyer in private `camp-flyers` storage). |
 | **Camp extra** | `public.camp_extras` | Active (F1.25) | Optional priced extras on a camp (e.g. lunch). |
 | **Child** | `public.children` | Active (F1.25) | Parent-owned dependent; not a login. Optional profile image in private `child-avatars` storage. Removable only when no registrations/invoices exist (2026-09-09); history otherwise kept. |
 | **Camp registration** | `public.camp_registrations` | Active (F1.25) | One child on one camp; place-holding until cancelled. Invoiced via `billing_documents.camp_registration_id`. |

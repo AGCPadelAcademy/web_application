@@ -109,7 +109,7 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 10.5 | Remove a child without history | Confirmation modal appears; child is deleted only after confirming |
 | 10.6 | Remove a child with registrations/invoices | Refused with an explanation; history intact |
 | 10.7 | During registration, open Terms, then go back | Return lands on the same `/camps/:slug` registration (never home) with selected child, extras, and terms state intact |
-| 10.8 | During registration, choose `+ Add new Child`, create the child | Return to the same registration with the draft restored and the new child pre-selected |
+| 10.8 | During registration, open `/children` and add a child, then return | Child appears in the saved-child selector; the registration form itself has no `+ Add new Child` button |
 | 10.9 | Register two children | Two separate registrations, one invoice per child (FR-012) |
 
 ## 11. Flyers and member pricing (convergence 2, 2026-09-09)
@@ -122,10 +122,21 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 11.4 | Visitor opens `/camps` | Flyer on the right side of the card; responsive stacking at 375px; camps without a flyer show the non-interactive fallback |
 | 11.5 | Click a card flyer | Larger view opens; closing returns to `/camps` with page state intact |
 | 11.6 | Anon requests an unpublished camp's flyer signed URL | Refused (admin-only until published) |
-| 11.7 | Admin sets both usual and member prices | Both prices shown on the card and the camp detail |
+| 11.7 | Admin sets both usual and member prices | Prices are **not** on `/camps` cards; they appear only in the Camp detail Submit registration card |
 | 11.8 | Parent registers without the membership checkbox | Usual price invoiced; registration not flagged |
 | 11.9 | Parent registers with "I have an active academy membership" | Member price invoiced; registration flagged in the admin list and CSV export |
 | 11.10 | Claim membership on a camp without a member price | Refused (`member_price_unavailable`) |
+
+## 12. Type filters, layout, and registration-card price (convergence 3, 2026-09-09)
+
+| Step | Action | Expected |
+|---|---|---|
+| 12.1 | Visitor opens `/camps` | Description width matches the card container; one Camp card per row; flyer (if any) is large and keep-aspect; no usual or member price on the card |
+| 12.2 | Type filters below the description | One chip per distinct Camp type plus All camps; selecting a type lists only that type; All restores the full list |
+| 12.3 | Click a card flyer | Existing larger view opens; close returns to `/camps` with filter state intact |
+| 12.4 | Open a Camp detail | Header has no price; Submit registration card shows the live total |
+| 12.5 | Camp with a member price: toggle membership | Total in the Submit registration card switches between usual and member price (with extras too); submit uses the same amount |
+| 12.6 | Registration form | No `+ Add new Child` control; Children page still creates children; several children still means several registrations |
 
 ## Acceptance mapping
 

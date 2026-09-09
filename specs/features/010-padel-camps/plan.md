@@ -228,3 +228,10 @@ User-confirmed evolution of children management and the registration flow. No Ed
 - **Shared**: `FlyerLightbox` (Dialog, per `InvoicePreviewModal` conventions) for the larger view; `src/lib/imageValidation.js` generalizes the C1 avatar validator.
 - **Edge Functions**: `camp-submit-registration` passes the claim through; `camp-admin` validation accepts `member_price_amount`; no new function.
 - **F1.09 handover (not built here)**: automatic active-at-registration membership check, member-only price display for members, and a pending-membership-payment admin flag.
+
+## Evolution 2026-09-09, round 3 (Phase 16): listing layout, type filters, price placement
+
+- **Schema** (`0018`): nullable `camps.camp_type` text (no Mini/Junior/Competition CHECK/enum); `camp_public_list` gains `camp_type`. One-time data backfill of current Herbstferien name prefixes into type labels is data-only.
+- **Admin**: Camp form accepts optional Camp type; `validateCampPayload` / `upsert_camp` pass it through. No new Edge Function.
+- **Public `/camps`**: type filters below the description (derived distinct types + All); description width matches the card container; one card per row; larger contain-fit flyer; no prices on cards.
+- **Camp detail**: usual/member price only inside the Submit registration card; C2 membership checkbox there when a member price exists; displayed total updates with membership/extras and is the invoiced amount. `+ Add new Child` removed from registration; Children page create and FR-012 unchanged. Terms draft restore stays.

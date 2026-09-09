@@ -303,13 +303,13 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 
 ## 8. Camps (F1.25 — BC addition)
 
-> **BC-CAMP-001** Published Camps MUST be discoverable at `/camps` (and `/camps/:slug`) without authentication. Unpublished Camps MUST NOT appear on the public list.
+> **BC-CAMP-001** Published Camps MUST be discoverable at `/camps` (and `/camps/:slug`) without authentication. Unpublished Camps MUST NOT appear on the public list. `/camps` lists one card per row, may filter by admin-configured Camp type, and MUST NOT show prices on listing cards.
 >
 > **BC-CAMP-002** A parent MUST register a saved child (not a second login) through `camp-submit-registration`. Capacity is enforced atomically by `register_camp_child`. Invoices reuse the F1.03 `billing_*` spine via `camp_registration_id`. A Camp MAY define an academy-member price; until F1.09 the parent self-declares membership at submit and the registration is flagged for admin review.
 >
-> **BC-CAMP-004** A Camp MAY carry a flyer image in the private `camp-flyers` bucket: publicly readable only while the Camp is published, admin-only writes. The public card shows the flyer beside the Camp information; the larger view is a dismissable dialog that never loses page or form state.
+> **BC-CAMP-004** A Camp MAY carry a flyer image in the private `camp-flyers` bucket: publicly readable only while the Camp is published, admin-only writes. The public card shows a large keep-aspect flyer beside the Camp information; the larger view is a dismissable dialog that never loses page or form state.
 >
-> **BC-CAMP-003** Child records live on `/children`, with a per-child profile view (image, level, invoices). Parents MAY add/edit their children and MAY remove a child after confirmation only when no registrations or invoices exist; removal with history is refused. `/trips` is unchanged.
+> **BC-CAMP-003** Child records live on `/children`, with a per-child profile view (image, level, invoices). Parents MAY add/edit their children and MAY remove a child after confirmation only when no registrations or invoices exist; removal with history is refused. Camp registration selects a saved child and does not offer `+ Add new Child`. `/trips` is unchanged.
 
 ---
 

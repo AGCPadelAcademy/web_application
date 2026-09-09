@@ -178,7 +178,7 @@ Authoritative HTTP shapes: `specs/features/010-padel-camps/contracts/edge-functi
 | `billing-invoice-document` | on | parent or admin | Also accepts `camp_registration_id` |
 | `bexio-reconcile` | off | scheduler or admin | Also confirms camp registrations and sends one confirmation email |
 
-**Public reads:** `camp_public_list` (anon + authenticated). **Owner writes:** `children` (incl. guarded DELETE when no history, 2026-09-09), waitlist join (`camp_waitlist_entries`). Funnel inserts: `camp_funnel_events` (no PII). Child profile images: private `child-avatars` Storage bucket, owner-path-or-admin policies, signed-URL reads (no Edge Function involved). Camp flyers: private `camp-flyers` Storage bucket — admin-only writes; reads allowed for anon/authenticated only while the camp is published (2026-09-09, C2).
+**Public reads:** `camp_public_list` (anon + authenticated; includes `camp_type` since 2026-09-09 C3). **Owner writes:** `children` (incl. guarded DELETE when no history, 2026-09-09), waitlist join (`camp_waitlist_entries`). Funnel inserts: `camp_funnel_events` (no PII). Child profile images: private `child-avatars` Storage bucket, owner-path-or-admin policies, signed-URL reads (no Edge Function involved). Camp flyers: private `camp-flyers` Storage bucket — admin-only writes; reads allowed for anon/authenticated only while the camp is published (2026-09-09, C2).
 
 ---
 

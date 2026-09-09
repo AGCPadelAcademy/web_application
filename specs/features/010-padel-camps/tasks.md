@@ -527,17 +527,17 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 ### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
 
-- [ ] T112 Amend `spec.md` Clarifications (new Session), US2/FR-003: `/camps` sort is `start_date` then Mini → Junior → Competition (other configured types after); this is a listing rank, not a type enum and not hardcoded filter chips (FR-002). Amend Compatibility / payment-card date so My Payments shows `created_at` (invoice/booking created) and does not depend on nullable `booking_date` per convergence-5 request §1–§2 (contradicts)
-- [ ] T113 Update `plan.md` and baseline docs (`requirements.md` FEAT-PAY-001 / BC-CAMP): listing sort helper; payment-card date = `created_at` fallback; no schema change and no `booking_date` backfill per convergence-5 request §1–§2 (partial)
+- [X] T112 Amend `spec.md` Clarifications (new Session), US2/FR-003: `/camps` sort is `start_date` then Mini → Junior → Competition (other configured types after); this is a listing rank, not a type enum and not hardcoded filter chips (FR-002). Amend Compatibility / payment-card date so My Payments shows `created_at` (invoice/booking created) and does not depend on nullable `booking_date` per convergence-5 request §1–§2 (contradicts)
+- [X] T113 Update `plan.md` and baseline docs (`requirements.md` FEAT-PAY-001 / BC-CAMP): listing sort helper; payment-card date = `created_at` fallback; no schema change and no `booking_date` backfill per convergence-5 request §1–§2 (partial)
 
 ### `/camps` listing order
 
-- [ ] T114 Add a `sortPublicCamps` (or equivalent) helper in `src/lib/camps.js` and apply it in `src/pages/CampsPage.jsx` after `fetchPublicCamps` / before render: Week 1 then Week 2 by `start_date`; within a week Mini → Junior → Competition using `camp_type`; unknown/empty types after. Do not change filter derivation to a hardcoded-only Mini/Junior/Competition enum. Keep type filters working on the sorted list per convergence-5 request §1 and FR-002/FR-003 (contradicts)
+- [X] T114 Add a `sortPublicCamps` (or equivalent) helper in `src/lib/camps.js` and apply it in `src/pages/CampsPage.jsx` after `fetchPublicCamps` / before render: Week 1 then Week 2 by `start_date`; within a week Mini → Junior → Competition using `camp_type`; unknown/empty types after. Do not change filter derivation to a hardcoded-only Mini/Junior/Competition enum. Keep type filters working on the sorted list per convergence-5 request §1 and FR-002/FR-003 (contradicts)
 
 ### My Payments card date
 
-- [ ] T115 Fix the My Payments card date in `src/pages/PaymentsPage.jsx` / `src/lib/payments.js`: do not show `'N/A'` when `booking_date` is null. Evidence: `LessonsPage.jsx` passes `bookingDate: null` since 2026-09-02; live bookings from 2026-09-06 have null `booking_date`. Display `created_at` as the payment-card date for lesson and Camp rows (Camp cards currently use `camp_start_date`, which is the camp week, not the payment). Do not backfill or require `booking_date` per convergence-5 request §2 and FEAT-BKG-004 / FEAT-PAY-001 (contradicts)
+- [X] T115 Fix the My Payments card date in `src/pages/PaymentsPage.jsx` / `src/lib/payments.js`: do not show `'N/A'` when `booking_date` is null. Evidence: `LessonsPage.jsx` passes `bookingDate: null` since 2026-09-02; live bookings from 2026-09-06 have null `booking_date`. Display `created_at` as the payment-card date for lesson and Camp rows (Camp cards currently use `camp_start_date`, which is the camp week, not the payment). Do not backfill or require `booking_date` per convergence-5 request §2 and FEAT-BKG-004 / FEAT-PAY-001 (contradicts)
 
 ### Tests and documentation
 
-- [ ] T116 Update automated coverage (FR-040): Vitest for week-then-Mini-Junior-Competition sort (and other types after); payment-card date uses `created_at` when `booking_date` is null and does not render N/A. Add quickstart scenarios for `/camps` Week 1 Mini/Junior/Competition then Week 2 same order, and My Payments date on a null-`booking_date` lesson row per convergence-5 request §1–§2 (missing)
+- [X] T116 Update automated coverage (FR-040): Vitest for week-then-Mini-Junior-Competition sort (and other types after); payment-card date uses `created_at` when `booking_date` is null and does not render N/A. Add quickstart scenarios for `/camps` Week 1 Mini/Junior/Competition then Week 2 same order, and My Payments date on a null-`booking_date` lesson row per convergence-5 request §1–§2 (missing)

@@ -10,6 +10,7 @@ import {
   distinctCampTypes,
   fetchPublicCamps,
   filterCampsByType,
+  sortPublicCamps,
   FUNNEL_EVENTS,
   trackCampFunnelEvent,
 } from '@/lib/camps';
@@ -34,7 +35,10 @@ const CampsPage = () => {
   }, []);
 
   const types = useMemo(() => distinctCampTypes(camps), [camps]);
-  const visibleCamps = useMemo(() => filterCampsByType(camps, typeFilter), [camps, typeFilter]);
+  const visibleCamps = useMemo(
+    () => sortPublicCamps(filterCampsByType(camps, typeFilter)),
+    [camps, typeFilter],
+  );
 
   const filterClass = (active) =>
     `px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${

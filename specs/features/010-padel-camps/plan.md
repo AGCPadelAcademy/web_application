@@ -245,3 +245,10 @@ No schema change and no new Edge Function. Payment remains QR / bank transfer + 
 - **My Payments**: `PaymentsPage` lists parent `camp_registrations` + `billing_documents` alongside lesson `bookings`. Camp invoices stay associated with that registration/child. Unpaid Camp cancel reuses `camp-cancel-registration`. Lesson rows are unchanged.
 - **Public `/camps` flyers**: explicit mobile height so `object-contain` thumbnails do not collapse on a phone-width viewport (FR-001b). Migration `0019` rewrites the `camp-flyers` SELECT policy to use `storage.objects.name` (0017’s unqualified `name` bound to `camps.name`, so anon signed URLs 404’d).
 
+## Evolution 2026-09-09, round 5 (Phase 18): listing order + My Payments card date
+
+No schema change, no `booking_date` backfill, no new Edge Function.
+
+- **Public `/camps`**: `sortPublicCamps` after `camp_public_list` — `start_date` ascending (Week 1 then Week 2), then Mini → Junior → Competition via `camp_type`; other/empty types after. Filter chips stay derived from distinct types and follow the same rank (not a Mini/Junior/Competition-only enum).
+- **My Payments**: card date is `created_at` for lesson bookings and Camp registrations. Do not use nullable `booking_date` (null since 2026-09-02 lesson calendar removal) or Camp `camp_start_date` as the payment date.
+

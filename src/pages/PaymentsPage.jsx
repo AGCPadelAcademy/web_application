@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { CreditCard, Clock, Calendar, CheckCircle, FileDown, Loader2, XCircle } from 'lucide-react';
-import { format } from 'date-fns';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
@@ -15,6 +14,7 @@ import {
   campPaymentTitle,
   documentOf,
   mergePaymentItems,
+  paymentCardDate,
   paymentInvoiceState,
 } from '@/lib/payments';
 
@@ -178,7 +178,7 @@ const PaymentsPage = () => {
           <div>
             <h3 className="font-bold text-xl text-white mb-1">{booking.lesson_name}</h3>
             <div className="flex items-center gap-4 text-sm text-gray-400">
-              <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {booking.booking_date ? format(new Date(booking.booking_date), 'dd MMM yyyy') : 'N/A'}</span>
+              <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {paymentCardDate(booking)}</span>
               <span className="font-medium text-green-400">{booking.price}</span>
               {doc?.document_nr && <span>{doc.document_nr}</span>}
             </div>
@@ -244,7 +244,7 @@ const PaymentsPage = () => {
           <div>
             <h3 className="font-bold text-xl text-white mb-1">{campPaymentTitle(registration)}</h3>
             <div className="flex items-center gap-4 text-sm text-gray-400">
-              <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {registration.camp_start_date ? format(new Date(registration.camp_start_date), 'dd MMM yyyy') : 'N/A'}</span>
+              <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {paymentCardDate(registration)}</span>
               {amount && <span className="font-medium text-green-400">{amount}</span>}
               {doc?.document_nr && <span>{doc.document_nr}</span>}
             </div>

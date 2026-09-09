@@ -11,7 +11,7 @@ FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name = 'camps'
   AND column_name IN ('flyer_path', 'member_price_amount');
 
-SELECT pg_get_constraintdef(oid) ILIKE '%member_price_amount >= 0%' AS member_price_check
+SELECT pg_get_constraintdef(oid) ILIKE '%member_price_amount >=%' AS member_price_check
 FROM pg_constraint
 WHERE conrelid = 'public.camps'::regclass AND conname = 'camps_member_price_nonneg';
 

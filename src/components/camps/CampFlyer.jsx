@@ -47,7 +47,7 @@ const CampFlyer = ({ camp, onOpen, className = '' }) => {
       type="button"
       onClick={() => onOpen?.(url, camp.name)}
       aria-label={`Enlarge the ${camp.name} flyer`}
-      className={`rounded-xl overflow-hidden border border-gray-800 hover:border-green-500/60 transition-colors ${className}`}
+      className={`flex items-center justify-center rounded-xl overflow-hidden border border-gray-800 hover:border-green-500/60 transition-colors ${className}`}
     >
       <img src={url} alt={`${camp.name} flyer`} className="w-full h-full object-contain bg-gray-900" />
     </button>

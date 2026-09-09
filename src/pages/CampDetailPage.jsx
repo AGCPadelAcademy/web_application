@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import ProfileCompletionModal from '@/components/modals/ProfileCompletionModal';
+import InvoicePreviewModal from '@/components/modals/InvoicePreviewModal.jsx';
 import { fetchProfile } from '@/lib/profileService';
 import { isProfileComplete } from '@/lib/profileValidation';
 import { listChildren } from '@/lib/children';
@@ -15,6 +16,7 @@ import {
   CAMP_FULL_LABEL,
   CAMPS_TERMS_VERSION,
   campDisplayTotal,
+  campInvoicePreviewFromSubmit,
   clearCampDraft,
   deriveCampStatus,
   fetchPublicCamp,
@@ -42,6 +44,8 @@ const CampDetailPage = () => {
   const [memberClaimed, setMemberClaimed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [previewRegistrationId, setPreviewRegistrationId] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -141,7 +145,7 @@ const CampDetailPage = () => {
     }
     setSubmitting(true);
     try {
-      await submitCampRegistration({
+      const result = await submitCampRegistration({
         campId: camp.id,
         childId,
         extraIds: selectedExtras,
@@ -150,8 +154,20 @@ const CampDetailPage = () => {
       });
       trackCampFunnelEvent(FUNNEL_EVENTS.COMPLETED, camp.id);
       clearCampDraft(camp.id, sessionStorage);
-      toast({ title: 'Registration submitted', description: 'Your invoice will appear under My Children.' });
-      navigate('/children');
+      const preview = campInvoicePreviewFromSubmit(result);
+      if (preview.campRegistrationId) {
+        setPreviewRegistrationId(preview.campRegistrationId);
+        setInvoiceOpen(true);
+        toast({
+          title: 'Registration submitted',
+          description: preview.documentReady
+            ? 'Review the invoice and scan the QR code to pay.'
+            : 'Your invoice is being prepared. You can reopen it from My Payments.',
+        });
+      } else {
+        toast({ title: 'Registration submitted', description: 'Your invoice will appear under My Payments.' });
+        navigate('/payments');
+      }
     } catch (error) {
       toast({ title: 'Registration failed', description: mapCampError(error.message), variant: 'destructive' });
     } finally {
@@ -280,6 +296,15 @@ const CampDetailPage = () => {
         )}
       </div>
       <ProfileCompletionModal open={profileModalOpen} onOpenChange={setProfileModalOpen} onSaveSuccess={() => setProfileModalOpen(false)} />
+      <InvoicePreviewModal
+        isOpen={invoiceOpen}
+        campRegistrationId={previewRegistrationId}
+        onClose={() => {
+          setInvoiceOpen(false);
+          setPreviewRegistrationId(null);
+          navigate('/payments');
+        }}
+      />
     </>
   );
 };

@@ -162,7 +162,9 @@ Authoritative request/response shapes: `specs/features/007-bexio-integration/con
 
 **Frontend cutover:** `isBexioBillingEnabled()` reads `billing_public_config.integration_enabled` (boolean only). True → `issueBexioInvoice`; false → `generate-invoice-pdf`.
 
-**Student cancel:** `PaymentsPage.jsx` → `cancelBooking()` → `billing-cancel-invoice` when Bexio is on.
+**Student cancel:** `PaymentsPage.jsx` → `cancelBooking()` → `billing-cancel-invoice` when Bexio is on. Camp unpaid cancel on the same page uses `camp-cancel-registration`.
+
+**My Payments (C4):** lists lesson `bookings` and parent `camp_registrations` together. Camp PDF preview uses `billing-invoice-document` `{ camp_registration_id }`.
 
 **Admin integrations:** `IntegrationsPanel.jsx` → `bexio-oauth` + `runBexioReconciliation()`. No invoice-cancel or refund controls.
 
@@ -172,7 +174,7 @@ Authoritative HTTP shapes: `specs/features/010-padel-camps/contracts/edge-functi
 
 | Function | Gateway JWT | Who may call | Purpose |
 |---|---|---|---|
-| `camp-submit-registration` | on | active parent who owns `child_id` | Atomic `register_camp_child` + camp invoice issue; accepts `membership_claimed` (2026-09-09) |
+| `camp-submit-registration` | on | active parent who owns `child_id` | Atomic `register_camp_child` + camp invoice issue; accepts `membership_claimed` (2026-09-09); SPA opens `InvoicePreviewModal` from `{ registration, document }` (C4) |
 | `camp-cancel-registration` | on | registration parent or admin | Unpaid cancel; paid → `refund_agreement_required` |
 | `camp-admin` | on | active admin | Camp/extra upsert, registrations JSON, waitlist convert |
 | `billing-invoice-document` | on | parent or admin | Also accepts `camp_registration_id` |

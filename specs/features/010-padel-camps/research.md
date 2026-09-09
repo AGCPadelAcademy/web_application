@@ -68,7 +68,7 @@ Sources: spec `010-padel-camps/spec.md`, constitution, F1.03 (`007-bexio-integra
 
 - **Decision**: A protected `/children` page lists `children` for the signed-in parent, allows add/edit (personal info only), archive (not delete) when history exists, and shows each child’s Camp registrations with their `billing_documents` status and a document link via the existing invoice-document function (extended to accept `camp_registration_id`).
 - **Rationale**: FR-006a–d and the clarification require a durable children list plus per-child invoices without exposing other families. Owner-or-admin RLS on `children` and `camp_registrations` enforces this server-side; the UI is only a convenience.
-- **Alternatives considered**: *Only show Camp registrations on My Payments* — rejected: the follow-up explicitly wants a child-centric list; mixing siblings into one lesson payment list would not satisfy per-child access.
+- **Alternatives considered**: *Only show Camp registrations on My Payments* — rejected as the **sole** surface: the follow-up explicitly wants a child-centric list; mixing siblings into one lesson payment list would not satisfy per-child access. **(Amended 2026-09-09 C4)** My Payments **also** lists Camp registration invoices alongside lesson bookings. Camps remain `camp_registrations` rows (R-01); they are not folded into `bookings`. Child-profile reopen stays required.
 
 ## R-10. Admin Camp management and CSV export stay in the existing dashboard
 

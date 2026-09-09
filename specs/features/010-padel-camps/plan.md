@@ -235,3 +235,13 @@ User-confirmed evolution of children management and the registration flow. No Ed
 - **Admin**: Camp form accepts optional Camp type; `validateCampPayload` / `upsert_camp` pass it through. No new Edge Function.
 - **Public `/camps`**: type filters below the description (derived distinct types + All); description width matches the card container; one card per row; larger contain-fit flyer; no prices on cards.
 - **Camp detail**: usual/member price only inside the Submit registration card; C2 membership checkbox there when a member price exists; displayed total updates with membership/extras and is the invoiced amount. `+ Add new Child` removed from registration; Children page create and FR-012 unchanged. Terms draft restore stays.
+
+## Evolution 2026-09-09, round 4 (Phase 17): invoice preview after registration + My Payments
+
+No schema change and no new Edge Function. Payment remains QR / bank transfer + Bexio reconcile (`XR-005`); do not add Stripe or a second checkout. FR-012 unchanged.
+
+- **Post-submit UX**: `camp-submit-registration` already returns `{ registration, document }` (`document` may be `null` when issuance is queued). `CampDetailPage` opens `InvoicePreviewModal` for `registration.id` instead of navigating to `/children`. Close & Proceed follows the lesson/Membership pattern (`/payments`).
+- **Preview**: `InvoicePreviewModal` accepts `campRegistrationId` and loads the PDF via existing `billing-invoice-document` `{ camp_registration_id }` / `fetchCampInvoicePdfBlob`. Pending/not-ready state when the document is not yet available.
+- **My Payments**: `PaymentsPage` lists parent `camp_registrations` + `billing_documents` alongside lesson `bookings`. Camp invoices stay associated with that registration/child. Unpaid Camp cancel reuses `camp-cancel-registration`. Lesson rows are unchanged.
+- **Public `/camps` flyers**: explicit mobile height so `object-contain` thumbnails do not collapse on a phone-width viewport (FR-001b). Migration `0019` rewrites the `camp-flyers` SELECT policy to use `storage.objects.name` (0017’s unqualified `name` bound to `camps.name`, so anon signed URLs 404’d).
+

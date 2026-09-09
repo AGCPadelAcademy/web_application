@@ -351,39 +351,47 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 ## Phase 14: Convergence
 
-**Source**: `/speckit-converge` run 2026-09-08 against the F1.25 evolution request (children management rework, multi-child registration, terms/add-child state preservation). The pre-evolution implementation is fully converged with the original spec; every task below is the delta to the evolved intent. Open decisions are listed in the convergence report and marked `DECISION` in the task text.
+**Source**: `/speckit-converge` run 2026-09-08 against the F1.25 evolution request (children management rework, registration-flow state preservation). The pre-evolution implementation is fully converged with the original spec; the tasks below are the delta to the evolved intent.
+
+**Decisions 2026-09-09 (user-confirmed)**:
+
+1. Padel level is removed from the create-child form only; it stays on the child record, is edited on the child profile-management view, and registrations keep snapshotting it. This supersedes the level dropdown + info-indicator requirement.
+2. Child Remove = hard delete only when the child has no registrations/invoices; otherwise refused with an explanation.
+3. FR-012 stays mandatory: one registration and one invoice per child. Multiple children means multiple separate registrations — no multi-child single-flow submission and no combined invoice (T074–T077 cancelled).
+4. Manual date-of-birth entry uses the DD.MM.YYYY format.
+5. Multi-child submit atomicity is moot (see decision 3).
 
 ### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
 
-- [ ] T061 Amend `spec.md` US3 / FR-006a / FR-006d for the evolved children management: capitalized labels, manual date-of-birth entry, padel-level select with info indicator, split emergency phone (prefix + number), centered create form, child profile image, profile-management child view, and Edit/Remove replacing Archive per convergence request §1 (partial)
-- [ ] T062 Amend `spec.md` US4 / FR-012 for multi-child registration in one flow with per-child extras and the invoice-grouping option (one invoice per child OR one combined invoice) per convergence request §2.1 — this explicitly changes FR-012's "one invoice per child" (partial)
+- [ ] T061 Amend `spec.md` US3 / FR-006a / FR-006d for the evolved children management per convergence request §1 as narrowed by decisions 1, 2, and 4: capitalized labels, manual DD.MM.YYYY date-of-birth entry, no padel level on the create-child form, split emergency phone (prefix + national number), centered create form and title, optional child profile image, child profile-management view, and Edit/Remove replacing Archive (partial)
+- [ ] T062 Record the 2026-09-09 decisions in `spec.md` Clarifications: level removed from the create form, the Remove rule, FR-012 upheld (separate registrations per child, no combined invoice), DD.MM.YYYY entry (partial)
 - [ ] T063 Amend `spec.md` US4 for terms-and-conditions return-with-state (never redirect home) and the `+ Add new Child` redirect-then-restore flow per convergence request §2.2/§2.3 (partial)
-- [ ] T064 Update `plan.md`, `data-model.md`, and `contracts/` for: `children.avatar_path` + `child-avatars` storage bucket, guarded children DELETE policy, multi-child submit contract, combined-invoice subject model, and the registration draft-preservation approach (partial)
+- [ ] T064 Update `plan.md`, `data-model.md`, and `contracts/edge-functions.md` for: `children.avatar_path` + `child-avatars` storage bucket, guarded children DELETE policy, and the registration draft-preservation approach; record that the evolution requires no Edge Function changes (partial)
 
 ### Schema
 
-- [ ] T065 Write `supabase/migrations/0016_f125_children_evolution.sql`: nullable `children.avatar_path` text; `child-avatars` Supabase Storage bucket with owner-path-or-admin policies modeled on the `payment-proofs` pattern from `0008`; DELETE policy on `children` for owner-or-admin (hard delete still blocked by `ON DELETE RESTRICT` when registrations exist — DECISION: confirm refuse-with-message vs archive fallback) per convergence request §1.1/§1.3/§1.4 (missing)
-- [ ] T066 [P] Write SQL tests in `tests/sql/0016_f125_children_evolution.test.sql`: avatar column, bucket policies (owner write/read own path, admin read, no anon), DELETE policy presence, delete-with-history refusal per data-model.md (missing)
+- [ ] T065 Write `supabase/migrations/0016_f125_children_evolution.sql`: nullable `children.avatar_path` text; private `child-avatars` Supabase Storage bucket with owner-path-or-admin policies modeled on the `payment-proofs` pattern from `0008`; DELETE policy on `children` for owner-or-admin (hard delete still blocked by `ON DELETE RESTRICT` when registrations exist — decision 2: refuse with explanation) per convergence request §1.1/§1.3/§1.4 (missing)
+- [ ] T066 [P] Write SQL tests in `tests/sql/0016_f125_children_evolution.test.sql`: avatar column, bucket privacy and policies (owner write/read own path, admin read, no anon), DELETE policy presence, delete-with-history refusal per data-model.md (missing)
 
 ### Children page and child profile
 
-- [ ] T067 Extend `src/lib/children.js`: `removeChild` (delete), avatar upload/replace/delete helpers via Supabase Storage, E.164 emergency-phone assembly from prefix + national number, padel-level enum constant (DECISION: level option list — none exists in the app; placeholder Beginner/Intermediate/Advanced until the academy confirms) per convergence request §1.1/§1.3/§1.4 (partial)
-- [ ] T068 Rework the create-child form in `src/pages/ChildrenPage.jsx`: capitalized labels, manual DOB text input with format validation (no `type="date"` picker), padel-level native select with a `!` info indicator reusing the existing Dialog pattern, emergency phone as prefix select + national-number input, centered form and title, optional profile-image upload per convergence request §1.1 (contradicts)
-- [ ] T069 Add the child profile-management view (e.g. `/children/:id` or a selected-child panel) following the `ProfileManagementPage` interaction pattern: all child information, edit fields, image replace/delete, default SVG avatar when no image exists; the card `Edit` action leads here per convergence request §1.2/§1.4 (missing)
-- [ ] T070 Replace `Archive` with `Remove` on child cards: confirmation Dialog modeled on `CancelBookingModal`; hard delete only when the child has no registrations/invoices, otherwise refuse with an explanation; remove the archive action from the UI (keep the `archived_at` column for existing data) per convergence request §1.3 (contradicts)
+- [ ] T067 Extend `src/lib/children.js`: `removeChild` (delete, mapping the FK-restriction error to a history explanation), avatar upload/replace/delete helpers via Supabase Storage signed URLs, E.164 emergency-phone assembly from prefix + national number, DD.MM.YYYY ↔ ISO date-of-birth helpers per convergence request §1.1/§1.3/§1.4 (partial)
+- [ ] T068 Rework the create-child form in `src/pages/ChildrenPage.jsx`: capitalized labels, manual DD.MM.YYYY DOB text input with validation (no `type="date"` picker), emergency phone as prefix select-or-enter + national-number input, centered form and centered title, optional profile-image upload; the padel level field is removed from this form (decision 1) per convergence request §1.1 (contradicts)
+- [ ] T069 Add the child profile-management view following the `ProfileManagementPage` interaction pattern: all child information including padel level (its maintenance location per decision 1), edit fields, image replace/delete, default SVG avatar when no image exists, and the child's Camp invoices; the card `Edit` action leads here per convergence request §1.2/§1.4 (missing)
+- [ ] T070 Replace `Archive` with `Remove` on child cards: confirmation Dialog modeled on `CancelBookingModal`; hard delete only when the child has no registrations/invoices, otherwise refuse with an explanation (decision 2); remove the archive action from the UI (keep the `archived_at` column for existing data) per convergence request §1.3 (contradicts)
 
 ### Camp registration flow
 
-- [ ] T071 Add registration draft preservation (sessionStorage or equivalent, no new dependency) covering selected children, per-child extras, terms state, and other form data, with restore-on-mount in `CampDetailPage.jsx` per convergence request §2.2/§2.3 (missing)
+- [ ] T071 Add registration draft preservation (sessionStorage or equivalent, no new dependency) covering the selected child, selected extras, terms state, and other form data, with restore-on-mount in `CampDetailPage.jsx` per convergence request §2.2/§2.3 (missing)
 - [ ] T072 Terms navigation: open `/terms` with return context and add a back path in `TermsPage.jsx` that returns to `/camps/:slug` with the draft restored; it must never redirect home per convergence request §2.2 (missing)
 - [ ] T073 Replace the inline "Save new child" mini-form in `CampDetailPage.jsx` with a `+ Add new Child` button that routes to the create-child form and returns after creation with the draft restored and the new child pre-selected per convergence request §2.3 (contradicts)
-- [ ] T074 Multi-child registration UI in `CampDetailPage.jsx`: select multiple saved children, associate extras with the appropriate child, and show a running total across all selected children per convergence request §2.1 (missing)
-- [ ] T075 Extend `camp-submit-registration` for multi-child submission (one `register_camp_child` call per child with that child's extras; DECISION: all-or-nothing vs partial success when one child fails mid-submit — recommend all-or-nothing) per convergence request §2.1 (missing)
-- [ ] T076 Implement the invoice-grouping option: one invoice per child (current behavior) OR one combined invoice for all children in the submission; the combined path requires a billing-subject model change (DECISION: e.g. group identifier vs join table — the exactly-one-subject CHECK on `billing_documents` must evolve), a group-level idempotency key, and per-child line items in the camp mapper per convergence request §2.1 (missing)
-- [ ] T077 Update per-child invoice listing on the Children page so a combined invoice is reachable from every child it covers per convergence request §2.1 (partial)
+- [ ] T074 — CANCELLED 2026-09-09 (decision 3: FR-012 stays mandatory; separate registrations per child): multi-child registration UI in `CampDetailPage.jsx` (missing)
+- [ ] T075 — CANCELLED 2026-09-09 (decision 3): multi-child support in `camp-submit-registration` (missing)
+- [ ] T076 — CANCELLED 2026-09-09 (decision 3: no combined invoice; the exactly-one-subject model stays): invoice-grouping option (missing)
+- [ ] T077 — CANCELLED 2026-09-09 (decision 3): combined-invoice listing on the Children page (partial)
 
 ### Tests and documentation
 
-- [ ] T078 Update automated coverage (FR-040): Vitest for children payload (E.164 phone, level enum, avatar path), draft preservation, multi-child totals; Deno tests for multi-child submit and combined-invoice idempotency per convergence request §1–§2 (missing)
-- [ ] T079 [P] Add evolved-flow scenarios to `quickstart.md`: child image upload/replace/delete, Remove guard with history, multi-child registration with both invoice options, terms return with intact state, add-child-during-registration restore per convergence request §1–§2 (partial)
+- [ ] T078 Update automated coverage (FR-040): Vitest for children payload (E.164 phone assembly, DOB helpers, avatar path, removeChild history mapping) and registration draft preservation per convergence request §1–§2 (missing)
+- [ ] T079 [P] Add evolved-flow scenarios to `quickstart.md`: child image upload/replace/delete, Remove guard with history, terms return with intact state, add-child-during-registration restore per convergence request §1–§2 (partial)
 - [ ] T080 [P] After implementation, sync baseline docs (`specs/baseline-system/requirements.md` BC-CAMP entries, `specs/project-context/api-contracts.md`, `specs/project-context/domain-model.md`) per specs/features/README.md rule 6 (partial)

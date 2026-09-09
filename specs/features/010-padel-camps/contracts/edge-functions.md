@@ -6,7 +6,9 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 
 ---
 
-## 1. `camp-submit-registration` — parent registers a saved child (US4, FR-006–FR-018, FR-028–FR-032)
+### `camp-submit-registration` — parent registers a saved child (US4, FR-006–FR-018, FR-028–FR-032)
+
+**(Amended 2026-09-09, C2)** The request additionally accepts `membership_claimed?: boolean`, forwarded to `register_camp_child` as `p_member_price_claimed`. When claimed on a Camp without a member price, the RPC raises `member_price_unavailable` and the function returns `409`.
 
 **Auth**: caller JWT required; caller must be an active parent who owns `child_id` (F1.04). Billing-profile completeness is enforced before a chargeable registration is created (same fields as the lesson gate).
 

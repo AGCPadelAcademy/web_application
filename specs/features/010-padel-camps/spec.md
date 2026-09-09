@@ -28,6 +28,12 @@
 - Q: Manual date-of-birth format? → A: DD.MM.YYYY text entry (Swiss convention), validated before save; no calendar picker in the create-child form.
 - Q: Can several children be registered in one submission? → A: No — see the FR-012 answer above; each child is registered in a separate registration flow.
 
+### Session 2026-09-09 (round 2 — flyers and member pricing)
+
+- Q: Camp flyer? → A: A Camp MAY carry an optional flyer image, managed by the admin from the Camp form (upload, preview, replace, remove) and shown on the public Camp card; clicking it opens an accessible larger view that never loses form or page state.
+- Q: Where does "academy member" come from? → A: **Interim (until F1.09):** the parent self-declares an active membership with a checkbox at registration; the member price then applies and the registration is flagged for admin verification in the registration list and CSV export. **F1.09 handover:** an automatic check — membership active at the moment of registration (no month matching, so a Christmas camp opened in October works); members then see only the member price; a membership bought at month start whose payment is still pending at registration time still counts, and the admin flag extends to that pending case so the academy can talk to the parent directly.
+- Q: Who sees which price? → A: Until F1.09 the system cannot know who is a member, so public pages show both prices when a member price exists; member-only display arrives with F1.09.
+
 ---
 
 ## Gap analysis (current → target)
@@ -131,6 +137,7 @@ An authenticated parent/guardian (the existing client) opens an open Camp with r
 8. **Given** incomplete required fields or terms not accepted, **When** the parent submits, **Then** they see a clear validation error and no chargeable registration is created.
 9. **Given** an unauthenticated visitor, **When** they start registration, **Then** they are sent through the existing sign-in/sign-up path and returned to the Camp registration (same pattern as lesson booking’s return-to behaviour).
 10. **Given** a deactivated client (F1.04), **When** they attempt a new Camp registration or to add a child, **Then** it is refused.
+11. **(Added 2026-09-09)** **Given** a Camp with a member price, **When** the parent declares an active academy membership at submit, **Then** the registration total uses the member price and the registration is flagged for admin review; **Given** the same Camp, **When** the parent does not declare it, **Then** the usual price applies and no flag is set.
 
 ---
 
@@ -275,7 +282,9 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 
 #### Camp configuration
 
-- **FR-001**: An admin MUST be able to create, edit, publish, and unpublish Camps without a code change. A Camp MUST be an event-like commercial offering with configurable name, description, start date, end date, daily schedule/hours, age range and/or eligibility criteria, base price, maximum capacity, registration opening date/time, registration closing/deadline date/time, published/active status, zero or more extras, and practical information for confirmation communication.
+- **FR-001**: An admin MUST be able to create, edit, publish, and unpublish Camps without a code change. A Camp MUST be an event-like commercial offering with configurable name, description, start date, end date, daily schedule/hours, age range and/or eligibility criteria, base price, maximum capacity, registration opening date/time, registration closing/deadline date/time, published/active status, zero or more extras, and practical information for confirmation communication. **(Amended 2026-09-09)** A Camp additionally supports an optional flyer image and an optional academy-member price alongside the usual price.
+- **FR-001a**: Camp flyer management lives in the admin Camp form: upload, immediate in-form preview before save, preview of the stored flyer when editing, replace, and remove. Clicking a preview opens an accessible larger view that can be closed (including keyboard dismissal) without submitting the form or losing form state. Flyers MUST be stored in private storage; flyers of published Camps are publicly readable, and flyers of unpublished Camps MUST NOT be readable by non-admins.
+- **FR-001b**: The public Camp card MUST show the flyer on the right side of the same card container, responsively stacked on small screens, with a non-interactive fallback when no flyer exists; clicking a real flyer opens the larger view without losing page state or causing navigation.
 - **FR-002**: Mini Camp / Junior Camp / Competition Camp prices and eligibility in the first offering MUST be configuration values. Application behaviour MUST NOT hardcode those names, ages, or prices as the only supported Camps.
 - **FR-003**: Published Camps MUST appear on the public `/camps` page with name, dates, schedule/hours, eligibility/ages, price, description, registration status/deadline, availability where appropriate, and a clear registration CTA when registration is open. Unpublished Camps MUST NOT be offered for public registration.
 - **FR-004**: `/camps` MUST be suitable as the primary marketing URL (Instagram, Stories, QR, WhatsApp, flyer). The discovery and registration flow MUST be usable on common mobile viewport sizes, with clear fields, validation, extras, status, and CTAs.
@@ -308,6 +317,7 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 
 - **FR-016**: A Camp MAY define zero or more extras, each with name, description, price, and active/configured state. Lunch is an example only and MUST NOT be hardcoded.
 - **FR-017**: Selected extras MUST increase the registration total by their configured prices at submission time. Total MUST equal Camp base price plus selected extras. Amounts MUST be in CHF (`XR-001`) and MUST follow the project’s decimal-safe money rules (constitution §V).
+- **FR-017a**: A Camp MAY define an academy-member price in addition to the usual price; both are CHF `numeric` per §V. **(Added 2026-09-09)** Interim until F1.09: the parent self-declares an active academy membership at submit; when claimed and the Camp defines a member price, the registration total MUST use the member price and the registration MUST be flagged as member-price-claimed for admin review (admin list + CSV). A claim on a Camp without a member price MUST be refused. When F1.09 ships, the claim is replaced by an automatic active-at-registration membership check, a membership whose payment is still pending still qualifies, and the admin flag extends to that pending case.
 - **FR-018**: Selected extras, their prices, the Camp base price, and the total MUST be persisted on the registration so historical totals remain reproducible after later configuration changes.
 - **FR-018a**: Each registration MUST snapshot the child personal information used at submit time. Later edits on the Children page MUST NOT rewrite past registration snapshots, invoices, or confirmation content.
 
@@ -350,7 +360,7 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 
 ### Key Entities
 
-- **Camp** — A reusable event-like commercial offering (not a lesson, not a trip, not a recurring Group). Holds current configuration: identity, copy, dates, daily hours, eligibility/age range, price, capacity, registration window, publication state, practical information.
+- **Camp** — A reusable event-like commercial offering (not a lesson, not a trip, not a recurring Group). Holds current configuration: identity, copy, dates, daily hours, eligibility/age range, usual price and optional academy-member price, capacity, registration window, publication state, practical information, and an optional flyer image.
 - **Camp extra** — An optional add-on belonging to a Camp (name, description, price, active state). Example: lunch. Configuration, not a hardcoded product type.
 - **Camp registration** — One saved child on one Camp, submitted by a parent/guardian client. Snapshots child details, parent contact, extras and prices, totals, terms acceptance, and Camp context needed for history and confirmation. Place-holding when active/awaiting payment or paid; not place-holding when cancelled or waitlisted.
 - **Child** — A durable dependent of one parent/guardian client (not a login, not a second paying customer). Holds personal information used across future Camps: name, date of birth, level/experience, allergies/important information, emergency contact, and an optional profile image kept in owner-scoped private storage. Listed on the Children page; created via the centered create-child form (no level field there); maintained in the child profile-management view.

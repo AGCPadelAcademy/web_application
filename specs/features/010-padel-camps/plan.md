@@ -219,3 +219,12 @@ User-confirmed evolution of children management and the registration flow. No Ed
 - **Children UI**: centered create-child form (capitalized labels, manual DD.MM.YYYY DOB, prefix + national emergency phone stored E.164, optional image upload, **no padel level** — decision 1); child profile-management view at `/children/:childId` following `ProfileManagementPage` (all fields incl. level, image replace/delete, default SVG avatar, per-child Camp invoices); card actions reduced to Edit/Remove with a `CancelBookingModal`-style confirmation Dialog.
 - **Registration flow**: draft preservation in `sessionStorage` (selected child, extras, terms state) keyed by Camp; `/terms` accepts `return_to` and navigates back (never home); `+ Add new Child` routes to `/children?new=1&return_to=…` and returns with the draft restored and the new child pre-selected.
 - **Unchanged by the evolution**: FR-012 (one registration + one invoice per child; multi-child = separate flows), the billing spine, capacity, waitlist, funnel, and all Edge Functions.
+
+## Evolution 2026-09-09, round 2 (Phase 15): Camp flyers + dual pricing
+
+- **Schema** (`0017`): `camps.flyer_path`, `camps.member_price_amount` (NULL, ≥ 0), `camp_registrations.member_price_claimed` (default false); `register_camp_child` gains optional `p_member_price_claimed` (snapshots the member price when claimed, else `member_price_unavailable`); private `camp-flyers` bucket (published-camp flyers publicly signable, unpublished admin-only, admin-only writes); `camp_public_list` gains `flyer_path` + `member_price_amount`.
+- **Admin**: `CampManagementPanel` gains usual + member price inputs and flyer upload/preview/replace/remove; registrations list and CSV flag member-price claims.
+- **Public**: `/camps` cards show the flyer right-side in the same card (fallback placeholder otherwise) and both prices when a member price exists; `CampDetailPage` shows both prices and an "active membership" checkbox (draft-preserved) that switches the total to the member price.
+- **Shared**: `FlyerLightbox` (Dialog, per `InvoicePreviewModal` conventions) for the larger view; `src/lib/imageValidation.js` generalizes the C1 avatar validator.
+- **Edge Functions**: `camp-submit-registration` passes the claim through; `camp-admin` validation accepts `member_price_amount`; no new function.
+- **F1.09 handover (not built here)**: automatic active-at-registration membership check, member-only price display for members, and a pending-membership-payment admin flag.

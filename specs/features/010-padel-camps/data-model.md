@@ -47,7 +47,9 @@ Admin-managed reusable Camp configuration (FR-001/FR-002).
 | `min_age` | smallint | NULL, CHECK `min_age >= 0` | age at `start_date` |
 | `max_age` | smallint | NULL, CHECK `max_age >= min_age` when both set | |
 | `eligibility_text` | text | NULL | e.g. “players with previous experience” |
-| `price_amount` | numeric(10,2) | NOT NULL, CHECK `price_amount >= 0` | base CHF |
+| `price_amount` | numeric(10,2) | NOT NULL, CHECK `price_amount >= 0` | base CHF (usual price) |
+| `member_price_amount` | numeric(10,2) | NULL, CHECK `member_price_amount >= 0` | **added 2026-09-09 (C2)** — optional academy-member price |
+| `flyer_path` | text | NULL | **added 2026-09-09 (C2)** — object path inside the private `camp-flyers` bucket (`{camp_id}/{file}`) |
 | `currency` | text | NOT NULL DEFAULT `'CHF'` | |
 | `max_capacity` | integer | NOT NULL, CHECK `max_capacity > 0` | |
 | `registration_opens_at` | timestamptz | NULL | when NULL, open immediately while published |
@@ -58,6 +60,14 @@ Admin-managed reusable Camp configuration (FR-001/FR-002).
 | `created_at` / `updated_at` | timestamptz | NOT NULL DEFAULT `now()` | |
 
 **RLS**: `SELECT` published Camps to everyone (public `/camps`); all rows to admins. `INSERT/UPDATE/DELETE` admin-only via `public.is_admin()`.
+
+**Flyer storage (2026-09-09, C2)**: private `camp-flyers` bucket; object path `{camp_id}/{file}`; images ≤ 5 MB. `storage.objects` policies: `SELECT` for anon/authenticated when the first path segment is a **published** Camp id, or the caller is an admin; `INSERT/UPDATE/DELETE` admin-only. The SPA reads flyers through short-lived signed URLs. Unpublished Camps' flyers are never publicly readable (convergence-2 §4).
+
+**Dual pricing (2026-09-09, C2)**: `member_price_amount` is optional. Interim (until F1.09): the parent self-declares an active membership at registration (`register_camp_child.p_member_price_claimed`); when claimed and a member price exists, the registration snapshots the member price as `base_price` and sets `member_price_claimed = true` (admin-visible); a claim on a Camp without a member price fails with `member_price_unavailable`. F1.09 handover: automatic active-at-registration membership check, member-only price display for members, and a pending-membership-payment admin flag.
+
+### `camp_registrations` — C2 addition
+
+`member_price_claimed` boolean NOT NULL DEFAULT false — set when the registration used the self-declared member price; surfaced in the admin registration list and CSV export (decision 3).
 
 ### `camp_extras`
 

@@ -165,6 +165,7 @@ function authorizedRegistrationRow(
     total_amount: row.total_amount,
     currency: row.currency,
     payment_status: row.payment_status,
+    member_price_claimed: row.member_price_claimed === true,
     document_status: document?.status ?? null,
     document_nr: document?.document_nr ?? null,
     registration_date: row.created_at,

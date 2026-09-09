@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/customSupabaseClient';
+import { imageFileExtension, validateImageFile } from '@/lib/imageValidation';
 
 export const CAMPS_TERMS_VERSION = '2026-09';
 export const CAMP_FULL_LABEL = 'Complet / Ausgebucht';
@@ -23,6 +24,7 @@ export const CSV_REGISTRATION_FIELDS = [
   'extras',
   'total_amount',
   'payment_status',
+  'member_price_claimed',
   'registration_date',
   'remaining_places',
 ];
@@ -75,8 +77,9 @@ export function extrasTotal(extras = []) {
   return extras.reduce((sum, extra) => sum + Number(extra.price_amount || 0), 0);
 }
 
-export function campDisplayTotal(camp, selectedExtras = []) {
-  return Number(camp?.price_amount || 0) + extrasTotal(selectedExtras);
+export function campDisplayTotal(camp, selectedExtras = [], basePrice = null) {
+  const base = basePrice != null ? Number(basePrice) : Number(camp?.price_amount || 0);
+  return base + extrasTotal(selectedExtras);
 }
 
 export async function fetchPublicCamps() {
@@ -130,13 +133,14 @@ export function convertWaitlistEntry(entryId) {
   return invokeCampFunction('camp-admin', { action: 'convert_waitlist', entry_id: entryId });
 }
 
-export function submitCampRegistration({ campId, childId, extraIds, termsVersion = CAMPS_TERMS_VERSION }) {
+export function submitCampRegistration({ campId, childId, extraIds, termsVersion = CAMPS_TERMS_VERSION, membershipClaimed = false }) {
   return invokeCampFunction('camp-submit-registration', {
     camp_id: campId,
     child_id: childId,
     extra_ids: extraIds ?? [],
     terms_version: termsVersion,
     terms_accepted: true,
+    membership_claimed: membershipClaimed === true,
   });
 }
 
@@ -165,8 +169,50 @@ export async function joinCampWaitlist({ campId, childId, parentId }) {
   return data;
 }
 
-export function funnelEventPayload(event, campId = null) {
-  return {
+// --- Camp flyers (convergence 2, FR-001a/FR-001b) ----------------------------
+
+export const CAMP_FLYERS_BUCKET = 'camp-flyers';
+
+/** Upload a flyer under {campId}/… and point the Camp row at it (admin RLS). */
+export async function uploadCampFlyer(campId, file) {
+  const problem = validateImageFile(file);
+  if (problem) throw new Error(problem);
+  const path = `${campId}/${Date.now()}.${imageFileExtension(file)}`;
+  const { error } = await supabase.storage
+    .from(CAMP_FLYERS_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (error) throw error;
+  const { error: updateError } = await supabase
+    .from('camps')
+    .update({ flyer_path: path, updated_at: new Date().toISOString() })
+    .eq('id', campId);
+  if (updateError) throw updateError;
+  return path;
+}
+
+/** Remove the stored flyer object and clear the Camp row. */
+export async function removeCampFlyer(camp) {
+  if (camp?.flyer_path) {
+    await supabase.storage.from(CAMP_FLYERS_BUCKET).remove([camp.flyer_path]).catch(() => {});
+  }
+  const { error } = await supabase
+    .from('camps')
+    .update({ flyer_path: null, updated_at: new Date().toISOString() })
+    .eq('id', camp.id);
+  if (error) throw error;
+}
+
+/** Short-lived signed URL; anon can sign only published Camps' flyers. */
+export async function campFlyerSignedUrl(path) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage
+    .from(CAMP_FLYERS_BUCKET)
+    .createSignedUrl(path, 3600);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+export function funnelEventPayload(event, campId = null) {  return {
     camp_id: campId,
     event,
   };
@@ -205,6 +251,7 @@ export function mapCampError(message) {
     terms_required: 'You must accept the terms to continue.',
     emergency_contact_required: 'Add an emergency contact on the child record before registering.',
     extras_invalid: 'One or more selected extras are no longer available.',
+    member_price_unavailable: 'This camp has no member price.',
     refund_agreement_required: 'Paid registrations cannot be cancelled here.',
     forbidden: 'You do not have permission to do that.',
   };
@@ -228,6 +275,7 @@ export function readCampDraft(campId, storage) {
         ? parsed.selectedExtras.filter((id) => typeof id === 'string')
         : [],
       termsAccepted: parsed.termsAccepted === true,
+      memberClaimed: parsed.memberClaimed === true,
     };
   } catch {
     return null;
@@ -240,6 +288,7 @@ export function writeCampDraft(campId, draft, storage) {
       childId: draft.childId || null,
       selectedExtras: Array.isArray(draft.selectedExtras) ? draft.selectedExtras : [],
       termsAccepted: draft.termsAccepted === true,
+      memberClaimed: draft.memberClaimed === true,
     }));
   } catch {
     /* storage full or unavailable — draft is best-effort */

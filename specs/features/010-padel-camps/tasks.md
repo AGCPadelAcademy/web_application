@@ -395,3 +395,40 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 - [X] T078 Update automated coverage (FR-040): Vitest for children payload (E.164 phone assembly, DOB helpers, avatar path, removeChild history mapping) and registration draft preservation per convergence request §1–§2 (missing)
 - [X] T079 [P] Add evolved-flow scenarios to `quickstart.md`: child image upload/replace/delete, Remove guard with history, terms return with intact state, add-child-during-registration restore per convergence request §1–§2 (partial)
 - [X] T080 [P] After implementation, sync baseline docs (`specs/baseline-system/requirements.md` BC-CAMP entries, `specs/project-context/api-contracts.md`, `specs/project-context/domain-model.md`) per specs/features/README.md rule 6 (partial)
+
+---
+
+## Phase 15: Convergence (round 2)
+
+**Source**: `/speckit-converge` run 2026-09-09 against the Convergence #2 request (Camp flyer upload/preview/larger view, dual member/usual pricing, flyer on `/camps` cards). Baseline: post-Convergence-#1 state (per decision 3 of 2026-09-09 there is no multi-child flow — registrations and invoices are per child, so dual pricing applies per registration).
+
+**Decisions 2026-09-09 (user-confirmed, round 2)**:
+
+1. Interim membership = the parent self-declares at registration ("I have an active academy membership"); the member price applies when claimed and the Camp defines one. F1.09 will replace this with an automatic membership check.
+2. Automatic-phase membership rule: membership **active at the moment of registration** — no month matching (a Christmas camp may open in October).
+3. Admin visibility: registrations made with the member price are flagged in the admin registration list and CSV export so the academy can verify and talk to the parent; once F1.09 lands, the flag extends to "membership payment still pending" (membership bought at month start, camp registration later, reconciliation still waiting).
+4. Display: public pages show both prices when a member price exists (the system cannot know membership before F1.09); member-only price display arrives with F1.09.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [X] T081 Amend `spec.md` for Convergence #2: FR-001 gains flyer + dual pricing (`price_amount` = usual, `member_price_amount` = academy member); new FRs for flyer upload/replace/delete, form and card preview, accessible larger view with close, flyer access control (published camps' flyers publicly readable, unpublished admin-only), self-declared member pricing with the admin claim flag, and the F1.09 handover (automatic active-at-registration check, member-only display, pending-payment flag); US1/US2 acceptance scenarios per convergence-2 request §1–§2 and the 2026-09-09 round-2 decisions (missing)
+- [X] T082 Update `plan.md`, `data-model.md`, and `contracts/edge-functions.md`: `camps.flyer_path`, `camps.member_price_amount`, `camp_registrations.member_price_claimed`, the `register_camp_child` claim parameter, `camp-flyers` bucket + policies, `camp_public_list` column additions, `validateCampPayload` extension; record that no new Edge Function is introduced per convergence-2 request §1–§2 (partial)
+
+### Schema
+
+- [X] T083 Write `supabase/migrations/0017_f125_camp_flyers_pricing.sql`: `camps.flyer_path` text NULL; `camps.member_price_amount` numeric(10,2) NULL CHECK ≥ 0; `camp_registrations.member_price_claimed` boolean NOT NULL DEFAULT false; drop and recreate `register_camp_child` with an optional `p_member_price_claimed` parameter that snapshots the member price when claimed (raising `member_price_unavailable` when the Camp defines none), preserving the service-role-only grants; private `camp-flyers` Storage bucket (png/jpeg/webp ≤ 5 MB) with SELECT for anon/authenticated when the first path segment is a published Camp id (or caller is admin) and INSERT/UPDATE/DELETE admin-only; `CREATE OR REPLACE` `camp_public_list` adding `flyer_path` and `member_price_amount` per convergence-2 request §1–§2 and §4 authz (missing)
+- [X] T084 [P] Write SQL tests in `tests/sql/0017_f125_camp_flyers_pricing.test.sql`: new columns and CHECKs, claim flag default, bucket privacy/limits, policy counts (no anon write), view column additions, unpublished-flyer read denial, claim-without-member-price refusal per data-model.md (missing)
+
+### Frontend
+
+- [X] T085 Extend `src/lib/camps.js` and the Edge Functions: carry `member_price_amount` through `validateCampPayload`/`upsertCamp`; pass `membership_claimed` through `submitCampRegistration` → `camp-submit-registration` → `register_camp_child`; flyer upload/replace/remove helpers (direct Supabase Storage under the admin JWT + `camps.flyer_path` update under the admin RLS policy) and a signed-url reader; generalize the C1 avatar file validator into a shared `src/lib/imageValidation.js` instead of duplicating it per convergence-2 request §1.1 (missing)
+- [X] T086 Add a reusable `FlyerLightbox` (Dialog-based, following `InvoicePreviewModal` conventions): meaningful accessible label, Escape/close button, responsive desktop/mobile, triggers always `type="button"` so enclosing forms never submit and page/registration state is never lost per convergence-2 request §1.1/§2.1/§4 (missing)
+- [X] T087 Extend `src/components/admin/CampManagementPanel.jsx`: usual + academy member price inputs; flyer file input with immediate local preview (object URL) before submit; stored flyer preview when editing; click preview → `FlyerLightbox`; replace/remove flyer per convergence-2 request §1.1 (missing)
+- [X] T088 Update `src/pages/CampsPage.jsx` cards: flyer on the right side of the same card container, responsive stacking on small screens, non-interactive fallback placeholder (initials/SVG per the C1 avatar pattern) when no flyer exists, click on a real flyer → `FlyerLightbox` without losing page state; show both prices when a member price exists (decision 4) per convergence-2 request §2.1 (missing)
+- [X] T091 Update `src/pages/CampDetailPage.jsx`: show both prices when a member price exists; add an "I have an active academy membership" checkbox (preserved in the registration draft) that switches the running total to the member price and submits `membership_claimed` per convergence-2 request §1.2 and round-2 decision 1 (missing)
+- [X] T092 Surface the member-price claim in `camp-admin` `list_registrations` and the CSV export (decision 3) so the admin can verify claims per convergence-2 request §1.2 and round-2 decision 3 (missing)
+
+### Tests and documentation
+
+- [X] T089 Update automated coverage (FR-040): Vitest for dual-price validation (optional, non-negative), flyer payload/helpers, shared image validator, membership checkbox totals, CSV claim column; Deno tests for `validateCampPayload` accepting `member_price_amount` and the `member_price_unavailable` mapping per convergence-2 request §1–§2 (missing)
+- [X] T090 [P] Add quickstart §11 scenarios (flyer upload/replace/preview/larger-view/close, responsive + accessibility checks, unpublished-flyer access denial, both prices shown publicly, member claim switches the total, admin sees the claim flag, registration unchanged without the claim) and sync baseline docs (`requirements.md` BC-CAMP, `api-contracts.md`, `domain-model.md`) per convergence-2 request §5.15 (partial)

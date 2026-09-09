@@ -12,6 +12,7 @@
 > Refreshed 2026-08-31 (Security Advisor): migration `0009_security_advisor_hardening` removes API execution of trigger-only functions, narrows definer views to explicit read-only grants, and revokes API privileges from service-role-only tables.
 > Refreshed 2026-08-31 (Security Advisor): migration `0010_private_projection_readers` makes all public views SECURITY INVOKER. Fixed-output privileged readers live in unexposed `private`; explicit deny policies document service-role-only tables.
 > Refreshed 2026-09-08 (010 F1.25): migrations `0014_f125_padel_camps` and `0015_f125_is_admin_anon_grant` add the Camps domain (8 new tables), the `camp_public_list` view, three camp Edge Functions, and `camp_registration_id` columns on `notifications_log` / `billing_documents` / `billing_operations` / `billing_events`. Legacy `bookings_duplicate` table documented. Live row counts, role distribution, and Edge Function versions reconciled with the live project. Schema-layout decision recorded (§2).
+> Refreshed 2026-09-09 (010 C1+C2): migrations `0016_f125_children_evolution` (`children.avatar_path`, private `child-avatars` bucket, owner/admin DELETE when no history) and `0017_f125_camp_flyers_pricing` (`camps.flyer_path`, `camps.member_price_amount`, `camp_registrations.member_price_claimed`, private `camp-flyers` bucket, `register_camp_child` claim parameter). `camp-submit-registration` v8 and `camp-admin` v5.
 > Project ref: `jokjxpogvwxbwdaroqkc`
 > Project URL: `https://jokjxpogvwxbwdaroqkc.supabase.co`
 > Methodology: SDD brownfield baseline — document as-is, flag issues, do not modify.
@@ -475,10 +476,10 @@ Admin-managed padel camps with parent/child registration. All RLS enabled; all c
 
 | Table | Purpose | Access summary |
 |---|---|---|
-| `camps` | Camp configuration (slug, dates, capacity, price, `is_published`, waitlist flag) | SELECT published-or-admin (anon OK); writes admin-only |
+| `camps` | Camp configuration (slug, dates, capacity, usual price, optional `member_price_amount`, optional `flyer_path`, `is_published`, waitlist flag) | SELECT published-or-admin (anon OK); writes admin-only |
 | `camp_extras` | Priced optional extras per camp | SELECT for published camps or admin; writes admin-only |
-| `children` | Parent-owned child profiles (PII: DOB, allergies, emergency contact); `archived_at` soft-delete | owner (active parent) or admin |
-| `camp_registrations` | Registration with denormalized child/camp/parent snapshots, `status` (`pending_payment`/`confirmed`/`cancelled`), `payment_status`, totals | SELECT owner-or-admin; writes via `camp-submit-registration` / `camp-cancel-registration` (service role) |
+| `children` | Parent-owned child profiles (PII: DOB, allergies, emergency contact); optional `avatar_path`; `archived_at` retained; DELETE allowed only with no registrations/invoices | owner (active parent) or admin |
+| `camp_registrations` | Registration with denormalized child/camp/parent snapshots, `status` (`pending_payment`/`confirmed`/`cancelled`), `payment_status`, totals, `member_price_claimed` | SELECT owner-or-admin; writes via `camp-submit-registration` / `camp-cancel-registration` (service role) |
 | `camp_registration_extras` | Snapshot of extras chosen per registration | SELECT owner-or-admin; writes service role |
 | `camp_waitlist_entries` | Waitlist for full camps (`active`/`converted`/`removed`) | INSERT active owner for own non-archived child; SELECT/UPDATE owner-or-admin |
 | `camp_funnel_events` | Anonymous-safe funnel counters (`camps_page_view`, `camp_registration_started`, `camp_registration_completed`, `camp_payment_confirmed`) — no PII | INSERT anon/authenticated with event/camp validation; SELECT admin-only |
@@ -496,8 +497,8 @@ Operational roster projection over `bookings` ⨝ `profiles`: `booking_id`, `boo
 #### `billing_public_config` — **ADDED 2026-08-25 (007 migration `0003`)**
 One boolean: `integration_enabled` (true when a `billing_integrations` row for `bexio` is `connected` or `degraded`). SECURITY INVOKER barrier over unexposed `private.billing_public_config_row()`; granted SELECT to `authenticated`. Powers the frontend invoice cutover. Does not expose tokens, config IDs, or status strings.
 
-#### `camp_public_list` — **ADDED 2026-09-08 (010 migration `0014`)**
-Public catalogue projection over `camps` (`WHERE is_published`): schedule/eligibility/pricing fields plus computed `places_remaining` / `is_full` (via SECURITY DEFINER `camp_active_registration_count(uuid)` — fixed-output count, no PII) and an aggregated `extras` jsonb array of active `camp_extras`. Granted SELECT to `anon` + `authenticated`; powers the public `/camps` page. Unlike the other views it reads RLS-protected tables directly (published-or-admin policies) rather than a `private` reader function.
+#### `camp_public_list` — **ADDED 2026-09-08 (010 migration `0014`)**; **extended 2026-09-09 (`0017`)**
+Public catalogue projection over `camps` (`WHERE is_published`): schedule/eligibility/pricing fields (including `member_price_amount` and `flyer_path` since `0017`) plus computed `places_remaining` / `is_full` (via SECURITY DEFINER `camp_active_registration_count(uuid)` — fixed-output count, no PII) and an aggregated `extras` jsonb array of active `camp_extras`. Granted SELECT to `anon` + `authenticated`; powers the public `/camps` page. Unlike the other views it reads RLS-protected tables directly (published-or-admin policies) rather than a `private` reader function.
 
 ---
 
@@ -520,9 +521,9 @@ Public catalogue projection over `camps` (`WHERE is_published`): schedule/eligib
 | `billing-invoice-document` | v10 | Stream Bexio PDF for owner/admin | **Active** (`InvoicePreviewModal` / `billing.js`). `verify_jwt` on; inactive owners retain own-document reads, inactive admins lose broad reads. |
 | `billing-cancel-invoice` | v6 | Cancel unpaid issued invoice + booking | **Active** (`PaymentsPage.jsx`). `verify_jwt` on; active owner/admin only. |
 | `bexio-reconcile` | v10 | Payment sync + retry queue | **Active** (`pg_cron` every six hours + admin Run now). `verify_jwt` off; scheduler secret or active-admin JWT. |
-| `camp-submit-registration` | v1 | Parent registers a saved child: atomic capacity-safe insert + Bexio invoice + confirmation email | **Active** (010, `/camps` registration flow). `verify_jwt` on; active owning parent. |
+| `camp-submit-registration` | v8 | Parent registers a saved child: atomic capacity-safe insert + Bexio invoice + confirmation email; accepts `membership_claimed` (C2) | **Active** (010, `/camps` registration flow). `verify_jwt` on; active owning parent. |
 | `camp-cancel-registration` | v1 | Unpaid cancel by registering parent; cancels Bexio document, releases capacity | **Active** (010). `verify_jwt` on; owner or admin. |
-| `camp-admin` | v1 | Admin CRUD for camps/extras and registration oversight | **Active** (010, admin UI). `verify_jwt` on; admin only. |
+| `camp-admin` | v5 | Admin CRUD for camps/extras (incl. `member_price_amount`) and registration oversight (incl. `member_price_claimed`) | **Active** (010, admin UI). `verify_jwt` on; admin only. |
 
 > **Deleted 2026-08-10** (by owner, via dashboard/CLI): `create-booking` (Stripe), `handle-stripe-webhook` (Stripe), `verify-booking-saved` (validated the dropped Stripe column), `generate-booking-receipt` and `assign-booking-time` (verified unused — no callers, no invocations, broken source bundles). Earlier snapshots also listed `create-booking-with-invoice` and `generate-invoice-pdf-v2`, which no longer exist.
 >
@@ -537,6 +538,8 @@ Public catalogue projection over `camps` (`WHERE is_published`): schedule/eligib
 | `invoices` | Yes | Generated invoice PDFs (`Pending/YYYY/MM/DD/` prefix; planned: `Paid/`, `Refused/` on finance verification) + `assets/logo.png` | None | None |
 | `qr-codes` | Yes | Swiss QR payment slips embedded in invoices (`QR_<amount>.pdf`) | None | None |
 | `payment-proofs` | No (private) | Customer-uploaded bank transfer proofs (`<booking_id>/attempt-<n>.<ext>`; legacy `<booking_id>/<booking_id>_<ts>.<ext>` files remain valid), accessed via 24h signed URLs. F1.02 (`0008`): SELECT/INSERT allowed when the first path segment equals an owned `bookings.id` or `is_admin()` | None | None |
+| `child-avatars` | No (private) | Child profile images (`{parent_id}/{child_id}.*`); owner-path-or-admin policies; SPA reads via signed URLs (0016) | 5 MB | png/jpeg/webp |
+| `camp-flyers` | No (private) | Camp flyer images (`{camp_id}/{file}`); SELECT for published-camp path or admin; writes admin-only (0017) | 5 MB | png/jpeg/webp |
 
 > ~~`receipts`~~ bucket **deleted 2026-08-10** (legacy Stripe-era invoice PDFs; verified unreferenced before deletion).
 >
@@ -587,6 +590,7 @@ Live policy set, verified 2026-08-10 via `pg_policies` (after migration `0006`);
 | `children` | children_select_owner_or_admin | authenticated | SELECT | `parent_id = (SELECT auth.uid())` OR `is_admin()` (010) |
 | `children` | children_insert_active_owner_or_admin | authenticated | INSERT | admin, or own active parent (010) |
 | `children` | children_update_active_owner_or_admin | authenticated | UPDATE | admin, or own active parent (010) |
+| `children` | children_delete_owner_or_admin | authenticated | DELETE | owner or admin; FK RESTRICT refuses delete when registrations exist (0016) |
 | `camp_registrations` | camp_registrations_select_owner_or_admin | authenticated | SELECT | owner parent OR `is_admin()`; writes service-role only via camp Edge Functions (010) |
 | `camp_registration_extras` | camp_registration_extras_select_owner_or_admin | authenticated | SELECT | admin, or owner via `camp_registrations.parent_id` (010) |
 | `camp_waitlist_entries` | camp_waitlist_insert_active_owner | authenticated | INSERT | active owner parent, own non-archived child (010) |
@@ -646,7 +650,7 @@ These were reported by the Supabase advisor. Listed here for traceability; remed
 - **Role system:** Canonical store is `public.profiles.role` (`student`, `coach`, `accounting`, `admin`; default `student`). Helpers: `is_admin()`, `is_coach()` (GRANT EXECUTE to `authenticated`). Live actors after F1.02: student, admin, coach (assigned-session roster). `accounting` remains unused (non-admin, no roster). Role promotion stays out-of-band SQL (`prevent_role_self_service`). JWT custom claims and a `user_roles` table remain rejected. Apply migration `0008` on the target project before treating this as the remote as-is. The current admin user is `josep.barbera.reverte.1999@gmail.com` (the legacy `admin@agcpadelacademy.com` hardcoded in old code never existed in `auth.users`).
 - ~~**`generate-invoice-pdf` vs `generate-invoice-pdf-v2`:**~~ **Resolved 2026-08-07** — the `-v2` function no longer exists in the live project; `generate-invoice-pdf` (v18) is the sole canonical generator.
 - ~~**`cleanup-pending-bookings`:**~~ **Resolved 2026-08-07** — no scheduler exists and none should be added; time-based auto-cancellation is rejected. To be replaced by an explicit cancel-reservation flow (customer/admin/coach), spec'd as a future feature.
-- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10. 007 added `0003_bexio_integration`, `0004_bexio_reconcile_cron`, `0005_profile_billing_fields` (feature numbering is independent of the earlier 0003–0006 brownfield files in git history). Live `supabase_migrations` confirmed 2026-09-08: `0001`–`0007` brownfield, `0003_bexio_integration`, `profile_billing_fields`, `bexio_reconcile_cron`, `f102_drop_public_profiles_policy_exact_name`, `0009`–`0013`, `0014_f125_padel_camps`, `0015_f125_is_admin_anon_grant`.
+- ~~**Migrations table is empty:**~~ **Resolved** — migrations `0001`–`0006` are tracked in `supabase_migrations` as of 2026-08-10. 007 added `0003_bexio_integration`, `0004_bexio_reconcile_cron`, `0005_profile_billing_fields` (feature numbering is independent of the earlier 0003–0006 brownfield files in git history). Live `supabase_migrations` confirmed 2026-09-09: `0001`–`0007` brownfield, `0003_bexio_integration`, `profile_billing_fields`, `bexio_reconcile_cron`, `f102_drop_public_profiles_policy_exact_name`, `0009`–`0013`, `0014_f125_padel_camps`, `0015_f125_is_admin_anon_grant`, `0016_f125_children_evolution`, `0017_f125_camp_flyers_pricing`.
 - **`bookings_duplicate` (83 rows):** legacy dashboard-created copy of `bookings`; API access denied (migration `0009`), no `src/` or Edge Function references. Await owner confirmation, then DROP via a spec'd migration.
 - **Bexio production cutover (T053):** Preview/test branch is live. Production redirect URL, production secrets, production migrations, and enabling the cutover flag still require an explicit production rollout.
 - **No-file-size or MIME-type restrictions on any Storage bucket:** Any file size / type can be uploaded to `payment-proofs`. Add limits when implementing the payment-proof upload feature spec.

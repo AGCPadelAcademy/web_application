@@ -370,8 +370,8 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 ### Schema
 
-- [ ] T065 Write `supabase/migrations/0016_f125_children_evolution.sql`: nullable `children.avatar_path` text; private `child-avatars` Supabase Storage bucket with owner-path-or-admin policies modeled on the `payment-proofs` pattern from `0008`; DELETE policy on `children` for owner-or-admin (hard delete still blocked by `ON DELETE RESTRICT` when registrations exist — decision 2: refuse with explanation) per convergence request §1.1/§1.3/§1.4 (missing)
-- [ ] T066 [P] Write SQL tests in `tests/sql/0016_f125_children_evolution.test.sql`: avatar column, bucket privacy and policies (owner write/read own path, admin read, no anon), DELETE policy presence, delete-with-history refusal per data-model.md (missing)
+- [X] T065 Write `supabase/migrations/0016_f125_children_evolution.sql`: nullable `children.avatar_path` text; private `child-avatars` Supabase Storage bucket with owner-path-or-admin policies modeled on the `payment-proofs` pattern from `0008`; DELETE policy on `children` for owner-or-admin (hard delete still blocked by `ON DELETE RESTRICT` when registrations exist — decision 2: refuse with explanation) per convergence request §1.1/§1.3/§1.4 (missing)
+- [X] T066 [P] Write SQL tests in `tests/sql/0016_f125_children_evolution.test.sql`: avatar column, bucket privacy and policies (owner write/read own path, admin read, no anon), DELETE policy presence, delete-with-history refusal per data-model.md (missing)
 
 ### Children page and child profile
 

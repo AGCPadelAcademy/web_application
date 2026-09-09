@@ -19,6 +19,7 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import CampsPage from '@/pages/CampsPage';
 import CampDetailPage from '@/pages/CampDetailPage';
 import ChildrenPage from '@/pages/ChildrenPage';
+import ChildProfilePage from '@/pages/ChildProfilePage';
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
@@ -64,6 +65,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ChildrenPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="children/:childId"
+              element={
+                <ProtectedRoute>
+                  <ChildProfilePage />
                 </ProtectedRoute>
               }
             />

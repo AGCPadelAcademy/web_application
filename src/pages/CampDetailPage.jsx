@@ -1,29 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import ProfileCompletionModal from '@/components/modals/ProfileCompletionModal';
 import { fetchProfile } from '@/lib/profileService';
 import { isProfileComplete } from '@/lib/profileValidation';
-import { createChild, listChildren } from '@/lib/children';
+import { listChildren } from '@/lib/children';
 import {
   CAMP_FULL_LABEL,
   CAMPS_TERMS_VERSION,
   campDisplayTotal,
+  clearCampDraft,
   deriveCampStatus,
   fetchPublicCamp,
   formatCampPrice,
   FUNNEL_EVENTS,
   joinCampWaitlist,
   mapCampError,
+  readCampDraft,
   submitCampRegistration,
   trackCampFunnelEvent,
+  writeCampDraft,
 } from '@/lib/camps';
 
 const CampDetailPage = () => {
@@ -39,7 +41,7 @@ const CampDetailPage = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [newChild, setNewChild] = useState({ first_name: '', last_name: '', date_of_birth: '', emergency_contact_name: '', emergency_contact_phone: '' });
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     setCamp(null);
@@ -61,6 +63,37 @@ const CampDetailPage = () => {
     if (!user) return;
     listChildren().then(setChildren).catch(() => setChildren([]));
   }, [user]);
+
+  // Restore a preserved draft (terms / + Add new Child navigation), then
+  // apply ?select_child= coming back from child creation.
+  useEffect(() => {
+    if (!camp) return;
+    const draft = readCampDraft(camp.id, sessionStorage);
+    if (draft) {
+      if (draft.childId) setChildId(draft.childId);
+      if (draft.selectedExtras.length > 0) setSelectedExtras(draft.selectedExtras);
+      if (draft.termsAccepted) setTermsAccepted(true);
+    }
+    const selectChild = searchParams.get('select_child');
+    if (selectChild) {
+      setChildId(selectChild);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camp]);
+
+  // Persist the draft so leaving for /terms or child creation restores it.
+  useEffect(() => {
+    if (!camp) return;
+    writeCampDraft(camp.id, { childId, selectedExtras, termsAccepted }, sessionStorage);
+  }, [camp, childId, selectedExtras, termsAccepted]);
+
+  // Drop a restored child that no longer exists on the parent's list.
+  useEffect(() => {
+    if (childId && children.length > 0 && !children.some((child) => child.id === childId)) {
+      setChildId('');
+    }
+  }, [children, childId]);
 
   const extras = useMemo(() => Array.isArray(camp?.extras) ? camp.extras : [], [camp]);
   const chosenExtras = extras.filter((extra) => selectedExtras.includes(extra.id));
@@ -92,18 +125,6 @@ const CampDetailPage = () => {
     setSelectedExtras((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   };
 
-  const addChildInline = async (event) => {
-    event.preventDefault();
-    try {
-      const created = await createChild(newChild, user.id);
-      setChildren((items) => [...items, created]);
-      setChildId(created.id);
-      toast({ title: 'Child saved' });
-    } catch (error) {
-      toast({ title: 'Could not save child', description: error.message, variant: 'destructive' });
-    }
-  };
-
   const submit = async (event) => {
     event.preventDefault();
     if (!(await ensureReady())) return;
@@ -124,6 +145,7 @@ const CampDetailPage = () => {
         termsVersion: CAMPS_TERMS_VERSION,
       });
       trackCampFunnelEvent(FUNNEL_EVENTS.COMPLETED, camp.id);
+      clearCampDraft(camp.id, sessionStorage);
       toast({ title: 'Registration submitted', description: 'Your invoice will appear under My Children.' });
       navigate('/children');
     } catch (error) {
@@ -199,14 +221,14 @@ const CampDetailPage = () => {
                     ))}
                   </select>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Input placeholder="First name" value={newChild.first_name} onChange={(e) => setNewChild((c) => ({ ...c, first_name: e.target.value }))} className="bg-gray-900 border-gray-700" />
-                  <Input placeholder="Last name" value={newChild.last_name} onChange={(e) => setNewChild((c) => ({ ...c, last_name: e.target.value }))} className="bg-gray-900 border-gray-700" />
-                  <Input type="date" value={newChild.date_of_birth} onChange={(e) => setNewChild((c) => ({ ...c, date_of_birth: e.target.value }))} className="bg-gray-900 border-gray-700" />
-                  <Input placeholder="Emergency contact" value={newChild.emergency_contact_name} onChange={(e) => setNewChild((c) => ({ ...c, emergency_contact_name: e.target.value }))} className="bg-gray-900 border-gray-700" />
-                  <Input placeholder="Emergency phone" value={newChild.emergency_contact_phone} onChange={(e) => setNewChild((c) => ({ ...c, emergency_contact_phone: e.target.value }))} className="bg-gray-900 border-gray-700 md:col-span-2" />
-                  <Button type="button" variant="outline" onClick={addChildInline} className="md:col-span-2 border-gray-700">Save new child</Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-gray-700 w-full"
+                  onClick={() => navigate(`/children?new=1&return_to=${encodeURIComponent(`/camps/${slug}`)}`)}
+                >
+                  + Add new Child
+                </Button>
 
                 {status === 'open' && extras.length > 0 && (
                   <div>
@@ -224,7 +246,7 @@ const CampDetailPage = () => {
                 {status === 'open' && (
                   <label className="flex items-start gap-2 text-sm">
                     <Checkbox checked={termsAccepted} onCheckedChange={(value) => setTermsAccepted(Boolean(value))} />
-                    <span>I accept the <Link to="/terms" className="text-green-400">terms and conditions</Link> (version {CAMPS_TERMS_VERSION}).</span>
+                    <span>I accept the <Link to={`/terms?return_to=${encodeURIComponent(`/camps/${slug}`)}`} className="text-green-400">terms and conditions</Link> (version {CAMPS_TERMS_VERSION}).</span>
                   </label>
                 )}
 

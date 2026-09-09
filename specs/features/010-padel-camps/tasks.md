@@ -375,16 +375,16 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 ### Children page and child profile
 
-- [ ] T067 Extend `src/lib/children.js`: `removeChild` (delete, mapping the FK-restriction error to a history explanation), avatar upload/replace/delete helpers via Supabase Storage signed URLs, E.164 emergency-phone assembly from prefix + national number, DD.MM.YYYY ↔ ISO date-of-birth helpers per convergence request §1.1/§1.3/§1.4 (partial)
-- [ ] T068 Rework the create-child form in `src/pages/ChildrenPage.jsx`: capitalized labels, manual DD.MM.YYYY DOB text input with validation (no `type="date"` picker), emergency phone as prefix select-or-enter + national-number input, centered form and centered title, optional profile-image upload; the padel level field is removed from this form (decision 1) per convergence request §1.1 (contradicts)
-- [ ] T069 Add the child profile-management view following the `ProfileManagementPage` interaction pattern: all child information including padel level (its maintenance location per decision 1), edit fields, image replace/delete, default SVG avatar when no image exists, and the child's Camp invoices; the card `Edit` action leads here per convergence request §1.2/§1.4 (missing)
-- [ ] T070 Replace `Archive` with `Remove` on child cards: confirmation Dialog modeled on `CancelBookingModal`; hard delete only when the child has no registrations/invoices, otherwise refuse with an explanation (decision 2); remove the archive action from the UI (keep the `archived_at` column for existing data) per convergence request §1.3 (contradicts)
+- [X] T067 Extend `src/lib/children.js`: `removeChild` (delete, mapping the FK-restriction error to a history explanation), avatar upload/replace/delete helpers via Supabase Storage signed URLs, E.164 emergency-phone assembly from prefix + national number, DD.MM.YYYY ↔ ISO date-of-birth helpers per convergence request §1.1/§1.3/§1.4 (partial)
+- [X] T068 Rework the create-child form in `src/pages/ChildrenPage.jsx`: capitalized labels, manual DD.MM.YYYY DOB text input with validation (no `type="date"` picker), emergency phone as prefix select-or-enter + national-number input, centered form and centered title, optional profile-image upload; the padel level field is removed from this form (decision 1) per convergence request §1.1 (contradicts)
+- [X] T069 Add the child profile-management view following the `ProfileManagementPage` interaction pattern: all child information including padel level (its maintenance location per decision 1), edit fields, image replace/delete, default SVG avatar when no image exists, and the child's Camp invoices; the card `Edit` action leads here per convergence request §1.2/§1.4 (missing)
+- [X] T070 Replace `Archive` with `Remove` on child cards: confirmation Dialog modeled on `CancelBookingModal`; hard delete only when the child has no registrations/invoices, otherwise refuse with an explanation (decision 2); remove the archive action from the UI (keep the `archived_at` column for existing data) per convergence request §1.3 (contradicts)
 
 ### Camp registration flow
 
-- [ ] T071 Add registration draft preservation (sessionStorage or equivalent, no new dependency) covering the selected child, selected extras, terms state, and other form data, with restore-on-mount in `CampDetailPage.jsx` per convergence request §2.2/§2.3 (missing)
-- [ ] T072 Terms navigation: open `/terms` with return context and add a back path in `TermsPage.jsx` that returns to `/camps/:slug` with the draft restored; it must never redirect home per convergence request §2.2 (missing)
-- [ ] T073 Replace the inline "Save new child" mini-form in `CampDetailPage.jsx` with a `+ Add new Child` button that routes to the create-child form and returns after creation with the draft restored and the new child pre-selected per convergence request §2.3 (contradicts)
+- [X] T071 Add registration draft preservation (sessionStorage or equivalent, no new dependency) covering the selected child, selected extras, terms state, and other form data, with restore-on-mount in `CampDetailPage.jsx` per convergence request §2.2/§2.3 (missing)
+- [X] T072 Terms navigation: open `/terms` with return context and add a back path in `TermsPage.jsx` that returns to `/camps/:slug` with the draft restored; it must never redirect home per convergence request §2.2 (missing)
+- [X] T073 Replace the inline "Save new child" mini-form in `CampDetailPage.jsx` with a `+ Add new Child` button that routes to the create-child form and returns after creation with the draft restored and the new child pre-selected per convergence request §2.3 (contradicts)
 - [ ] T074 — CANCELLED 2026-09-09 (decision 3: FR-012 stays mandatory; separate registrations per child): multi-child registration UI in `CampDetailPage.jsx` (missing)
 - [ ] T075 — CANCELLED 2026-09-09 (decision 3): multi-child support in `camp-submit-registration` (missing)
 - [ ] T076 — CANCELLED 2026-09-09 (decision 3: no combined invoice; the exactly-one-subject model stays): invoice-grouping option (missing)
@@ -392,6 +392,6 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 ### Tests and documentation
 
-- [ ] T078 Update automated coverage (FR-040): Vitest for children payload (E.164 phone assembly, DOB helpers, avatar path, removeChild history mapping) and registration draft preservation per convergence request §1–§2 (missing)
+- [X] T078 Update automated coverage (FR-040): Vitest for children payload (E.164 phone assembly, DOB helpers, avatar path, removeChild history mapping) and registration draft preservation per convergence request §1–§2 (missing)
 - [ ] T079 [P] Add evolved-flow scenarios to `quickstart.md`: child image upload/replace/delete, Remove guard with history, terms return with intact state, add-child-during-registration restore per convergence request §1–§2 (partial)
 - [ ] T080 [P] After implementation, sync baseline docs (`specs/baseline-system/requirements.md` BC-CAMP entries, `specs/project-context/api-contracts.md`, `specs/project-context/domain-model.md`) per specs/features/README.md rule 6 (partial)

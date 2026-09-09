@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { format } from 'date-fns';
 import {
   campPaymentTitle,
   documentOf,
   mergePaymentItems,
+  paymentCardDate,
   paymentInvoiceState,
 } from '@/lib/payments';
 
@@ -45,5 +47,26 @@ describe('campPaymentTitle', () => {
 describe('documentOf', () => {
   it('reads the first nested billing document', () => {
     expect(documentOf({ billing_documents: [{ document_nr: 'RE-1' }] }).document_nr).toBe('RE-1');
+  });
+});
+
+describe('paymentCardDate', () => {
+  it('formats created_at when booking_date is null and does not render N/A', () => {
+    const created = '2026-09-06T10:00:00Z';
+    const label = paymentCardDate({ created_at: created, booking_date: null });
+    expect(label).toBe(format(new Date(created), 'dd MMM yyyy'));
+    expect(label).not.toBe('N/A');
+  });
+
+  it('uses created_at for Camp rows instead of camp_start_date', () => {
+    const created = '2026-09-08T10:00:00Z';
+    expect(paymentCardDate({
+      created_at: created,
+      camp_start_date: '2026-10-05',
+    })).toBe(format(new Date(created), 'dd MMM yyyy'));
+  });
+
+  it('returns N/A only when created_at is missing', () => {
+    expect(paymentCardDate({ booking_date: '2026-09-01' })).toBe('N/A');
   });
 });

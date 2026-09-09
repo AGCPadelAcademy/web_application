@@ -86,6 +86,29 @@ export function campDisplayTotal(camp, selectedExtras = [], basePrice = null) {
   return base + extrasTotal(selectedExtras);
 }
 
+/** Listing rank for configured type labels — not a type enum (FR-002 / C5). */
+const CAMP_TYPE_RANK = { mini: 0, junior: 1, competition: 2 };
+
+export function campTypeRank(type) {
+  const label = typeof type === 'string' ? type.trim().toLowerCase() : '';
+  if (!label) return 101;
+  if (Object.prototype.hasOwnProperty.call(CAMP_TYPE_RANK, label)) return CAMP_TYPE_RANK[label];
+  return 100;
+}
+
+/** Week (`start_date`) then Mini → Junior → Competition; other/empty types after. */
+export function sortPublicCamps(camps = []) {
+  return [...camps].sort((a, b) => {
+    const startA = String(a?.start_date || '');
+    const startB = String(b?.start_date || '');
+    if (startA !== startB) return startA.localeCompare(startB);
+    const rankA = campTypeRank(a?.camp_type);
+    const rankB = campTypeRank(b?.camp_type);
+    if (rankA !== rankB) return rankA - rankB;
+    return String(a?.name || '').localeCompare(String(b?.name || ''));
+  });
+}
+
 /** Distinct non-empty camp_type values among published camps (FR-003). */
 export function distinctCampTypes(camps = []) {
   const seen = [];
@@ -93,7 +116,12 @@ export function distinctCampTypes(camps = []) {
     const type = typeof camp?.camp_type === 'string' ? camp.camp_type.trim() : '';
     if (type && !seen.includes(type)) seen.push(type);
   }
-  return seen.sort((a, b) => a.localeCompare(b));
+  return seen.sort((a, b) => {
+    const rankA = campTypeRank(a);
+    const rankB = campTypeRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    return a.localeCompare(b);
+  });
 }
 
 /** Filter published camps by type. Null/empty selectedType returns the full list. */
@@ -109,7 +137,7 @@ export async function fetchPublicCamps() {
     .select('*')
     .order('start_date', { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return sortPublicCamps(data ?? []);
 }
 
 export async function fetchPublicCamp(slug) {

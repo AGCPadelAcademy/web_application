@@ -150,9 +150,18 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 13.6 | Open My Payments | Camp invoice appears alongside lesson bookings, labelled with the Camp and child; lesson rows still work |
 | 13.7 | Visitor opens `/camps` at 375px | Published flyer is visible and tappable (not a collapsed/zero-height box); keep-aspect; lightbox still works |
 
+## 14. Listing order and My Payments card date (convergence 5, 2026-09-09)
+
+| Step | Action | Expected |
+|---|---|---|
+| 14.1 | Visitor opens `/camps` with Week 1 and Week 2 published Mini, Junior, and Competition Camps | Cards list Week 1 Mini → Junior → Competition, then Week 2 Mini → Junior → Competition |
+| 14.2 | Visitor uses type filter chips | Chips follow Mini → Junior → Competition (then any other configured types). Filtering a type keeps week order; All Camps restores the full ranked list. Chips stay derived — not a Mini/Junior/Competition-only enum |
+| 14.3 | Parent opens My Payments with a lesson booking whose `booking_date` is null | Card date is `created_at` (dd MMM yyyy), not N/A |
+| 14.4 | Parent opens My Payments with a Camp registration | Card date is the registration `created_at`, not the camp week `camp_start_date` |
+
 ## Acceptance mapping
 
-Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
 
 ## Validation log (2026-09-08)
 

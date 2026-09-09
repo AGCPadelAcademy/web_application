@@ -39,6 +39,7 @@ import {
   distinctCampTypes,
   extrasTotal,
   filterCampsByType,
+  sortPublicCamps,
   funnelEventPayload,
   FUNNEL_EVENTS,
   readCampDraft,
@@ -97,13 +98,57 @@ describe('camp type filters', () => {
   ];
 
   it('lists distinct non-empty types and excludes empty type from chips', () => {
-    expect(distinctCampTypes(camps)).toEqual(['Junior', 'Mini']);
+    expect(distinctCampTypes(camps)).toEqual(['Mini', 'Junior']);
+  });
+
+  it('ranks filter chips Mini then Junior then Competition then other types', () => {
+    expect(distinctCampTypes([
+      { camp_type: 'Elite' },
+      { camp_type: 'Competition' },
+      { camp_type: 'Mini' },
+      { camp_type: 'Junior' },
+    ])).toEqual(['Mini', 'Junior', 'Competition', 'Elite']);
   });
 
   it('filters to one type and restores the full list for All', () => {
     expect(filterCampsByType(camps, 'Mini').map((c) => c.id)).toEqual(['1', '3']);
     expect(filterCampsByType(camps, null)).toEqual(camps);
     expect(filterCampsByType(camps, '')).toEqual(camps);
+  });
+});
+
+describe('sortPublicCamps', () => {
+  it('lists Week 1 Mini then Junior then Competition, then Week 2 in the same type order', () => {
+    const camps = [
+      { id: 'w2c', name: 'Competition Week 2', start_date: '2026-10-12', camp_type: 'Competition' },
+      { id: 'w1j', name: 'Junior Week 1', start_date: '2026-10-05', camp_type: 'Junior' },
+      { id: 'w2m', name: 'Mini Week 2', start_date: '2026-10-12', camp_type: 'Mini' },
+      { id: 'w1c', name: 'Competition Week 1', start_date: '2026-10-05', camp_type: 'Competition' },
+      { id: 'w2j', name: 'Junior Week 2', start_date: '2026-10-12', camp_type: 'Junior' },
+      { id: 'w1m', name: 'Mini Week 1', start_date: '2026-10-05', camp_type: 'Mini' },
+    ];
+    expect(sortPublicCamps(camps).map((camp) => camp.id)).toEqual([
+      'w1m', 'w1j', 'w1c', 'w2m', 'w2j', 'w2c',
+    ]);
+  });
+
+  it('places unknown and empty types after Mini/Junior/Competition in the same week', () => {
+    const camps = [
+      { id: 'empty', name: 'No type', start_date: '2026-10-05', camp_type: null },
+      { id: 'elite', name: 'Elite', start_date: '2026-10-05', camp_type: 'Elite' },
+      { id: 'comp', name: 'Competition', start_date: '2026-10-05', camp_type: 'Competition' },
+      { id: 'mini', name: 'Mini', start_date: '2026-10-05', camp_type: 'Mini' },
+    ];
+    expect(sortPublicCamps(camps).map((camp) => camp.id)).toEqual(['mini', 'comp', 'elite', 'empty']);
+  });
+
+  it('keeps Mini-only filter order by week after sorting', () => {
+    const camps = sortPublicCamps([
+      { id: 'w2m', name: 'Mini Week 2', start_date: '2026-10-12', camp_type: 'Mini' },
+      { id: 'w1j', name: 'Junior Week 1', start_date: '2026-10-05', camp_type: 'Junior' },
+      { id: 'w1m', name: 'Mini Week 1', start_date: '2026-10-05', camp_type: 'Mini' },
+    ]);
+    expect(filterCampsByType(camps, 'Mini').map((camp) => camp.id)).toEqual(['w1m', 'w2m']);
   });
 });
 

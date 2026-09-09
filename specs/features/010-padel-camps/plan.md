@@ -210,3 +210,12 @@ Detailed runnable order and expected outcomes: [quickstart.md](quickstart.md).
 | Additive `camp_registration_id` on `billing_*` instead of a camp-only invoice schema | Reuses F1.03 idempotency, retry, correlation, and reconciliation without a second payment machine | A parallel `camp_invoices` table duplicates audit/retry and violates the F1.03 reuse constraint |
 
 Both reuse established project patterns and add no new subsystem.
+
+## Evolution 2026-09-09 (Phase 14)
+
+User-confirmed evolution of children management and the registration flow. No Edge Function changes (removal and avatars use direct PostgREST/Storage under RLS); no new dependencies.
+
+- **Children schema**: `children.avatar_path` (nullable text); private `child-avatars` Storage bucket with owner-path-or-admin policies modeled on `payment-proofs` (migration `0008`); DELETE policy on `children` for owner-or-admin — the `camp_registrations.child_id` `ON DELETE RESTRICT` FK still blocks removal when history exists (decision 2).
+- **Children UI**: centered create-child form (capitalized labels, manual DD.MM.YYYY DOB, prefix + national emergency phone stored E.164, optional image upload, **no padel level** — decision 1); child profile-management view at `/children/:childId` following `ProfileManagementPage` (all fields incl. level, image replace/delete, default SVG avatar, per-child Camp invoices); card actions reduced to Edit/Remove with a `CancelBookingModal`-style confirmation Dialog.
+- **Registration flow**: draft preservation in `sessionStorage` (selected child, extras, terms state) keyed by Camp; `/terms` accepts `return_to` and navigates back (never home); `+ Add new Child` routes to `/children?new=1&return_to=…` and returns with the draft restored and the new child pre-selected.
+- **Unchanged by the evolution**: FR-012 (one registration + one invoice per child; multi-child = separate flows), the billing spine, capacity, waitlist, funnel, and all Edge Functions.

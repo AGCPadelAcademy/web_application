@@ -86,6 +86,10 @@ Action-specific `200 { … }`; `401/403` for non-admins; `409 camp_full | age_ou
 
 Joining a Camp waitlist needs **no Edge Function**: the frontend inserts into `camp_waitlist_entries` under owner-scoped RLS (`parent_id = auth.uid()`, active parent). The `guard_camp_waitlist_join` BEFORE INSERT trigger (data-model.md) rejects the insert with `camp_waitlist_unavailable` unless the Camp is published, `waitlist_enabled`, and currently full — so direct API calls cannot join a waitlist for an open or waitlist-disabled Camp, and can never obtain a place-holding registration through this path. Duplicate active entries are refused by the partial UNIQUE index. Leave/remove is an owner-scoped `UPDATE` of `status` to `removed`.
 
+## 3b. Child removal and profile images — direct PostgREST/Storage (evolution 2026-09-09)
+
+The 2026-09-09 children evolution adds **no Edge Function changes**. Child removal is a direct owner-scoped `DELETE` on `children` under RLS; the `camp_registrations.child_id` `ON DELETE RESTRICT` FK refuses removal (23503) when the child has history, and the UI maps that to an explanation (FR-006d/FR-006f). Profile images go directly to the private `child-avatars` Storage bucket under owner-path-or-admin policies and are read back via signed URLs. Registration draft preservation and the terms `return_to` flow are client-side only.
+
 ---
 
 ## 4. Existing functions extended

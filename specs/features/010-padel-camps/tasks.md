@@ -363,10 +363,10 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 ### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
 
-- [ ] T061 Amend `spec.md` US3 / FR-006a / FR-006d for the evolved children management per convergence request §1 as narrowed by decisions 1, 2, and 4: capitalized labels, manual DD.MM.YYYY date-of-birth entry, no padel level on the create-child form, split emergency phone (prefix + national number), centered create form and title, optional child profile image, child profile-management view, and Edit/Remove replacing Archive (partial)
-- [ ] T062 Record the 2026-09-09 decisions in `spec.md` Clarifications: level removed from the create form, the Remove rule, FR-012 upheld (separate registrations per child, no combined invoice), DD.MM.YYYY entry (partial)
-- [ ] T063 Amend `spec.md` US4 for terms-and-conditions return-with-state (never redirect home) and the `+ Add new Child` redirect-then-restore flow per convergence request §2.2/§2.3 (partial)
-- [ ] T064 Update `plan.md`, `data-model.md`, and `contracts/edge-functions.md` for: `children.avatar_path` + `child-avatars` storage bucket, guarded children DELETE policy, and the registration draft-preservation approach; record that the evolution requires no Edge Function changes (partial)
+- [X] T061 Amend `spec.md` US3 / FR-006a / FR-006d for the evolved children management per convergence request §1 as narrowed by decisions 1, 2, and 4: capitalized labels, manual DD.MM.YYYY date-of-birth entry, no padel level on the create-child form, split emergency phone (prefix + national number), centered create form and title, optional child profile image, child profile-management view, and Edit/Remove replacing Archive (partial)
+- [X] T062 Record the 2026-09-09 decisions in `spec.md` Clarifications: level removed from the create form, the Remove rule, FR-012 upheld (separate registrations per child, no combined invoice), DD.MM.YYYY entry (partial)
+- [X] T063 Amend `spec.md` US4 for terms-and-conditions return-with-state (never redirect home) and the `+ Add new Child` redirect-then-restore flow per convergence request §2.2/§2.3 (partial)
+- [X] T064 Update `plan.md`, `data-model.md`, and `contracts/edge-functions.md` for: `children.avatar_path` + `child-avatars` storage bucket, guarded children DELETE policy, and the registration draft-preservation approach; record that the evolution requires no Edge Function changes (partial)
 
 ### Schema
 

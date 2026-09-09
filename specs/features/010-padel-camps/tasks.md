@@ -507,3 +507,7 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 ### Tests and documentation
 
 - [ ] T110 Update automated coverage (FR-040): Vitest for modal camp-registration fetch vs booking fetch, CampDetailPage post-submit preview (does not navigate to `/children` before preview), and PaymentsPage including camp rows; add quickstart scenarios for immediate preview after Camp submit, pay-from-preview (QR/PDF), reopen from child profile, and reopen from My Payments; sync baseline docs (`requirements.md` BC-CAMP, `api-contracts.md`, `domain-model.md`) per convergence-4 request §1–§2.3 (partial)
+
+### Mobile flyer visibility (added 2026-09-09)
+
+- [ ] T111 Diagnose and fix `/camps` flyers that do not appear on a mobile-width viewport (~375px). Evidence in `src/pages/CampsPage.jsx` + `src/components/camps/CampFlyer.jsx` after C3 T098: the `<img>` is `w-full h-full object-contain` inside an `overflow-hidden` control that only has `min-h-[16rem]` on small screens (`md:self-stretch` / `md:min-h-[22rem]` give a definite height from `md` up, which is why desktop still paints). Percentage `h-full` does not resolve against `min-height`, so the flyer can collapse to zero height on mobile; the `flex-col` card also places the flyer after the copy and CTA. Make published flyers visible and tappable at 375px without clipping to zero, keep aspect ratio (`object-contain`), keep the lightbox, and verify quickstart 11.4 / 12.1 per FR-001b / US2 (partial)

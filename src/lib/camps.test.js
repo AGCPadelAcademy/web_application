@@ -30,7 +30,9 @@ const { mockSupabase, makeChain } = vi.hoisted(() => {
 vi.mock('@/lib/customSupabaseClient', () => ({ supabase: mockSupabase }));
 
 import {
+  CAMP_CARD_FLYER_FRAME_CLASS,
   campDisplayTotal,
+  campInvoicePreviewFromSubmit,
   clearCampDraft,
   CSV_REGISTRATION_FIELDS,
   deriveCampStatus,
@@ -212,5 +214,31 @@ describe('registration draft preservation', () => {
     writeCampDraft('camp-1', { childId: 'k1', selectedExtras: [], termsAccepted: true }, storage);
     clearCampDraft('camp-1', storage);
     expect(readCampDraft('camp-1', storage)).toBeNull();
+  });
+});
+
+describe('post-submit invoice preview (C4)', () => {
+  it('opens the preview for the returned registration and does not send the parent to /children first', () => {
+    const preview = campInvoicePreviewFromSubmit({
+      registration: { id: 'reg-1' },
+      document: { id: 'doc-1', document_nr: 'RE-1' },
+    });
+    expect(preview).toEqual({ campRegistrationId: 'reg-1', documentReady: true });
+    expect(preview.campRegistrationId).not.toBeNull();
+  });
+
+  it('still opens the preview when issuance is queued (document null)', () => {
+    expect(campInvoicePreviewFromSubmit({ registration: { id: 'reg-2' }, document: null })).toEqual({
+      campRegistrationId: 'reg-2',
+      documentReady: false,
+    });
+  });
+});
+
+describe('camp card flyer frame (C4 T111)', () => {
+  it('gives the flyer an explicit mobile height so object-contain cannot collapse', () => {
+    expect(CAMP_CARD_FLYER_FRAME_CLASS).toMatch(/\bh-64\b/);
+    expect(CAMP_CARD_FLYER_FRAME_CLASS).not.toMatch(/\bmin-h-\[16rem\]\b/);
+    expect(CAMP_CARD_FLYER_FRAME_CLASS).toMatch(/\border-first\b/);
   });
 });

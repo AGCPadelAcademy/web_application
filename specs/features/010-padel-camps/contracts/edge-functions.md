@@ -36,6 +36,7 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 ### Responses
 
 - `200 { "registration": { "id", "camp_id", "child_id", "status": "pending_payment", "total_amount", "currency" }, "document": { "id", "document_nr", "status": "issued", "total", "currency" } | null, "reused": false }`
+  - **(C4)** The SPA uses `registration.id` to open `InvoicePreviewModal` immediately. `document` may be `null` when issuance is queued; the preview then shows a pending/not-ready state.
 - `409 { "error": "camp_full" | "camp_closed" | "camp_not_published" | "age_out_of_range" | "duplicate_registration" | "profile_incomplete" }`
 - `401/403` auth/ownership • `502 { "error": "provider_unavailable" }` — registration exists; invoice issue enqueued in `billing_operations` for the worker.
 
@@ -99,6 +100,8 @@ The 2026-09-09 children evolution adds **no Edge Function changes**. Child remov
 ### `billing-invoice-document`
 
 Accepts `{ "camp_registration_id": "uuid" }` in addition to `{ "booking_id": "uuid" }`. Authorization: registration’s parent or admin. Streams the Bexio PDF exactly as for lesson invoices.
+
+**(Amended 2026-09-09 C4)** The SPA post-submit Camp preview and My Payments Camp rows call this with `{ camp_registration_id }` via `fetchCampInvoicePdfBlob`. `camp-submit-registration`’s `{ registration, document }` return drives the immediate preview (`document` may be `null` while `camp_invoice_issue` is queued). No new function. Unpaid Camp cancel remains `camp-cancel-registration`.
 
 ### `bexio-reconcile`
 

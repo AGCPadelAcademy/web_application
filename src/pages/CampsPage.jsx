@@ -5,6 +5,7 @@ import CampFlyer from '@/components/camps/CampFlyer';
 import FlyerLightbox from '@/components/modals/FlyerLightbox';
 import {
   CAMP_FULL_LABEL,
+  CAMP_CARD_FLYER_FRAME_CLASS,
   deriveCampStatus,
   distinctCampTypes,
   fetchPublicCamps,
@@ -107,7 +108,7 @@ const CampsPage = () => {
                 <CampFlyer
                   camp={camp}
                   onOpen={(url, name) => setLightbox({ url, title: name })}
-                  className="w-full md:w-[min(42%,26rem)] min-h-[16rem] md:min-h-[22rem] shrink-0 md:self-stretch"
+                  className={CAMP_CARD_FLYER_FRAME_CLASS}
                 />
               </article>
             );

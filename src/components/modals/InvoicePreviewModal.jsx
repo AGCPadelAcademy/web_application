@@ -9,9 +9,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X, Loader2, Info } from 'lucide-react';
-import { fetchInvoicePdfBlob } from '@/lib/billing';
+import { invoicePreviewDownloadName, loadInvoicePreviewBlob } from '@/lib/invoicePreview';
 
-export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoiceUrl }) {
+export default function InvoicePreviewModal({ isOpen, onClose, bookingId, campRegistrationId, invoiceUrl }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,18 +30,6 @@ export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoic
       return;
     }
 
-    if (invoiceUrl) {
-      setPreviewUrl(invoiceUrl);
-      setLoadError(null);
-      setIsLoading(false);
-      return;
-    }
-
-    if (!bookingId) {
-      setLoadError('Invoice is not available yet.');
-      return;
-    }
-
     let cancelled = false;
     setIsLoading(true);
     setLoadError(null);
@@ -49,13 +37,13 @@ export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoic
 
     (async () => {
       try {
-        const blobUrl = await fetchInvoicePdfBlob(bookingId);
+        const loaded = await loadInvoicePreviewBlob({ invoiceUrl, bookingId, campRegistrationId });
         if (cancelled) {
-          URL.revokeObjectURL(blobUrl);
+          if (loaded.ownedBlob) URL.revokeObjectURL(loaded.previewUrl);
           return;
         }
-        blobUrlRef.current = blobUrl;
-        setPreviewUrl(blobUrl);
+        if (loaded.ownedBlob) blobUrlRef.current = loaded.previewUrl;
+        setPreviewUrl(loaded.previewUrl);
       } catch (error) {
         if (!cancelled) {
           setLoadError(error.message || 'Could not load the invoice PDF.');
@@ -68,7 +56,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoic
     return () => {
       cancelled = true;
     };
-  }, [isOpen, invoiceUrl, bookingId]);
+  }, [isOpen, invoiceUrl, bookingId, campRegistrationId]);
 
   const handleDownload = async () => {
     if (!previewUrl) return;
@@ -81,7 +69,7 @@ export default function InvoicePreviewModal({ isOpen, onClose, bookingId, invoic
 
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `Invoice_${bookingId || 'receipt'}.pdf`;
+      link.download = invoicePreviewDownloadName({ bookingId, campRegistrationId });
       document.body.appendChild(link);
       link.click();
       link.remove();

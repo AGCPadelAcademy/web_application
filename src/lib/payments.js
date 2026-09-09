@@ -1,3 +1,5 @@
+import { format } from 'date-fns';
+
 export function documentOf(record) {
   const docs = record?.billing_documents;
   if (!docs) return null;
@@ -34,4 +36,12 @@ export function campPaymentTitle(registration) {
   const child = [registration?.child_first_name, registration?.child_last_name].filter(Boolean).join(' ');
   if (child && registration?.camp_name) return `${registration.camp_name} · ${child}`;
   return registration?.camp_name || 'Camp registration';
+}
+
+/** Card date is created_at (invoice/booking created). Do not use nullable booking_date. */
+export function paymentCardDate(record) {
+  if (!record?.created_at) return 'N/A';
+  const date = new Date(record.created_at);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return format(date, 'dd MMM yyyy');
 }

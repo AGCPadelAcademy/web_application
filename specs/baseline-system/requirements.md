@@ -145,7 +145,7 @@ This file describes **what the live system already does**: existing features, ac
 
 ### 4.7 Customer payments (My Payments)
 
-- **FEAT-PAY-001**: An authenticated student MUST see only their own bookings on `/payments`, newest first, with lesson name, date, price, and payment status (`pending` → “Pending”, `confirmed` → “Paid”).
+- **FEAT-PAY-001**: An authenticated student MUST see only their own bookings on `/payments`, newest first, with lesson name, date, price, and payment status (`pending` → “Pending”, `confirmed` → “Paid”). **(Amended 2026-09-09 C5)** The card date is `created_at` (booking/registration created). It MUST NOT require `booking_date` (null on post-2026-09-02 lesson bookings). Camp registration invoices on the same page use the same `created_at` rule.
 - **FEAT-PAY-002**: For a booking that already has `receipt_url`, the student MUST be able to re-open the invoice PDF (“Invoice (PDF)”).
 - **FEAT-PAY-003**: For a pending booking with no `receipt_url`, the student MUST be able to generate the invoice on demand (“Get invoice”), subject to **FEAT-INV-005**.
 - **FEAT-PAY-004** through **FEAT-PAY-009**: **Retired 2026-08-24.** Payment-proof upload, preview, and re-upload after rejection are removed. Students pay the QR invoice; confirmation is Bexio reconciliation.
@@ -303,7 +303,7 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 
 ## 8. Camps (F1.25 — BC addition)
 
-> **BC-CAMP-001** Published Camps MUST be discoverable at `/camps` (and `/camps/:slug`) without authentication. Unpublished Camps MUST NOT appear on the public list. `/camps` lists one card per row, may filter by admin-configured Camp type, and MUST NOT show prices on listing cards.
+> **BC-CAMP-001** Published Camps MUST be discoverable at `/camps` (and `/camps/:slug`) without authentication. Unpublished Camps MUST NOT appear on the public list. `/camps` lists one card per row, may filter by admin-configured Camp type, and MUST NOT show prices on listing cards. **(Amended 2026-09-09 C5)** Listing order is `start_date` then Mini → Junior → Competition (other types after); that rank is not a type enum.
 >
 > **BC-CAMP-002** A parent MUST register a saved child (not a second login) through `camp-submit-registration`. Capacity is enforced atomically by `register_camp_child`. Invoices reuse the F1.03 `billing_*` spine via `camp_registration_id`. After a successful submit the parent is shown that registration’s invoice in the existing in-app preview (PDF + QR) and can reopen it from the child profile and from My Payments. A Camp MAY define an academy-member price; until F1.09 the parent self-declares membership at submit and the registration is flagged for admin review.
 >

@@ -11,6 +11,7 @@ import {
   ClipboardList,
   SlidersHorizontal,
   Users,
+  Menu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,9 +24,19 @@ import {
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 
+const NAV_LINKS = [
+  { to: '/', label: 'Home', end: true },
+  { to: '/lessons', label: 'Lessons' },
+  { to: '/camps', label: 'Camps' },
+  { to: '/trips', label: 'Trips' },
+  { to: '/tournaments', label: 'Tournaments' },
+  { to: '/contact', label: 'Contact' },
+];
+
 const Header = () => {
   const { user, signOut, loading, role } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -46,18 +57,28 @@ const Header = () => {
     fetchProfile();
   }, [user]);
 
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)');
+    const closeOnDesktop = (event) => {
+      if (event.matches) setMobileNavOpen(false);
+    };
+    media.addEventListener('change', closeOnDesktop);
+    return () => media.removeEventListener('change', closeOnDesktop);
+  }, []);
+
   const navLinkClasses = "hover:text-green-400 transition-colors";
   const activeNavLinkClasses = "text-green-400";
+  const navClassName = ({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`;
 
   return (
     <motion.header 
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-10 py-4 bg-black/80 backdrop-blur-sm border-b border-gray-800"
+      className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 md:px-10 py-4 bg-black/80 backdrop-blur-sm border-b border-gray-800"
     >
-      <Link to="/" className="flex items-center space-x-2">
-        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+      <Link to="/" className="flex items-center space-x-2 min-w-0">
+        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
           <span className="text-black font-bold text-lg">A</span>
         </div>
         <div>
@@ -66,18 +87,15 @@ const Header = () => {
         </div>
       </Link>
 
-      <nav className="hidden md:flex items-center space-x-8 font-medium">
-        <NavLink to="/" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`} end>Home</NavLink>
-        <NavLink to="/lessons" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Lessons</NavLink>
-        <NavLink to="/camps" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Camps</NavLink>
-        <NavLink to="/trips" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Trips</NavLink>
-        <NavLink to="/tournaments" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Tournaments</NavLink>
-        <NavLink to="/contact" className={({ isActive }) => `${navLinkClasses} ${isActive ? activeNavLinkClasses : 'text-gray-300'}`}>Contact</NavLink>
+      <nav className="hidden md:flex items-center space-x-8 font-medium" aria-label="Main">
+        {NAV_LINKS.map(({ to, label, end }) => (
+          <NavLink key={to} to={to} end={end} className={navClassName}>{label}</NavLink>
+        ))}
       </nav>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
         <Link to="/lessons">
-          <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-6 py-2 rounded-lg">
+          <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
             Book Now
           </Button>
         </Link>
@@ -86,7 +104,7 @@ const Header = () => {
         ) : user && profile ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-full w-10 h-10 p-0 border-gray-600 text-white">
+              <Button variant="outline" className="rounded-full w-10 h-10 p-0 border-gray-600 text-white" aria-label="Open profile menu">
                 <User className="w-5 h-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -144,11 +162,34 @@ const Header = () => {
           </DropdownMenu>
         ) : (
           <Link to="/login">
-            <Button variant="outline" className="border-gray-600 hover:bg-gray-800 text-white">
+            <Button variant="outline" className="border-gray-600 hover:bg-gray-800 text-white px-3 md:px-4">
               Login
             </Button>
           </Link>
         )}
+
+        <DropdownMenu open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="md:hidden rounded-full w-10 h-10 p-0 border-gray-600 text-white"
+              aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            >
+              <Menu className="w-5 h-5" />
+              <span className="sr-only">Menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white w-56 md:hidden" align="end">
+            {NAV_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to}>
+                <DropdownMenuItem className="cursor-pointer focus:bg-gray-800 font-medium py-2.5">
+                  {label}
+                </DropdownMenuItem>
+              </Link>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </motion.header>
   );

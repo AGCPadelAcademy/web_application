@@ -475,3 +475,35 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 - [X] T102 Extend `src/components/admin/CampManagementPanel.jsx` and `src/lib/camps.js` / `supabase/functions/_shared/camps/validate.ts` so admins can set `camp_type` on create/edit; empty type remains valid per convergence-3 request §1.1 (missing)
 - [X] T103 Update automated coverage (FR-040): Vitest for type-filter helpers (All vs one type, empty type excluded from chips), listing cards without prices, registration total switching on membership with and without extras, and absence of the add-child CTA helper if extracted; Deno `validateCampPayload` accepts `camp_type` per convergence-3 request §1–§2 (missing)
 - [X] T104 [P] Add quickstart scenarios for type filters + All reset, one-card-per-row + larger contain-fit flyer, no listing prices, price-only-in-submit-card + membership total update, and no `+ Add new Child` on registration (Children page create still works); sync baseline docs (`requirements.md` BC-CAMP, `api-contracts.md`, `domain-model.md`) per convergence-3 request §1–§2 (partial)
+
+---
+
+## Phase 17: Convergence (round 4)
+
+**Source**: `/speckit-converge` run 2026-09-09 against the Convergence #4 request (Camp registration invoice preview and payment flow, aligned with the existing lesson / “Membership” payment experience). Baseline: post-Convergence-#3 state (type filters, one-card `/camps` layout, prices only in the Submit registration card, no `+ Add new Child` on registration; FR-012 still one registration/invoice per child).
+
+**Baseline assessment (current spec vs code)**: Invoice issuance, idempotency, invoice-PDF email, Bexio reconciliation, unpaid cancel, and per-child invoice reopen on `ChildProfilePage.jsx` (via `fetchCampInvoicePdfBlob`) are present. Remaining gaps vs the C4 request: after a successful Camp submit, `CampDetailPage.jsx` toasts and `navigate('/children')` without opening the in-app invoice preview; `InvoicePreviewModal` accepts only `bookingId` / `invoiceUrl` (no `campRegistrationId`); `PaymentsPage.jsx` loads `bookings` only — Camp registrations never appear on My Payments. There is no separate Membership billing product in this app; the client’s “Membership payment experience” is the Adult Memberships / lesson flow on `/lessons` (`InvoicePreviewModal` with QR bank-transfer slip, then Close & Proceed → `/payments`). Payment remains QR / bank transfer + Bexio reconcile (`XR-005`); do not add Stripe or a second checkout. `camp-submit-registration` already returns `{ registration, document }` (document may be `null` when issuance is queued). Do **not** change FR-012.
+
+**Decisions 2026-09-09 (user-confirmed, round 4)**:
+
+1. After a successful Camp registration, present the generated invoice immediately for preview (same in-app modal UX as lessons). The parent must be able to review it and proceed to pay without first hunting another section.
+2. Payment from that preview reuses the existing lesson/Membership infrastructure: PDF + QR slip in `InvoicePreviewModal`, Close & Proceed into the existing payments surface, Bexio reconciliation as the paid authority. No new payment processor.
+3. After the initial flow, the same Camp invoice stays findable on the relevant child’s profile/registration area **and** on the parent’s My Payments list, still associated with that Camp registration and child. FR-012 grouping is unchanged (one invoice per child / registration).
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [ ] T105 Amend `spec.md` Clarifications (new Session), US5 acceptance, FR-031, Compatibility: after successful Camp registration the parent MUST see the issued invoice in-app immediately (lesson/Membership `InvoicePreviewModal` pattern) with a direct proceed-to-pay action; the invoice MUST remain reopenable from the child profile **and** from My Payments; “Membership payment” means the existing lesson invoice/QR/bank-transfer flow (there is no separate membership billing product); FR-012 unchanged per convergence-4 request §1–§2.3 (contradicts)
+- [ ] T106 Update `plan.md`, `contracts/edge-functions.md`, and `research.md` R-07: Camp invoices appear on My Payments alongside lesson bookings without folding Camps into `bookings`; reuse `InvoicePreviewModal` + `billing-invoice-document` `{ camp_registration_id }` + existing cancel-unpaid; no new Edge Function or schema; record that `camp-submit-registration`’s `{ registration, document }` return drives the post-submit preview (handle `document: null`) per convergence-4 request §2.1–§2.3 (partial)
+
+### Immediate invoice preview and payment (post-submit)
+
+- [ ] T107 Extend `src/components/modals/InvoicePreviewModal.jsx` to accept `campRegistrationId` in addition to `bookingId` / `invoiceUrl`; fetch via existing `fetchCampInvoicePdfBlob`; download filename uses the camp registration id; show a pending/not-ready state when the document is not yet available (queued issuance) rather than a blank modal per US5 / FR-031 and convergence-4 request §2.1–§2.2 (missing)
+- [ ] T108 After a successful `submitCampRegistration` in `src/pages/CampDetailPage.jsx`, open `InvoicePreviewModal` for that registration (`result.registration.id`) instead of only toasting and `navigate('/children')`. Do not require the parent to open My Children first. Close & Proceed MUST follow the lesson pattern (navigate to `/payments`). Keep FR-012 (one registration/invoice per submit) and do not mark the registration paid on preview per US5 / FR-027 / FR-031 and convergence-4 request §2.1–§2.2 (partial)
+
+### Ongoing invoice availability
+
+- [ ] T109 List the parent’s Camp registration invoices on `src/pages/PaymentsPage.jsx` alongside lesson bookings: load `camp_registrations` + `billing_documents` for the signed-in parent; Invoice (PDF) opens the same preview/pay path (`campRegistrationId` + `fetchCampInvoicePdfBlob`); unpaid Camp rows may keep the existing cancel-unpaid action (`cancelCampRegistration`); do not change FR-012 grouping; do not break lesson rows per convergence-4 request §2.3 (missing)
+
+### Tests and documentation
+
+- [ ] T110 Update automated coverage (FR-040): Vitest for modal camp-registration fetch vs booking fetch, CampDetailPage post-submit preview (does not navigate to `/children` before preview), and PaymentsPage including camp rows; add quickstart scenarios for immediate preview after Camp submit, pay-from-preview (QR/PDF), reopen from child profile, and reopen from My Payments; sync baseline docs (`requirements.md` BC-CAMP, `api-contracts.md`, `domain-model.md`) per convergence-4 request §1–§2.3 (partial)

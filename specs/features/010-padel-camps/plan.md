@@ -243,5 +243,5 @@ No schema change and no new Edge Function. Payment remains QR / bank transfer + 
 - **Post-submit UX**: `camp-submit-registration` already returns `{ registration, document }` (`document` may be `null` when issuance is queued). `CampDetailPage` opens `InvoicePreviewModal` for `registration.id` instead of navigating to `/children`. Close & Proceed follows the lesson/Membership pattern (`/payments`).
 - **Preview**: `InvoicePreviewModal` accepts `campRegistrationId` and loads the PDF via existing `billing-invoice-document` `{ camp_registration_id }` / `fetchCampInvoicePdfBlob`. Pending/not-ready state when the document is not yet available.
 - **My Payments**: `PaymentsPage` lists parent `camp_registrations` + `billing_documents` alongside lesson `bookings`. Camp invoices stay associated with that registration/child. Unpaid Camp cancel reuses `camp-cancel-registration`. Lesson rows are unchanged.
-- **Public `/camps` flyers**: explicit mobile height so `object-contain` thumbnails do not collapse on a phone-width viewport (FR-001b).
+- **Public `/camps` flyers**: explicit mobile height so `object-contain` thumbnails do not collapse on a phone-width viewport (FR-001b). Migration `0019` rewrites the `camp-flyers` SELECT policy to use `storage.objects.name` (0017’s unqualified `name` bound to `camps.name`, so anon signed URLs 404’d).
 

@@ -1,9 +1,12 @@
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, FileText, Shield, AlertTriangle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 const TermsPage = () => {
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('return_to');
+  const safeReturnTo = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
   return <>
       <Helmet>
         <title>Terms & Conditions - AGC Padel Academy</title>
@@ -18,9 +21,9 @@ const TermsPage = () => {
         opacity: 1,
         y: 0
       }} className="max-w-4xl mx-auto">
-          <Link to="/">
+          <Link to={safeReturnTo || '/'}>
             <Button variant="ghost" className="mb-8 pl-0 text-gray-400 hover:text-white">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
+              <ArrowLeft className="mr-2 h-4 w-4" /> {safeReturnTo ? 'Back to registration' : 'Back to Home'}
             </Button>
           </Link>
 

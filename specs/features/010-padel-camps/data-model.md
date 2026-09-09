@@ -87,14 +87,17 @@ Parent-owned dependents (FR-006/FR-006a). Not logins.
 | `first_name` | text | NOT NULL | |
 | `last_name` | text | NOT NULL | |
 | `date_of_birth` | date | NULL, CHECK not future | same rule as profile DOB |
-| `padel_level` | text | NULL | declared experience |
+| `padel_level` | text | NULL | declared experience; **not collected on the create form (2026-09-09)** — maintained on the child profile-management view |
 | `allergies` | text | NULL | important information |
 | `emergency_contact_name` | text | NULL | |
-| `emergency_contact_phone` | text | NULL | |
-| `archived_at` | timestamptz | NULL | archive, never hard delete |
+| `emergency_contact_phone` | text | NULL | E.164; captured as prefix + national number in the UI |
+| `avatar_path` | text | NULL | **added 2026-09-09** — object path inside the private `child-avatars` bucket |
+| `archived_at` | timestamptz | NULL | legacy archive marker; the Archive UI action was removed 2026-09-09 |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
-**RLS**: `SELECT/INSERT/UPDATE` where `parent_id = auth.uid()` and the parent profile is active; `SELECT` for admins. No `DELETE` policy (FR-006d).
+**RLS**: `SELECT/INSERT/UPDATE` where `parent_id = auth.uid()` and the parent profile is active; `SELECT` for admins. **(Amended 2026-09-09)** A `DELETE` policy exists for owner-or-admin, but removal succeeds only when the child has no registrations/invoices — `camp_registrations.child_id` is `ON DELETE RESTRICT`, so the database refuses the delete with FK violation 23503 when history exists (FR-006d/FR-006f, decision 2).
+
+**Profile image storage (2026-09-09)**: private `child-avatars` bucket; object path `{parent_id}/{child_id}/{file}`; `storage.objects` policies are owner-path-or-admin (SELECT/INSERT/UPDATE/DELETE), modeled on the `payment-proofs` pattern from migration `0008`; the SPA reads images through short-lived signed URLs. Images are restricted to common image MIME types and ≤ 5 MB at bucket level.
 
 **Emergency contact (analysis A2)**: `emergency_contact_*` may stay empty on the child record; `register_camp_child` rejects a submission without a usable emergency contact (FR-007), so the snapshot on `camp_registrations` is always populated for chargeable registrations.
 

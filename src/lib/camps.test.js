@@ -30,14 +30,17 @@ const { mockSupabase, makeChain } = vi.hoisted(() => {
 vi.mock('@/lib/customSupabaseClient', () => ({ supabase: mockSupabase }));
 
 import {
+  clearCampDraft,
   CSV_REGISTRATION_FIELDS,
   deriveCampStatus,
   extrasTotal,
   funnelEventPayload,
   FUNNEL_EVENTS,
+  readCampDraft,
   serializeRegistrationsCsv,
   submitCampRegistration,
   upsertCamp,
+  writeCampDraft,
 } from '@/lib/camps';
 
 beforeEach(() => {
@@ -126,5 +129,42 @@ describe('funnel payloads', () => {
     const payload = funnelEventPayload(FUNNEL_EVENTS.STARTED, 'camp-1');
     expect(payload).toEqual({ camp_id: 'camp-1', event: 'camp_registration_started' });
     expect(JSON.stringify(payload)).not.toMatch(/email|phone|allerg|dob|emergency|name/i);
+  });
+});
+
+describe('registration draft preservation', () => {
+  const makeStorage = () => {
+    const map = new Map();
+    return {
+      getItem: (key) => (map.has(key) ? map.get(key) : null),
+      setItem: (key, value) => map.set(key, String(value)),
+      removeItem: (key) => map.delete(key),
+    };
+  };
+
+  it('round-trips child, extras, and terms state', () => {
+    const storage = makeStorage();
+    writeCampDraft('camp-1', { childId: 'k1', selectedExtras: ['e1', 'e2'], termsAccepted: true }, storage);
+    expect(readCampDraft('camp-1', storage)).toEqual({
+      childId: 'k1',
+      selectedExtras: ['e1', 'e2'],
+      termsAccepted: true,
+    });
+  });
+
+  it('returns null for missing or corrupt drafts and sanitizes shapes', () => {
+    const storage = makeStorage();
+    expect(readCampDraft('camp-1', storage)).toBeNull();
+    storage.setItem('campRegistrationDraft:camp-1', '{not json');
+    expect(readCampDraft('camp-1', storage)).toBeNull();
+    writeCampDraft('camp-1', { childId: 42, selectedExtras: 'nope', termsAccepted: 'yes' }, storage);
+    expect(readCampDraft('camp-1', storage)).toEqual({ childId: null, selectedExtras: [], termsAccepted: false });
+  });
+
+  it('clears the draft after submit', () => {
+    const storage = makeStorage();
+    writeCampDraft('camp-1', { childId: 'k1', selectedExtras: [], termsAccepted: true }, storage);
+    clearCampDraft('camp-1', storage);
+    expect(readCampDraft('camp-1', storage)).toBeNull();
   });
 });

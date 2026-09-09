@@ -210,3 +210,46 @@ export function mapCampError(message) {
   };
   return map[code] || code || 'Camp request failed';
 }
+
+// --- Registration draft preservation (evolution 2026-09-09, FR-008a) --------
+
+export function campDraftKey(campId) {
+  return `campRegistrationDraft:${campId}`;
+}
+
+export function readCampDraft(campId, storage) {
+  try {
+    const raw = storage.getItem(campDraftKey(campId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      childId: typeof parsed.childId === 'string' && parsed.childId ? parsed.childId : null,
+      selectedExtras: Array.isArray(parsed.selectedExtras)
+        ? parsed.selectedExtras.filter((id) => typeof id === 'string')
+        : [],
+      termsAccepted: parsed.termsAccepted === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeCampDraft(campId, draft, storage) {
+  try {
+    storage.setItem(campDraftKey(campId), JSON.stringify({
+      childId: draft.childId || null,
+      selectedExtras: Array.isArray(draft.selectedExtras) ? draft.selectedExtras : [],
+      termsAccepted: draft.termsAccepted === true,
+    }));
+  } catch {
+    /* storage full or unavailable — draft is best-effort */
+  }
+}
+
+export function clearCampDraft(campId, storage) {
+  try {
+    storage.removeItem(campDraftKey(campId));
+  } catch {
+    /* best-effort */
+  }
+}

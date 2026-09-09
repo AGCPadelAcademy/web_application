@@ -77,6 +77,15 @@ function App() {
               }
             />
 
+            <Route
+              path="payments"
+              element={
+                <ProtectedRoute>
+                  <PaymentsPage />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="admin" element={<Navigate to="/admin/integrations" replace />} />
             <Route path="admin/payment-verification" element={<Navigate to="/admin/integrations" replace />} />
             <Route

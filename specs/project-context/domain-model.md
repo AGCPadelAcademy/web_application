@@ -32,7 +32,7 @@
 | **Contact Message** | `public.contact_messages` | Active — 12 rows | A message sent via the public contact form. Links to Profile by email when matched. |
 | **Camp** | `public.camps` | Active (F1.25) | Admin-managed reusable camp offering (dates, ages, price, capacity, publication). |
 | **Camp extra** | `public.camp_extras` | Active (F1.25) | Optional priced extras on a camp (e.g. lunch). |
-| **Child** | `public.children` | Active (F1.25) | Parent-owned dependent; not a login. Archived, never hard-deleted. |
+| **Child** | `public.children` | Active (F1.25) | Parent-owned dependent; not a login. Optional profile image in private `child-avatars` storage. Removable only when no registrations/invoices exist (2026-09-09); history otherwise kept. |
 | **Camp registration** | `public.camp_registrations` | Active (F1.25) | One child on one camp; place-holding until cancelled. Invoiced via `billing_documents.camp_registration_id`. |
 | **Camp waitlist entry** | `public.camp_waitlist_entries` | Active (F1.25) | Interest in a full camp; does not consume capacity. |
 | ~~**Archived Booking**~~ | ~~`public.bookings_old`~~ | **Dropped** | No longer present in the live schema as of 2026-08-07. |

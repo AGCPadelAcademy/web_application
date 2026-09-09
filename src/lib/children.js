@@ -169,11 +169,15 @@ export async function archiveChild(childId) {
 
 /** Hard delete; the FK RESTRICT on camp_registrations maps to CHILD_HAS_HISTORY_MESSAGE. */
 export async function removeChild(childId) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('children')
     .delete()
-    .eq('id', childId);
+    .eq('id', childId)
+    .select('id');
   if (error) throw mapChildError(error);
+  if (!data || data.length === 0) {
+    throw new Error('Child could not be removed (not found or not permitted).');
+  }
 }
 
 export async function uploadChildAvatar(childId, parentId, file) {

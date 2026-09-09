@@ -98,6 +98,20 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 9.3 | Registration after deadline / before opening / unpublished | Refused |
 | 9.4 | Deactivated parent tries to register or add a child | Refused; existing history still readable |
 
+## 10. Children evolution (2026-09-09 decisions)
+
+| Step | Action | Expected |
+|---|---|---|
+| 10.1 | Open `/children` | Create form and its title are centered; labels are capitalized; **no padel level field**; DOB is a manual DD.MM.YYYY text input (no calendar picker); emergency phone is prefix + national number |
+| 10.2 | Add a child with an image | Child listed with the image; stored in private `child-avatars` under the parent's folder; displayed via signed URL |
+| 10.3 | Open the child (click or Edit) | Child profile view: all information incl. padel level, image replace/delete, default initials avatar when no image, the child's Camp invoices |
+| 10.4 | Replace then remove the image | Image replaced; after removal the default avatar shows |
+| 10.5 | Remove a child without history | Confirmation modal appears; child is deleted only after confirming |
+| 10.6 | Remove a child with registrations/invoices | Refused with an explanation; history intact |
+| 10.7 | During registration, open Terms, then go back | Return lands on the same `/camps/:slug` registration (never home) with selected child, extras, and terms state intact |
+| 10.8 | During registration, choose `+ Add new Child`, create the child | Return to the same registration with the draft restored and the new child pre-selected |
+| 10.9 | Register two children | Two separate registrations, one invoice per child (FR-012) |
+
 ## Acceptance mapping
 
 Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).

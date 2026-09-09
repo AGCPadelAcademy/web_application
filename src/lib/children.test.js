@@ -130,11 +130,17 @@ describe('archive vs delete', () => {
     expect(chain.update).toHaveBeenCalled();
   });
 
-  it('removeChild issues a delete', async () => {
-    const chain = makeChain({ data: null, error: null });
+  it('removeChild issues a delete and expects a deleted row back', async () => {
+    const chain = makeChain({ data: [{ id: 'k1' }], error: null });
     mockSupabase.from.mockReturnValue(chain);
     await removeChild('k1');
     expect(chain.delete).toHaveBeenCalled();
+  });
+
+  it('removeChild fails when RLS permits no row', async () => {
+    const chain = makeChain({ data: [], error: null });
+    mockSupabase.from.mockReturnValue(chain);
+    await expect(removeChild('k1')).rejects.toThrow(/not found or not permitted/);
   });
 
   it('removeChild maps the history FK refusal to an explanation', async () => {

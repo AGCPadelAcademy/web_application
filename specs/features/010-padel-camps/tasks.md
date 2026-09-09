@@ -393,5 +393,5 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 ### Tests and documentation
 
 - [X] T078 Update automated coverage (FR-040): Vitest for children payload (E.164 phone assembly, DOB helpers, avatar path, removeChild history mapping) and registration draft preservation per convergence request §1–§2 (missing)
-- [ ] T079 [P] Add evolved-flow scenarios to `quickstart.md`: child image upload/replace/delete, Remove guard with history, terms return with intact state, add-child-during-registration restore per convergence request §1–§2 (partial)
-- [ ] T080 [P] After implementation, sync baseline docs (`specs/baseline-system/requirements.md` BC-CAMP entries, `specs/project-context/api-contracts.md`, `specs/project-context/domain-model.md`) per specs/features/README.md rule 6 (partial)
+- [X] T079 [P] Add evolved-flow scenarios to `quickstart.md`: child image upload/replace/delete, Remove guard with history, terms return with intact state, add-child-during-registration restore per convergence request §1–§2 (partial)
+- [X] T080 [P] After implementation, sync baseline docs (`specs/baseline-system/requirements.md` BC-CAMP entries, `specs/project-context/api-contracts.md`, `specs/project-context/domain-model.md`) per specs/features/README.md rule 6 (partial)

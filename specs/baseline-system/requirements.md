@@ -307,7 +307,7 @@ These appear in marketing copy, schema, or earlier specs but **MUST NOT** be tre
 >
 > **BC-CAMP-002** A parent MUST register a saved child (not a second login) through `camp-submit-registration`. Capacity is enforced atomically by `register_camp_child`. Invoices reuse the F1.03 `billing_*` spine via `camp_registration_id`.
 >
-> **BC-CAMP-003** Child records live on `/children`. Parents MAY add/edit/archive their children; there is no DELETE policy. Per-child Camp invoices are listed there. `/trips` is unchanged.
+> **BC-CAMP-003** Child records live on `/children`, with a per-child profile view (image, level, invoices). Parents MAY add/edit their children and MAY remove a child after confirmation only when no registrations or invoices exist; removal with history is refused. `/trips` is unchanged.
 
 ---
 

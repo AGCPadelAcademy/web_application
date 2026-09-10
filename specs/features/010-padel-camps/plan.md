@@ -252,3 +252,12 @@ No schema change, no `booking_date` backfill, no new Edge Function.
 - **Public `/camps`**: `sortPublicCamps` after `camp_public_list` — `start_date` ascending (Week 1 then Week 2), then Mini → Junior → Competition via `camp_type`; other/empty types after. Filter chips stay derived from distinct types and follow the same rank (not a Mini/Junior/Competition-only enum).
 - **My Payments**: card date is `created_at` for lesson bookings and Camp registrations. Do not use nullable `booking_date` (null since 2026-09-02 lesson calendar removal) or Camp `camp_start_date` as the payment date.
 
+## Evolution 2026-09-10, round 6 (Phase 19): register child, extras, flyer chrome
+
+No schema change and no new Edge Function. FR-012 unchanged.
+
+- **Registration**: restore `+ Add new Child` on the Submit registration card as a link to `/children?return_to=/camps/:slug`. Existing `sessionStorage` draft + `?select_child=` restore extras/membership/terms and pre-select the new child. No inline mini-form.
+- **Extras**: `camp_extras.description` is already stored and present on `camp_public_list.extras`. Show it next to name and price on the register card and on the Camp form extras list. Admin Edit reuses `upsert_extra` PATCH when `extra.id` is set.
+- **Public `/camps` flyer**: size the listing control to the image (no oversized empty `h-64` frame). Keep keep-aspect and a non-zero mobile height via the image itself (`h-auto`).
+- **Flyer preview**: `FlyerLightbox` is image-only (blurred overlay, close **X** on the image, click-outside/Escape). Do not reuse invoice-preview dialog chrome.
+

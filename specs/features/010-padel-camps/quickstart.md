@@ -159,9 +159,19 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 14.3 | Parent opens My Payments with a lesson booking whose `booking_date` is null | Card date is `created_at` (dd MMM yyyy), not N/A |
 | 14.4 | Parent opens My Payments with a Camp registration | Card date is the registration `created_at`, not the camp week `camp_start_date` |
 
+## 15. Register child, extras, flyer chrome (convergence 6, 2026-09-10)
+
+| Step | Action | Expected |
+|---|---|---|
+| 15.1 | Authenticated parent on an open Camp Submit registration card clicks `+ Add new Child` | Navigates to My Children. After saving a child, returns to `/camps/:slug` with extras / membership / terms still selected and the new child pre-selected. One child per submit (FR-012) |
+| 15.2 | Parent views extras on the Submit registration card | Each extra shows name, price, and description when set (e.g. Lunch / El Toro). Empty description is omitted |
+| 15.3 | Admin opens a Camp form extras list | Stored extra description is visible. Edit loads name, price, description; Save extra PATCHes that extra; Add extra still creates a new one |
+| 15.4 | Visitor opens `/camps` at ~375px | Flyer control is sized to the flyer (no oversized empty frame). Flyer stays visible and tappable |
+| 15.5 | Visitor or admin opens the flyer preview (phone and desktop) | Preview is the flyer only on a blurred background — no invoice-style dialog title. **X** is on the top-right of the image. Click outside or Escape returns to the previous state |
+
 ## Acceptance mapping
 
-Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
 
 ## Validation log (2026-09-08)
 

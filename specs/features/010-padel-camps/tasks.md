@@ -541,3 +541,45 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 ### Tests and documentation
 
 - [X] T116 Update automated coverage (FR-040): Vitest for week-then-Mini-Junior-Competition sort (and other types after); payment-card date uses `created_at` when `booking_date` is null and does not render N/A. Add quickstart scenarios for `/camps` Week 1 Mini/Junior/Competition then Week 2 same order, and My Payments date on a null-`booking_date` lesson row per convergence-5 request §1–§2 (missing)
+
+---
+
+## Phase 19: Convergence (round 6)
+
+**Source**: `/speckit-converge` run 2026-09-10 against the Convergence #6 request (restore `+ Add new Child` on Camp register with draft return; show extra descriptions on register and admin Camp form; edit extras; size the phone flyer box to the image; flyer preview is image-only with blur). Baseline: post-Convergence-#5 state (`/camps` Mini → Junior → Competition within each week; My Payments card date = `created_at`).
+
+**Baseline assessment (current spec vs code)**: C3 T100 / US4 AC2 / FR-008a currently **forbid** `+ Add new Child` on registration. `CampDetailPage.jsx` has no add-child control. Draft persist (`writeCampDraft` / `readCampDraft`) and Children-page `return_to` + `?select_child=` restore from C1 T071–T073 are still in the code — only the button was removed. FR-012 (one registration per child) MUST stay. FR-016 already requires extras to have name, **description**, and price. Live `camp_extras` rows store descriptions (e.g. Lunch “Optional Lunch Package…” / “Offered by El Toro Restaurant”). `camp_public_list.extras` JSON already includes `description`. The Submit registration card renders only `{name} · {price}` (`CampDetailPage.jsx`). The admin extras list renders only `{name} · {price} CHF` (`CampManagementPanel.jsx`); the add form writes `description` via `validateExtraPayload`, and `upsert_extra` already PATCHes when `extra.id` is set, but the UI has Add + Remove only — no Edit. C4 T111 sized the listing flyer with `CAMP_CARD_FLYER_FRAME_CLASS` (`h-64` + border + `object-contain`), which leaves a box larger than the flyer. `FlyerLightbox.jsx` is a Dialog with title header matching `InvoicePreviewModal` (T086), not an image-only blurred overlay.
+
+**Decisions 2026-09-10 (user-confirmed, round 6)**:
+
+1. Restore `+ Add new Child` on the Submit registration card. It navigates to My Children so the parent can create the child, then returns to this Camp register with selected child/extras/membership/terms intact. Reuse the existing draft + `return_to` / `select_child` path. Do not reintroduce an inline mini-form. Do not change FR-012 (several children still means several separate registrations).
+2. Extra **description** is shown next to name and price on the register card (data already on the extra).
+3. The Camp form extras list shows the stored description. Admins can **edit** an extra’s name, price, and description (reuse existing `upsert_extra` PATCH).
+4. On a phone, the `/camps` flyer control is sized to the flyer (no oversized empty frame). Keep the flyer visible and tappable; do not regress C4 zero-height collapse.
+5. Flyer preview (phone and desktop, listing and admin) is the flyer only: blurred background, no invoice-style dialog chrome/title. Close **X** is on the top-right of the image. Clicking outside the image (and Escape) still closes without losing page/form state.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [X] T117 Amend `spec.md` Clarifications (new Session), US4/AC2, FR-006b / FR-008a: restore `+ Add new Child` on the Submit registration card as a link to My Children that returns with the registration draft intact (reverses C3 removal; FR-012 unchanged). Amend FR-016 / US4 extras so description is visible next to name and price. Amend US1 extras so the Camp form lists description and supports edit of name/price/description. Amend FR-001a / FR-001b: listing flyer frame hugs the image; larger view is image-only with blur, X on the image, click-outside/Escape close per convergence-6 request §1–§4 (contradicts)
+- [X] T118 Update `plan.md` and baseline docs (`requirements.md` BC-CAMP): registration add-child return path; extra description in register + admin list; extra edit via existing `upsert_extra`; flyer frame sized to image; `FlyerLightbox` no longer InvoicePreview chrome. No schema change and no new Edge Function per convergence-6 request §1–§4 (partial)
+
+### Camp register
+
+- [X] T119 Restore `+ Add new Child` on the Submit registration card in `src/pages/CampDetailPage.jsx`: authenticated open-Camp register navigates to `/children?return_to=/camps/:slug` (create form). On return, keep selected extras / membership / terms via existing `sessionStorage` draft and pre-select the new child via `?select_child=`. Do not add an inline save-child mini-form. Do not register several children on one submit (FR-012) per convergence-6 request §1 (contradicts)
+- [X] T120 Show each extra’s `description` next to name and price in the Submit registration extras list in `src/pages/CampDetailPage.jsx`. Descriptions already exist on `camp_public_list.extras` / `camp_extras.description`; do not add a column. Empty description stays hidden per FR-016 and convergence-6 request §1 (partial)
+
+### Camp creation form extras
+
+- [X] T121 In `src/components/admin/CampManagementPanel.jsx`, show each extra’s description in the extras list and add Edit (name, price, description) that reuses `upsertCampExtra` / `upsert_extra` PATCH when `extra.id` is set. Keep Add and Remove. Do not add a new Edge Function per FR-001 / FR-016 and convergence-6 request §2 (missing)
+
+### Camp flyer frame (phone)
+
+- [X] T122 Size the `/camps` flyer control in `src/components/camps/CampFlyer.jsx` / `CAMP_CARD_FLYER_FRAME_CLASS` (`src/lib/camps.js`, used by `src/pages/CampsPage.jsx`) to the flyer itself (no oversized empty box around a smaller `object-contain` image). Keep keep-aspect, tappable, and non-zero height at ~375px (do not regress C4 T111) per FR-001b and convergence-6 request §3 (partial)
+
+### Camp flyer preview
+
+- [X] T123 Change `src/components/modals/FlyerLightbox.jsx` so the preview is only the flyer: blurred overlay, no Dialog header/title chrome like `InvoicePreviewModal`. Place the close **X** on the top-right of the image. Clicking outside the image and Escape still close without submitting enclosing forms or losing page state. Apply on phone and desktop (listing + admin Camp form both use this component) per FR-001a and convergence-6 request §4 (contradicts)
+
+### Tests and documentation
+
+- [X] T124 Update automated coverage (FR-040): Vitest for extra description rendering helper and/or extras list payload (description present next to name/price); extra edit payload includes `id` + description; flyer-frame class no longer forces an oversized empty box. Add quickstart scenarios: add-child from register and return with extras still selected; extra description on register and Camp form; edit extra; phone flyer hugs image; preview is image-only with blur and X on the image per convergence-6 request §1–§4 (missing)

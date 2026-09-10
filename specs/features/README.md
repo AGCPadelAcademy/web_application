@@ -32,6 +32,7 @@ Do not pre-create empty folders. Add a folder when a spec is started.
 | `008-roles-and-permissions` | F1.02 — live Coach + student isolation tightenings (delta vs `006`) |
 | `009-client-management` | F1.04 — client profiles, admin directory, deactivation (delta vs `005`/`006`) |
 | `010-padel-camps` | F1.25 — admin-managed Camps, parent Children page, child registration, extras, capacity, F1.03 invoice, confirmation email |
+| `011-level-system` | F1.05 — Declared / Playtomic / Official Academy levels, catalog, history, centralized compatibility (delta vs `009`) |
 
 ---
 

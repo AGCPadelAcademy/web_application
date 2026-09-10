@@ -129,7 +129,10 @@ After making changes:
   project exists).
 - Once that gate passes, the agent MUST NOT run agent-driven
   manual/browser walkthroughs (computer-use sessions, screen
-  recordings, click-throughs) unless the user explicitly asks for them.
+  recordings, click-throughs, walkthrough-artifact videos) unless the
+  user explicitly asks for them. This includes Cursor Cloud Agent
+  visual/demo recording flows. Code tests (lint, Vitest, build, Deno)
+  remain required.
 - Final acceptance is performed manually by the user in the live
   environment. The user gives the final approval.
 - The agent still reports what the automated gate covered and lists

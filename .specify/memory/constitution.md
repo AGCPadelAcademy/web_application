@@ -77,7 +77,7 @@ Start with the smallest change that satisfies the spec. Defer generalization unt
 - **Runner:** Vitest 4 (`npm test`), configured in `vite.config.js` (`environment: 'node'`, `src/**/*.test.{js,jsx}`). Unit tests cover `src/lib/` services with a mocked Supabase client.
 - **Integration tests** (`*.integration.test.js`) must auto-skip when `SUPABASE_TEST_URL` / `SUPABASE_TEST_SERVICE_KEY` are unset.
 - **Single Supabase project (amended 2026-09-08):** only one Supabase project exists (production). Until a dedicated test project is created, that project is also the migration and live-verification target: agents may apply migrations and run live checks against it on explicit user request. Test data written to it must be clearly marked and cleaned up afterwards where possible.
-- **Quality gate:** `npm run lint` + `npm test` + `npm run build` must pass (enforced by `.github/workflows/ci.yml` on `main` pushes and PRs).
+- **Quality gate:** `npm run lint` + `npm test` + `npm run build` must pass (enforced by `.github/workflows/ci.yml` on `main` pushes and PRs). **(Amended 2026-09-10)** That gate **is** implementation verification. Agents MUST NOT add browser click-throughs, computer-use sessions, or screen-recording walkthroughs after implement unless the user explicitly asks. Visual/manual acceptance is performed by the user in the live environment.
 - RLS policy changes and Edge Function contract changes are **always** required to have a written verification checklist in the plan.
 
 ### Lint gate
@@ -103,9 +103,9 @@ No PR may add a hardcoded credential. Reviews must reject any commit that introd
 | 2026-08-19 | 1.1.1 | Documented `docs/sdd-brownfield/` as the SDD navigation layer; `specs/baseline-system/tasks.md` renamed to `implementation-inventory.md` to avoid collision with Spec-Kit feature `tasks.md`. | SDD session |
 | 2026-08-21 | 1.1.2 | Feature-spec implementation must use a dedicated `sdd/<feature-folder>` git branch (never `main`). Spec Kit does not create the branch. | SDD session |
 | 2026-09-04 | 1.1.3 | Kept dedicated feature-branch isolation while allowing managed Cloud Agents to use the platform-required `cursor/<feature>-<suffix>` naming convention. | User-approved F1.04 remediation |
-| 2026-09-08 | 1.2.0 | Testing principle amended: a single Supabase project (production) exists and doubles as the migration and live-verification target until a dedicated test project is created. | User-approved (F1.25) |
+| 2026-09-10 | 1.2.1 | Implementation verification is the automated quality gate only; agent-driven browser/visual walkthroughs are off unless the user asks. | User-approved (skip visual tests after implement) |
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-09-08
+**Version**: 1.2.1 | **Ratified**: 2026-07-01 | **Last Amended**: 2026-09-10
 
 ---
 

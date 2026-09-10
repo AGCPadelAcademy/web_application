@@ -39,6 +39,7 @@ import {
   distinctCampTypes,
   extrasTotal,
   filterCampsByType,
+  formatCampExtraChoice,
   sortPublicCamps,
   funnelEventPayload,
   FUNNEL_EVENTS,
@@ -46,6 +47,7 @@ import {
   serializeRegistrationsCsv,
   submitCampRegistration,
   upsertCamp,
+  upsertCampExtra,
   writeCampDraft,
 } from '@/lib/camps';
 
@@ -187,6 +189,29 @@ describe('admin camp invoke', () => {
       body: expect.objectContaining({ membership_claimed: false }),
     }));
   });
+
+  it('sends extra id and description when editing an extra', async () => {
+    mockSupabase.functions.invoke.mockResolvedValue({ data: { extra: { id: 'e1' } }, error: null });
+    await upsertCampExtra('camp-1', {
+      id: 'e1',
+      name: 'Lunch',
+      description: 'Offered by El Toro Restaurant',
+      price_amount: 99,
+    });
+    expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('camp-admin', {
+      headers: { Authorization: 'Bearer test-token' },
+      body: {
+        action: 'upsert_extra',
+        camp_id: 'camp-1',
+        extra: {
+          id: 'e1',
+          name: 'Lunch',
+          description: 'Offered by El Toro Restaurant',
+          price_amount: 99,
+        },
+      },
+    });
+  });
 });
 
 describe('CSV serialization', () => {
@@ -280,10 +305,26 @@ describe('post-submit invoice preview (C4)', () => {
   });
 });
 
-describe('camp card flyer frame (C4 T111)', () => {
-  it('gives the flyer an explicit mobile height so object-contain cannot collapse', () => {
-    expect(CAMP_CARD_FLYER_FRAME_CLASS).toMatch(/\bh-64\b/);
-    expect(CAMP_CARD_FLYER_FRAME_CLASS).not.toMatch(/\bmin-h-\[16rem\]\b/);
+describe('camp card flyer frame (C6 T122)', () => {
+  it('does not force an oversized empty mobile box around the flyer', () => {
+    expect(CAMP_CARD_FLYER_FRAME_CLASS).not.toMatch(/\bh-64\b/);
+    expect(CAMP_CARD_FLYER_FRAME_CLASS).not.toMatch(/min-h-\[22rem\]/);
+    expect(CAMP_CARD_FLYER_FRAME_CLASS).not.toMatch(/self-stretch/);
     expect(CAMP_CARD_FLYER_FRAME_CLASS).toMatch(/\border-first\b/);
+  });
+});
+
+describe('formatCampExtraChoice', () => {
+  it('places description next to name and price and hides empty description', () => {
+    expect(formatCampExtraChoice({
+      name: 'Lunch',
+      price_amount: 99,
+      description: 'Offered by El Toro Restaurant',
+    })).toEqual({
+      name: 'Lunch',
+      price: '99.00 CHF',
+      description: 'Offered by El Toro Restaurant',
+    });
+    expect(formatCampExtraChoice({ name: 'Lunch', price_amount: 99, description: '  ' }).description).toBe('');
   });
 });

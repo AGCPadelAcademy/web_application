@@ -20,6 +20,7 @@ import {
   clearCampDraft,
   deriveCampStatus,
   fetchPublicCamp,
+  formatCampExtraChoice,
   formatCampPrice,
   FUNNEL_EVENTS,
   joinCampWaitlist,
@@ -106,6 +107,13 @@ const CampDetailPage = () => {
   const status = deriveCampStatus(camp);
   const memberBase = memberClaimed && camp?.member_price_amount != null ? Number(camp.member_price_amount) : null;
   const total = campDisplayTotal(camp, chosenExtras, memberBase);
+
+  const goAddChild = () => {
+    if (camp?.id) {
+      writeCampDraft(camp.id, { childId, selectedExtras, termsAccepted, memberClaimed }, sessionStorage);
+    }
+    navigate(`/children?new=1&return_to=${encodeURIComponent(`/camps/${slug}`)}`);
+  };
 
   const ensureReady = async () => {
     if (!user) {
@@ -239,6 +247,11 @@ const CampDetailPage = () => {
                       <option key={child.id} value={child.id}>{child.first_name} {child.last_name}</option>
                     ))}
                   </select>
+                  {status === 'open' && (
+                    <Button type="button" variant="outline" onClick={goAddChild} className="mt-2 border-gray-700 text-gray-200">
+                      + Add new Child
+                    </Button>
+                  )}
                 </div>
               </>
             )}
@@ -256,12 +269,20 @@ const CampDetailPage = () => {
             {user && status === 'open' && extras.length > 0 && (
               <div>
                 <p className="font-medium mb-2">Extras</p>
-                {extras.map((extra) => (
-                  <label key={extra.id} className="flex items-center gap-2 text-sm mb-2">
-                    <Checkbox checked={selectedExtras.includes(extra.id)} onCheckedChange={() => toggleExtra(extra.id)} />
-                    {extra.name} · {formatCampPrice(extra.price_amount, camp.currency)}
-                  </label>
-                ))}
+                {extras.map((extra) => {
+                  const choice = formatCampExtraChoice(extra, camp.currency);
+                  return (
+                    <label key={extra.id} className="flex items-start gap-2 text-sm mb-3">
+                      <Checkbox className="mt-0.5" checked={selectedExtras.includes(extra.id)} onCheckedChange={() => toggleExtra(extra.id)} />
+                      <span>
+                        {choice.name} · {choice.price}
+                        {choice.description ? (
+                          <span className="block text-gray-400 mt-0.5">{choice.description}</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             )}
 

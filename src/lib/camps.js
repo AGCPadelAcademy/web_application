@@ -5,9 +5,9 @@ export const CAMPS_TERMS_VERSION = '2026-09';
 export const CAMP_FULL_LABEL = 'Complet / Ausgebucht';
 export const INACTIVE_CLIENT_MESSAGE = 'This client profile is inactive. Contact the academy.';
 
-/** Explicit `h-64` on small screens so `object-contain` + `h-full` does not collapse (C4 T111). */
+/** Listing flyer hugs the image (`h-auto`); no oversized empty `h-64` frame (C6 T122). */
 export const CAMP_CARD_FLYER_FRAME_CLASS =
-  'w-full md:w-[min(42%,26rem)] h-64 md:h-auto md:min-h-[22rem] shrink-0 md:self-stretch order-first md:order-none';
+  'w-full md:w-[min(42%,26rem)] shrink-0 order-first md:order-none';
 
 export const FUNNEL_EVENTS = {
   PAGE_VIEW: 'camps_page_view',
@@ -79,6 +79,16 @@ export function formatCampPrice(amount, currency = 'CHF') {
 
 export function extrasTotal(extras = []) {
   return extras.reduce((sum, extra) => sum + Number(extra.price_amount || 0), 0);
+}
+
+/** Name, price, and trimmed description for register/admin extra rows (FR-016). */
+export function formatCampExtraChoice(extra, currency = 'CHF') {
+  const description = typeof extra?.description === 'string' ? extra.description.trim() : '';
+  return {
+    name: extra?.name || '',
+    price: formatCampPrice(extra?.price_amount, currency),
+    description,
+  };
 }
 
 export function campDisplayTotal(camp, selectedExtras = [], basePrice = null) {

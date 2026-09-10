@@ -208,13 +208,24 @@ const CampManagementPanel = () => {
         sort_order: Number(extraForm.sort_order) || 0,
       });
       setExtraForm(emptyExtra);
-      toast({ title: 'Extra saved' });
+      toast({ title: extraForm.id ? 'Extra updated' : 'Extra saved' });
       await load();
     } catch (error) {
       toast({ title: 'Extra failed', description: mapCampError(error.message), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
+  };
+
+  const startEditExtra = (extra) => {
+    setExtraForm({
+      id: extra.id,
+      name: extra.name || '',
+      description: extra.description || '',
+      price_amount: extra.price_amount ?? '',
+      sort_order: extra.sort_order || 0,
+      is_active: extra.is_active !== false,
+    });
   };
 
   const loadOps = async () => {
@@ -396,9 +407,17 @@ const CampManagementPanel = () => {
                   <h3 className="font-semibold mb-3">Extras</h3>
                   <ul className="space-y-2 mb-4">
                     {(selected.extras || []).map((extra) => (
-                      <li key={extra.id} className="flex items-center justify-between text-sm border border-gray-800 rounded-lg px-3 py-2">
-                        <span>{extra.name} · {extra.price_amount} CHF {extra.is_active ? '' : '(inactive)'}</span>
-                        <Button variant="ghost" size="sm" onClick={async () => { await removeCampExtra(extra.id); await load(); }}>Remove</Button>
+                      <li key={extra.id} className="flex items-start justify-between gap-3 text-sm border border-gray-800 rounded-lg px-3 py-2">
+                        <span>
+                          {extra.name} · {extra.price_amount} CHF {extra.is_active ? '' : '(inactive)'}
+                          {extra.description ? (
+                            <span className="block text-gray-400 mt-1">{extra.description}</span>
+                          ) : null}
+                        </span>
+                        <span className="flex shrink-0 gap-1">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => startEditExtra(extra)}>Edit</Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={async () => { await removeCampExtra(extra.id); await load(); }}>Remove</Button>
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -406,7 +425,16 @@ const CampManagementPanel = () => {
                     <Input placeholder="Name" value={extraForm.name} onChange={(e) => setExtraForm((c) => ({ ...c, name: e.target.value }))} className="bg-gray-950 border-gray-700" />
                     <Input placeholder="Price" type="number" value={extraForm.price_amount} onChange={(e) => setExtraForm((c) => ({ ...c, price_amount: e.target.value }))} className="bg-gray-950 border-gray-700" />
                     <Input placeholder="Description" value={extraForm.description} onChange={(e) => setExtraForm((c) => ({ ...c, description: e.target.value }))} className="bg-gray-950 border-gray-700" />
-                    <Button type="submit" disabled={saving} className="bg-green-500 text-black">Add extra</Button>
+                    <div className="flex gap-2">
+                      <Button type="submit" disabled={saving} className="bg-green-500 text-black">
+                        {extraForm.id ? 'Save extra' : 'Add extra'}
+                      </Button>
+                      {extraForm.id ? (
+                        <Button type="button" variant="outline" className="border-gray-700" onClick={() => setExtraForm(emptyExtra)}>
+                          Cancel
+                        </Button>
+                      ) : null}
+                    </div>
                   </form>
                 </div>
               )}

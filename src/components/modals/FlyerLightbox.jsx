@@ -1,48 +1,49 @@
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
 
 /**
- * Larger view for a Camp flyer. Radix Dialog provides Escape dismissal,
- * focus trapping, and overlay click-out, matching InvoicePreviewModal
- * conventions. Triggers must be type="button" so enclosing forms (camp
- * edit form, registration flow) never submit and page state is preserved.
+ * Image-only Camp flyer preview (C6 T123). Blurred overlay, no invoice-style
+ * dialog chrome/title. Close sits on the image; overlay click and Escape
+ * still dismiss without submitting enclosing forms.
  */
 export default function FlyerLightbox({ open, onClose, imageUrl, title }) {
+  const label = title ? `${title} flyer` : 'Camp flyer';
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent className="max-w-3xl w-[95vw] bg-gray-950 border-gray-800 p-0 overflow-hidden">
-        <DialogHeader className="p-4 border-b border-gray-900 flex flex-row items-center justify-between">
-          <DialogTitle className="text-white text-lg m-0 font-serif">
-            {title ? `${title} — flyer` : 'Camp flyer'}
-          </DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="Close flyer view"
-            className="text-gray-400 hover:text-white hover:bg-gray-900 rounded-full"
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </DialogHeader>
-        <div className="flex items-center justify-center p-4">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={title ? `${title} flyer` : 'Camp flyer'}
-              className="max-w-full max-h-[72vh] object-contain rounded-lg"
-            />
-          ) : (
-            <p className="text-gray-500 py-16">The flyer could not be loaded.</p>
-          )}
-        </div>
-      </DialogContent>
+      <DialogPortal>
+        <DialogOverlay className="bg-black/40 backdrop-blur-md" />
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 p-0 border-0 bg-transparent shadow-none outline-none"
+          aria-describedby={undefined}
+        >
+          <DialogTitle className="sr-only">{label}</DialogTitle>
+          <div className="relative inline-block max-w-[95vw]">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={label}
+                className="max-w-[95vw] max-h-[90vh] object-contain"
+              />
+            ) : (
+              <p className="text-gray-200 py-16 px-8">The flyer could not be loaded.</p>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close flyer view"
+              className="absolute top-2 right-2 z-10 rounded-full bg-black/60 text-white p-1.5 hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 }

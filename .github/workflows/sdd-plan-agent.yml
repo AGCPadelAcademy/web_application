@@ -24,6 +24,7 @@ jobs:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           REPOSITORY: ${{ github.repository }}
+          ACTION: ${{ github.event.action }}
         run: |
           set -euo pipefail
 
@@ -33,16 +34,25 @@ jobs:
           fi
 
           payload=$(python - <<'PY'
-          import json, os
+          import json
+          import os
+          import re
+
+          issue_title = os.environ["ISSUE_TITLE"]
+          feature_id = issue_title.split(" - ", 1)[0].strip()
+          feature_slug = re.sub(r"[^a-z0-9]+", "-", issue_title.lower()).strip("-")
+          branch = f"sdd/{feature_slug}"
 
           print(json.dumps({
               "event": "github.issue.sdd_plan",
               "stage": "plan",
-              "feature_id": os.environ["ISSUE_TITLE"].split(" - ", 1)[0],
+              "feature_id": feature_id,
               "repository": os.environ["REPOSITORY"],
               "issue_number": int(os.environ["ISSUE_NUMBER"]),
-              "issue_title": os.environ["ISSUE_TITLE"],
+              "issue_title": issue_title,
               "issue_url": os.environ["ISSUE_URL"],
+              "branch": branch,
+              "action": os.environ["ACTION"],
           }))
           PY
           )

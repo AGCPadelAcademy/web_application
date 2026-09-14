@@ -1,0 +1,55 @@
+name: SDD Plan Agent
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  trigger-plan-agent:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.label.name == 'sdd:plan' &&
+      startsWith(github.event.issue.title, 'F1.')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+
+    steps:
+      - name: Trigger Cursor SDD Plan Automation
+        env:
+          CURSOR_WEBHOOK_URL: ${{ secrets.CURSOR_PLAN_AUTOMATION_WEBHOOK_URL }}
+          CURSOR_WEBHOOK_AUTH: ${{ secrets.CURSOR_AUTOMATION_AUTH }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CURSOR_WEBHOOK_URL}" ] || [ -z "${CURSOR_WEBHOOK_AUTH}" ]; then
+            echo "Cursor Plan webhook secrets are not configured."
+            exit 1
+          fi
+
+          payload=$(python - <<'PY'
+          import json, os
+
+          print(json.dumps({
+              "event": "github.issue.sdd_plan",
+              "stage": "plan",
+              "feature_id": os.environ["ISSUE_TITLE"].split(" - ", 1)[0],
+              "repository": os.environ["REPOSITORY"],
+              "issue_number": int(os.environ["ISSUE_NUMBER"]),
+              "issue_title": os.environ["ISSUE_TITLE"],
+              "issue_url": os.environ["ISSUE_URL"],
+          }))
+          PY
+          )
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "${CURSOR_WEBHOOK_URL}" \
+            --header "Authorization: ${CURSOR_WEBHOOK_AUTH}" \
+            --header "Content-Type: application/json" \
+            --data "${payload}"

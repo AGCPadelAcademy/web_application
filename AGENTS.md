@@ -69,3 +69,5 @@ Requires an approved plan.
 ### Implementation Agent
 
 Responsible for implementing approved tasks only.
+
+Verification after implement is the **automated quality gate only** (`npm run lint`, `npm test`, `npm run build`, plus Deno/SQL when those surfaces changed). Do **not** run agent-driven browser walkthroughs, computer-use sessions, or screen recordings unless the user explicitly asks. The user does visual/manual acceptance in the live app.

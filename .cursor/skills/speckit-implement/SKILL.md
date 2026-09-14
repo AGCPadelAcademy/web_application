@@ -171,8 +171,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 9. Completion validation:
    - Verify all required tasks are completed
    - Check that implemented features match the original specification
-   - Validate that tests pass and coverage meets requirements
+   - Validate that the **automated quality gate** passes (`npm run lint`, `npm test`, `npm run build`; plus `deno test` under `supabase/functions/` when Edge Functions changed; plus SQL assertions when a migration changed)
    - Confirm the implementation follows the technical plan
+   - **Do not** run agent-driven browser click-throughs, computer-use sessions, screen recordings, or walkthrough artifacts unless the user explicitly asks. This project's verification is the quality gate above; the user performs visual/manual acceptance in the live app. List remaining `quickstart.md` scenarios for the user to check. `/no-test` would skip code tests too — do not use it for this preference.
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit-tasks` first to regenerate the task list.
 
@@ -218,6 +219,7 @@ Report final status with summary of completed work.
 ## Done When
 
 - [ ] All tasks in tasks.md completed and marked `[X]`
-- [ ] Implementation validated against specification, plan, and test coverage
+- [ ] Implementation validated against specification, plan, and the automated quality gate (lint / unit tests / build; Deno/SQL when those surfaces changed)
+- [ ] No agent browser/visual walkthrough was run unless the user asked for one
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with summary of completed work

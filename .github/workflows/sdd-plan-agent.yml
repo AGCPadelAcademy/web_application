@@ -19,7 +19,7 @@ jobs:
       - name: Trigger Cursor SDD Plan Automation
         env:
           CURSOR_WEBHOOK_URL: ${{ secrets.CURSOR_PLAN_AUTOMATION_WEBHOOK_URL }}
-          CURSOR_WEBHOOK_AUTH: ${{ secrets.CURSOR_AUTOMATION_AUTH }}
+          CURSOR_WEBHOOK_AUTH: ${{ secrets.CURSOR_PLAN_AUTOMATION_AUTH }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_URL: ${{ github.event.issue.html_url }}

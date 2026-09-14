@@ -48,5 +48,4 @@ Requires:
 
 ### Implementation completion
 
-Implementation is not considered complete until
-verification passes.
+Implementation is not considered complete until the automated quality gate passes (`npm run lint`, `npm test`, `npm run build`, plus Deno/SQL when those surfaces changed). Agent-driven browser/visual walkthroughs are not part of that gate unless the user asks for them.

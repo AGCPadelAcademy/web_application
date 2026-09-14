@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+# Implementation verification
+
+After `/speckit-implement` or other code changes:
+
+1. **Required:** the automated quality gate — `npm run lint`, `npm test`, `npm run build`. Also run Deno tests under `supabase/functions/` when Edge Functions changed, and SQL assertions when a migration changed.
+2. **Do not run** agent-driven browser click-throughs, computer-use sessions, screen recordings, or walkthrough-artifact videos unless the user explicitly asks for them.
+3. Final visual/manual acceptance is done by the user in the live app. Report what the quality gate covered and list remaining `quickstart.md` scenarios for them to check.
+
+`/no-test` skips code tests as well — do not use it to skip only visual checks.

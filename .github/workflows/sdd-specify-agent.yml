@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Trigger Cursor SDD Specification Automation
         env:
-          CURSOR_WEBHOOK_URL: ${{ secrets.CURSOR_AUTOMATION_WEBHOOK_URL }}
+          CURSOR_WEBHOOK_URL: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_WEBHOOK_URL }}
           CURSOR_WEBHOOK_AUTH: ${{ secrets.CURSOR_AUTOMATION_AUTH }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -34,20 +34,30 @@ jobs:
           set -euo pipefail
 
           if [ -z "${CURSOR_WEBHOOK_URL}" ] || [ -z "${CURSOR_WEBHOOK_AUTH}" ]; then
-            echo "Cursor webhook secrets are not configured."
+            echo "Cursor Specify webhook secrets are not configured."
             exit 1
           fi
 
           payload=$(python - <<'PY'
-          import json, os
+          import json
+          import os
+          import re
+
+          issue_title = os.environ["ISSUE_TITLE"]
+          feature_id = issue_title.split(" - ", 1)[0].strip()
+          feature_slug = re.sub(r"[^a-z0-9]+", "-", issue_title.lower()).strip("-")
+          branch = f"sdd/{feature_slug}"
 
           print(json.dumps({
               "event": "github.issue.sdd_specify",
-              "action": os.environ["ACTION"],
+              "stage": "specify",
+              "feature_id": feature_id,
               "repository": os.environ["REPOSITORY"],
               "issue_number": int(os.environ["ISSUE_NUMBER"]),
-              "issue_title": os.environ["ISSUE_TITLE"],
+              "issue_title": issue_title,
               "issue_url": os.environ["ISSUE_URL"],
+              "branch": branch,
+              "action": os.environ["ACTION"],
           }))
           PY
           )

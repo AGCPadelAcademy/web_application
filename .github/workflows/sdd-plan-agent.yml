@@ -41,21 +41,27 @@ jobs:
           issue_title = os.environ["ISSUE_TITLE"]
           feature_id = issue_title.split(" - ", 1)[0].strip()
           feature_slug = re.sub(r"[^a-z0-9]+", "-", issue_title.lower()).strip("-")
-          branch = f"sdd/{feature_slug}"
+          source_branch = f"sdd/{feature_slug}"
+          run_id = f"sdd-plan-{feature_id.lower().replace('.', '-')}-issue-{os.environ['ISSUE_NUMBER']}"
 
           print(json.dumps({
               "event": "github.issue.sdd_plan",
               "stage": "plan",
+              "action": os.environ["ACTION"],
+              "run_id": run_id,
               "feature_id": feature_id,
               "repository": os.environ["REPOSITORY"],
               "issue_number": int(os.environ["ISSUE_NUMBER"]),
               "issue_title": issue_title,
               "issue_url": os.environ["ISSUE_URL"],
-              "branch": branch,
-              "action": os.environ["ACTION"],
+              "branch": source_branch,
+              "source_branch": source_branch,
+              "source_spec_path": f"specs/features/{feature_slug}/spec.md",
           }))
           PY
           )
+
+          echo "Dispatching SDD Plan run: ${payload}"
 
           curl --fail-with-body --silent --show-error \
             --request POST \

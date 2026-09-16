@@ -34,6 +34,8 @@ jobs:
           PLAN_WEBHOOK_AUTH: ${{ secrets.CURSOR_PLAN_AUTOMATION_AUTH }}
           TASKS_WEBHOOK_URL: ${{ secrets.CURSOR_TASK_AUTOMATION_WEBHOOK_URL }}
           TASKS_WEBHOOK_AUTH: ${{ secrets.CURSOR_TASK_AUTOMATION_AUTH }}
+          SPECIFY_WEBHOOK_URL: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_WEBHOOK_URL }}
+          SPECIFY_WEBHOOK_AUTH: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_AUTH }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_URL: ${{ github.event.issue.html_url }}

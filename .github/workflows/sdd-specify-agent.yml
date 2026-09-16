@@ -57,10 +57,16 @@ jobs:
               "issue_title": issue_title,
               "issue_url": os.environ["ISSUE_URL"],
               "branch": branch,
+              "source_branch": branch,
+              "feature_directory": None,
+              "source_spec_path": None,
+              "resolve_feature_directory": True,
               "action": os.environ["ACTION"],
           }))
           PY
           )
+
+          echo "Dispatching SDD Specify run: ${payload}"
 
           curl --fail-with-body --silent --show-error \
             --request POST \

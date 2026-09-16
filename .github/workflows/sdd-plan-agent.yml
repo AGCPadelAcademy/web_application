@@ -56,7 +56,9 @@ jobs:
               "issue_url": os.environ["ISSUE_URL"],
               "branch": source_branch,
               "source_branch": source_branch,
-              "source_spec_path": f"specs/features/{feature_slug}/spec.md",
+              "feature_directory": None,
+              "source_spec_path": None,
+              "resolve_feature_directory": True,
           }))
           PY
           )

@@ -45,9 +45,6 @@ jobs:
           set -euo pipefail
 
           stage="${STAGE}"
-          webhook_url="${SPECIFY_WEBHOOK_URL}"
-          webhook_auth="${SPECIFY_WEBHOOK_AUTH}"
-
           case "${stage}" in
             specify)
               webhook_url="${SPECIFY_WEBHOOK_URL}"

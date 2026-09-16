@@ -29,7 +29,7 @@ jobs:
       - name: Dispatch the selected SDD stage to Cursor
         env:
           SPECIFY_WEBHOOK_URL: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_WEBHOOK_URL }}
-          SPECIFY_WEBHOOK_AUTH: ${{ secrets.CURSOR_AUTOMATION_AUTH }}
+          SPECIFY_WEBHOOK_AUTH: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_AUTH }}
           PLAN_WEBHOOK_URL: ${{ secrets.CURSOR_PLAN_AUTOMATION_WEBHOOK_URL }}
           PLAN_WEBHOOK_AUTH: ${{ secrets.CURSOR_PLAN_AUTOMATION_AUTH }}
           TASKS_WEBHOOK_URL: ${{ secrets.CURSOR_TASK_AUTOMATION_WEBHOOK_URL }}

@@ -44,8 +44,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          stage="${STAGE}"
-          case "${stage}" in
+          case "${STAGE}" in
             specify)
               webhook_url="${SPECIFY_WEBHOOK_URL}"
               webhook_auth="${SPECIFY_WEBHOOK_AUTH}"
@@ -59,13 +58,13 @@ jobs:
               webhook_auth="${TASKS_WEBHOOK_AUTH}"
               ;;
             *)
-              echo "Unsupported SDD stage: ${stage}"
+              echo "Unsupported SDD stage: ${STAGE}"
               exit 1
               ;;
           esac
 
           if [ -z "${webhook_url}" ] || [ -z "${webhook_auth}" ]; then
-            echo "Cursor ${stage} webhook secrets are not configured."
+            echo "Cursor ${STAGE} webhook secrets are not configured."
             exit 1
           fi
 
@@ -105,8 +104,7 @@ jobs:
           PY
           )
 
-          echo "Dispatching SDD ${stage} run: ${payload}"
-
+          echo "Dispatching SDD ${STAGE} run: ${payload}"
           curl --fail-with-body --silent --show-error \
             --request POST \
             --url "${webhook_url}" \

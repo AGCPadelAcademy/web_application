@@ -40,36 +40,32 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           ACTION: ${{ github.event.action }}
           LABEL_NAME: ${{ github.event.label.name }}
+          STAGE: ${{ github.event.action == 'opened' && 'specify' || github.event.label.name == 'sdd:plan' && 'plan' || github.event.label.name == 'sdd:tasks' && 'tasks' || 'specify' }}
         run: |
           set -euo pipefail
 
-          stage="specify"
+          stage="${STAGE}"
           webhook_url="${SPECIFY_WEBHOOK_URL}"
           webhook_auth="${SPECIFY_WEBHOOK_AUTH}"
 
-          if [ "${ACTION}" = "labeled" ]; then
-            case "${LABEL_NAME}" in
-              sdd:specify)
-                stage="specify"
-                webhook_url="${SPECIFY_WEBHOOK_URL}"
-                webhook_auth="${SPECIFY_WEBHOOK_AUTH}"
-                ;;
-              sdd:plan)
-                stage="plan"
-                webhook_url="${PLAN_WEBHOOK_URL}"
-                webhook_auth="${PLAN_WEBHOOK_AUTH}"
-                ;;
-              sdd:tasks)
-                stage="tasks"
-                webhook_url="${TASKS_WEBHOOK_URL}"
-                webhook_auth="${TASKS_WEBHOOK_AUTH}"
-                ;;
-              *)
-                echo "Unsupported SDD label: ${LABEL_NAME}"
-                exit 1
-                ;;
-            esac
-          fi
+          case "${stage}" in
+            specify)
+              webhook_url="${SPECIFY_WEBHOOK_URL}"
+              webhook_auth="${SPECIFY_WEBHOOK_AUTH}"
+              ;;
+            plan)
+              webhook_url="${PLAN_WEBHOOK_URL}"
+              webhook_auth="${PLAN_WEBHOOK_AUTH}"
+              ;;
+            tasks)
+              webhook_url="${TASKS_WEBHOOK_URL}"
+              webhook_auth="${TASKS_WEBHOOK_AUTH}"
+              ;;
+            *)
+              echo "Unsupported SDD stage: ${stage}"
+              exit 1
+              ;;
+          esac
 
           if [ -z "${webhook_url}" ] || [ -z "${webhook_auth}" ]; then
             echo "Cursor ${stage} webhook secrets are not configured."
@@ -120,5 +116,3 @@ jobs:
             --header "Authorization: ${webhook_auth}" \
             --header "Content-Type: application/json" \
             --data "${payload}"
-        env:
-          STAGE: ${{ github.event.action == 'opened' && 'specify' || github.event.label.name == 'sdd:plan' && 'plan' || github.event.label.name == 'sdd:tasks' && 'tasks' || 'specify' }}

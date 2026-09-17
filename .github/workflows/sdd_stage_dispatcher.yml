@@ -1,0 +1,117 @@
+name: SDD Stage Dispatcher
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  dispatch-sdd-stage:
+    if: >-
+      github.event.issue.pull_request == null &&
+      startsWith(github.event.issue.title, 'F1.') &&
+      (
+        github.event.action == 'opened' ||
+        (
+          github.event.action == 'labeled' &&
+          (
+            github.event.label.name == 'sdd:specify' ||
+            github.event.label.name == 'sdd:plan' ||
+            github.event.label.name == 'sdd:tasks'
+          )
+        )
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+
+    steps:
+      - name: Dispatch the selected SDD stage to Cursor
+        env:
+          SPECIFY_WEBHOOK_URL: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_WEBHOOK_URL }}
+          SPECIFY_WEBHOOK_AUTH: ${{ secrets.CURSOR_SPECIFY_AUTOMATION_AUTH }}
+          PLAN_WEBHOOK_URL: ${{ secrets.CURSOR_PLAN_AUTOMATION_WEBHOOK_URL }}
+          PLAN_WEBHOOK_AUTH: ${{ secrets.CURSOR_PLAN_AUTOMATION_AUTH }}
+          TASKS_WEBHOOK_URL: ${{ secrets.CURSOR_TASK_AUTOMATION_WEBHOOK_URL }}
+          TASKS_WEBHOOK_AUTH: ${{ secrets.CURSOR_TASK_AUTOMATION_AUTH }}
+          IMPLEMENT_WEBHOOK_URL: ${{ secrets.CURSOR_IMPLEMENT_AUTOMATION_WEBHOOK_URL }}
+          IMPLEMENT_WEBHOOK_AUTH: ${{ secrets.CURSOR_IMPLEMENT_AUTOMATION_AUTH }}
+          CONVERGE_WEBHOOK_URL: ${{ secrets.CURSOR_CONVERGE_AUTOMATION_AUTH }}
+          CONVERGE_WEBHOOK_AUTH: ${{ secrets.CURSOR_CONVERGE_AUTOMATION_WEBHOOK_URL }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          REPOSITORY: ${{ github.repository }}
+          ACTION: ${{ github.event.action }}
+          LABEL_NAME: ${{ github.event.label.name }}
+          STAGE: ${{ github.event.action == 'opened' && 'specify' || github.event.label.name == 'sdd:plan' && 'plan' || github.event.label.name == 'sdd:tasks' && 'tasks' || 'specify' }}
+        run: |
+          set -euo pipefail
+
+          case "${STAGE}" in
+            specify)
+              webhook_url="${SPECIFY_WEBHOOK_URL}"
+              webhook_auth="${SPECIFY_WEBHOOK_AUTH}"
+              ;;
+            plan)
+              webhook_url="${PLAN_WEBHOOK_URL}"
+              webhook_auth="${PLAN_WEBHOOK_AUTH}"
+              ;;
+            tasks)
+              webhook_url="${TASKS_WEBHOOK_URL}"
+              webhook_auth="${TASKS_WEBHOOK_AUTH}"
+              ;;
+            *)
+              echo "Unsupported SDD stage: ${STAGE}"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${webhook_url}" ] || [ -z "${webhook_auth}" ]; then
+            echo "Cursor ${STAGE} webhook secrets are not configured."
+            exit 1
+          fi
+
+          payload=$(python - <<'PY'
+          import json
+          import os
+          import re
+
+          issue_title = os.environ["ISSUE_TITLE"]
+          feature_id = issue_title.split(" - ", 1)[0].strip()
+          feature_slug = re.sub(r"[^a-z0-9]+", "-", issue_title.lower()).strip("-")
+          branch = f"sdd/{feature_slug}"
+          stage = os.environ["STAGE"]
+          run_id = f"sdd-{stage}-{feature_id.lower().replace('.', '-')}-issue-{os.environ['ISSUE_NUMBER']}"
+
+          payload = {
+              "event": f"github.issue.sdd_{stage}",
+              "stage": stage,
+              "action": os.environ["ACTION"],
+              "run_id": run_id,
+              "feature_id": feature_id,
+              "repository": os.environ["REPOSITORY"],
+              "issue_number": int(os.environ["ISSUE_NUMBER"]),
+              "issue_title": issue_title,
+              "issue_url": os.environ["ISSUE_URL"],
+              "branch": branch,
+              "source_branch": branch,
+              "feature_directory_resolution": "required",
+          }
+
+          if stage == "plan":
+              payload["source_spec_path"] = "resolve-from-existing-sequential-feature-directory"
+          elif stage == "tasks":
+              payload["source_plan_path"] = "resolve-from-existing-sequential-feature-directory"
+
+          print(json.dumps(payload))
+          PY
+          )
+
+          echo "Dispatching SDD ${STAGE} run: ${payload}"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "${webhook_url}" \
+            --header "Authorization: ${webhook_auth}" \
+            --header "Content-Type: application/json" \
+            --data "${payload}"

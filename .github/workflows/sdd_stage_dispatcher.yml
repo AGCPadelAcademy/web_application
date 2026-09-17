@@ -2,7 +2,7 @@ name: SDD Stage Dispatcher
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
 
 jobs:
   dispatch-sdd-stage:
@@ -10,15 +10,11 @@ jobs:
       github.event.issue.pull_request == null &&
       startsWith(github.event.issue.title, 'F1.') &&
       (
-        github.event.action == 'opened' ||
-        (
-          github.event.action == 'labeled' &&
-          (
-            github.event.label.name == 'sdd:specify' ||
-            github.event.label.name == 'sdd:plan' ||
-            github.event.label.name == 'sdd:tasks'
-          )
-        )
+        github.event.label.name == 'sdd:specify' ||
+        github.event.label.name == 'sdd:plan' ||
+        github.event.label.name == 'sdd:tasks' ||
+        github.event.label.name == 'sdd:implement' ||
+        github.event.label.name == 'sdd:converge'
       )
     runs-on: ubuntu-latest
     permissions:
@@ -36,15 +32,21 @@ jobs:
           TASKS_WEBHOOK_AUTH: ${{ secrets.CURSOR_TASK_AUTOMATION_AUTH }}
           IMPLEMENT_WEBHOOK_URL: ${{ secrets.CURSOR_IMPLEMENT_AUTOMATION_WEBHOOK_URL }}
           IMPLEMENT_WEBHOOK_AUTH: ${{ secrets.CURSOR_IMPLEMENT_AUTOMATION_AUTH }}
-          CONVERGE_WEBHOOK_URL: ${{ secrets.CURSOR_CONVERGE_AUTOMATION_AUTH }}
-          CONVERGE_WEBHOOK_AUTH: ${{ secrets.CURSOR_CONVERGE_AUTOMATION_WEBHOOK_URL }}
+          CONVERGE_WEBHOOK_URL: ${{ secrets.CURSOR_CONVERGE_AUTOMATION_WEBHOOK_URL }}
+          CONVERGE_WEBHOOK_AUTH: ${{ secrets.CURSOR_CONVERGE_AUTOMATION_AUTH }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           REPOSITORY: ${{ github.repository }}
           ACTION: ${{ github.event.action }}
           LABEL_NAME: ${{ github.event.label.name }}
-          STAGE: ${{ github.event.action == 'opened' && 'specify' || github.event.label.name == 'sdd:plan' && 'plan' || github.event.label.name == 'sdd:tasks' && 'tasks' || 'specify' }}
+          STAGE: >-
+            ${{ github.event.label.name == 'sdd:specify' && 'specify' ||
+                github.event.label.name == 'sdd:plan' && 'plan' ||
+                github.event.label.name == 'sdd:tasks' && 'tasks' ||
+                github.event.label.name == 'sdd:implement' && 'implement' ||
+                github.event.label.name == 'sdd:converge' && 'converge' ||
+                'unsupported' }}
         run: |
           set -euo pipefail
 
@@ -60,6 +62,14 @@ jobs:
             tasks)
               webhook_url="${TASKS_WEBHOOK_URL}"
               webhook_auth="${TASKS_WEBHOOK_AUTH}"
+              ;;
+            implement)
+              webhook_url="${IMPLEMENT_WEBHOOK_URL}"
+              webhook_auth="${IMPLEMENT_WEBHOOK_AUTH}"
+              ;;
+            converge)
+              webhook_url="${CONVERGE_WEBHOOK_URL}"
+              webhook_auth="${CONVERGE_WEBHOOK_AUTH}"
               ;;
             *)
               echo "Unsupported SDD stage: ${STAGE}"
@@ -103,6 +113,8 @@ jobs:
               payload["source_spec_path"] = "resolve-from-existing-sequential-feature-directory"
           elif stage == "tasks":
               payload["source_plan_path"] = "resolve-from-existing-sequential-feature-directory"
+          elif stage in {"implement", "converge"}:
+              payload["source_tasks_path"] = "resolve-from-existing-sequential-feature-directory"
 
           print(json.dumps(payload))
           PY

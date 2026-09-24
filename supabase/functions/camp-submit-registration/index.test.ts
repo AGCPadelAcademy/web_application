@@ -41,10 +41,10 @@ Deno.test('maps register_camp_child errors to 409 codes', () => {
     'camp_full',
     'camp_closed',
     'camp_not_published',
-    'age_out_of_range',
     'duplicate_registration',
   ]) {
     assertEquals(mapSubmitError(code), { error: code, status: 409 });
   }
+  assertEquals(mapSubmitError('age_out_of_range'), { error: 'register_failed', status: 500 });
   assertEquals(mapSubmitError('terms missing').error, 'register_failed');
 });

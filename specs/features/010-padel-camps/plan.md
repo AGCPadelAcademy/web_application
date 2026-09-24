@@ -261,3 +261,11 @@ No schema change and no new Edge Function. FR-012 unchanged.
 - **Public `/camps` flyer**: size the listing control to the image (no oversized empty `h-64` frame). Keep keep-aspect and a non-zero mobile height via the image itself (`h-auto`).
 - **Flyer preview**: `FlyerLightbox` is image-only (blurred overlay, close **X** on the image, click-outside/Escape). Do not reuse invoice-preview dialog chrome.
 
+## Evolution 2026-09-24, round 7 (Phase 20): age range is informational
+
+No new Edge Function. Do not drop `children.date_of_birth`, `camp_registrations.child_date_of_birth`, or `camps.min_age` / `max_age`. Apply migration `0020` only when the user asks.
+
+- **Schema** (`0020`): `CREATE OR REPLACE public.register_camp_child` from the `0017` six-argument body **without** the `min_age` / `max_age` / missing-DOB `age_out_of_range` block. Member price, capacity, window, extras, and the child snapshot (including date of birth when present) stay. Repeat service-role-only `REVOKE` / `GRANT`.
+- **Client / Edge mapping**: `mapCampError` and `mapSubmitError` no longer treat `age_out_of_range` as a registration refusal. Other 409 codes stay.
+- **Unchanged display**: public “Ages …” lines, admin min/max fields, and child date of birth collection remain.
+

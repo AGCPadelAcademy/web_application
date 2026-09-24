@@ -583,3 +583,30 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 ### Tests and documentation
 
 - [X] T124 Update automated coverage (FR-040): Vitest for extra description rendering helper and/or extras list payload (description present next to name/price); extra edit payload includes `id` + description; flyer-frame class no longer forces an oversized empty box. Add quickstart scenarios: add-child from register and return with extras still selected; extra description on register and Camp form; edit extra; phone flyer hugs image; preview is image-only with blur and X on the image per convergence-6 request §1–§4 (missing)
+
+---
+
+## Phase 20: Convergence (round 7)
+
+**Source**: `/speckit-converge` run 2026-09-24 against the Convergence #7 request (remove the camp age-range registration block; keep child and camp age information). Baseline: post-Convergence-#6 state (add-child return, extra descriptions/edit, flyer frame and image-only preview).
+
+**Baseline assessment (current spec vs code)**: FR-009, US4 acceptance scenario 5, and SC-005 require refusal when a child’s age at the Camp start date is outside `min_age`/`max_age`. The live gate is `public.register_camp_child` (last defined in `supabase/migrations/0017_f125_camp_flyers_pricing.sql`, lines that `RAISE EXCEPTION 'age_out_of_range'` when DOB is missing or age is outside the range). The same function is used by submit and waitlist conversion. `src/lib/camps.js` `mapCampError` shows “This child is outside the camp age range.” Deno tests and `tests/sql/0014_f125_padel_camps.test.sql` comments still expect that refusal. Age **data** is separate and MUST stay: `children.date_of_birth`, registration DOB snapshot, `camps.min_age` / `max_age`, admin min/max fields, and the public “Ages …” lines on `/camps` and camp detail. Do not drop those columns (constitution §III).
+
+**Decisions 2026-09-24 (user-confirmed, round 7)**:
+
+1. A child whose age is outside the Camp’s configured range MUST still be allowed to register. Missing DOB MUST NOT be refused solely because a range is configured.
+2. Keep collecting and showing age: child date of birth, camp min/max age as information on the listing and detail pages, and admin configuration of those fields. Do not delete columns or the age display.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [X] T125 Amend `spec.md` Clarifications (new Session), US4 acceptance scenario 5, FR-009, and SC-005: a configured camp age range is informational only and MUST NOT refuse registration (`age_out_of_range` is removed). Child date of birth and camp min/max age remain stored and displayed. Deadline, unpublished, full, and other non-age refusals stay per convergence-7 request §1 (contradicts)
+- [X] T126 Update `plan.md` and baseline docs (`requirements.md` BC-CAMP-002): `register_camp_child` no longer raises `age_out_of_range`; do not drop `children.date_of_birth`, registration DOB snapshot, or `camps.min_age` / `max_age`. No new Edge Function per convergence-7 request §1 (partial)
+
+### Remove the age registration gate
+
+- [X] T127 Add a forward-only migration (next number after `0019`, expected `supabase/migrations/0020_f125_camp_age_informational.sql`) that `CREATE OR REPLACE`s `public.register_camp_child` from the `0017` definition **without** the `min_age` / `max_age` / missing-DOB `age_out_of_range` block. Preserve member-price, capacity, window, extras, and child snapshot behaviour, including storing date of birth when present. Do not drop age columns. Apply only when the user asks to apply it per convergence-7 request §1 and constitution §III (contradicts)
+- [X] T128 Stop treating age as a registration error in `src/lib/camps.js` `mapCampError` (`age_out_of_range`). Update `supabase/functions/camp-submit-registration/index.test.ts` and the age-refusal notes in `tests/sql/0014_f125_padel_camps.test.sql` so coverage no longer expects a child outside the range (or with no DOB) to be refused. Keep other refusal tests per convergence-7 request §1 (contradicts)
+
+### Tests and documentation
+
+- [X] T129 Add a quickstart scenario: a saved child younger or older than the Camp’s displayed age range can still submit one registration; the Ages line and the child’s date of birth remain visible. Do not add an agent browser walkthrough per convergence-7 request §1 (missing)

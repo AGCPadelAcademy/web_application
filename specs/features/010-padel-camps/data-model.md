@@ -262,10 +262,10 @@ stateDiagram-v2
 
 ## Transactional capacity function
 
-`public.register_camp_child(p_camp_id uuid, p_child_id uuid, p_parent_id uuid, p_extra_ids uuid[], p_terms_version text)` (SECURITY DEFINER, service-role only):
+`public.register_camp_child(p_camp_id uuid, p_child_id uuid, p_parent_id uuid, p_extra_ids uuid[], p_terms_version text, p_member_price_claimed boolean)` (SECURITY DEFINER, service-role only; six-argument form since `0017`):
 
 1. Lock the Camp row `FOR UPDATE`.
-2. Revalidate: Camp exists, `is_published`, window open, deadline not passed, child belongs to `p_parent_id` and is not archived, age within range when configured.
+2. Revalidate: Camp exists, `is_published`, window open, deadline not passed, child belongs to `p_parent_id` and is not archived. **(Amended 2026-09-24 C7)** `min_age` / `max_age` and a missing date of birth do not refuse the insert. The function still snapshots `child_date_of_birth` when present. Signature is the six-argument form from `0017` (`p_member_price_claimed boolean`).
 3. Count active registrations (`pending_payment`,`confirmed`). If `count >= max_capacity` → raise `camp_full`.
 4. Insert the registration with snapshots and computed totals; insert selected extras (validated active and belonging to the Camp).
 5. Return the registration id.
@@ -291,7 +291,7 @@ One additive migration `supabase/migrations/0014_f125_padel_camps.sql` (confirm 
 | FR-001/FR-002 configurable Camps | `camps` columns + admin RLS |
 | FR-006/FR-006a parent-owned children | `children.parent_id` RLS |
 | FR-006d no child hard delete | no `DELETE` policy; `archived_at` only |
-| FR-009 age eligibility | transactional function age check at `start_date` |
+| FR-009 age range informational | `camps.min_age` / `max_age` and `children.date_of_birth` stay stored and displayed; `register_camp_child` does not raise `age_out_of_range` (`0020`) |
 | FR-010/FR-011 window/full/idempotent submit | transactional function + partial UNIQUE index |
 | FR-017/FR-018 decimal totals + snapshots | `numeric(10,2)` snapshots on registration/extras |
 | FR-019/FR-020 capacity | derived count + `FOR UPDATE` lock in one transaction |

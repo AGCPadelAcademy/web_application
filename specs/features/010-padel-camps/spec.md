@@ -59,6 +59,10 @@
 - Q: Phone flyer box vs image? → A: The `/camps` flyer control MUST be sized to the flyer (no oversized empty frame around a smaller image). Keep-aspect; remain visible and tappable at a mobile-width viewport (do not collapse to zero height).
 - Q: Flyer larger view? → A: **The flyer only.** Blurred background, no invoice-style dialog title/chrome. Close **X** on the top-right of the image. Clicking outside the image or Escape returns to the previous page/form state.
 
+### Session 2026-09-24 (round 7 — age range is informational)
+
+- Q: Should a child outside the Camp age range be refused? → A: **No.** A configured `min_age` / `max_age` is informational. Registration MUST NOT be refused because the child’s age is outside that range, or because date of birth is missing. Keep storing and showing the child’s date of birth and the Camp’s min/max age (listing, detail, admin). Deadline, unpublished, full, duplicate, and other non-age refusals stay. `age_out_of_range` is removed.
+
 ---
 
 ## Gap analysis (current → target)
@@ -142,11 +146,11 @@ An authenticated parent opens a Children page, sees every child attached to thei
 
 ### User Story 4 - Parent registers a saved child and selects extras (Priority: P1)
 
-An authenticated parent/guardian (the existing client) opens an open Camp with remaining places, chooses one of their saved children, confirms parent contact details, optional extras, membership (when the Camp defines a member price), and terms. The running total in the Submit registration card updates when extras or the membership option change. On submit, the system re-checks that the Camp is still open and has a place, validates eligibility against that child, and creates exactly one registration for that child. Retrying the same submission does not create a second registration. Invalid or incomplete input is rejected without a chargeable registration.
+An authenticated parent/guardian (the existing client) opens an open Camp with remaining places, chooses one of their saved children, confirms parent contact details, optional extras, membership (when the Camp defines a member price), and terms. The running total in the Submit registration card updates when extras or the membership option change. On submit, the system re-checks that the Camp is still open and has a place, and creates exactly one registration for that child. **(Amended 2026-09-24 C7)** A configured age range does not refuse that registration. Retrying the same submission does not create a second registration. Invalid or incomplete input is rejected without a chargeable registration.
 
 **Why this priority**: This is the client’s second V1 priority and the operational heart of the feature.
 
-**Independent Test**: Sign in as parent A with a complete billing profile and two saved children. Register eligible child X on an open Camp, select one extra, accept terms, submit twice. Exactly one registration exists for X; total equals base price + extra; snapshots retain the extra name and price. Register child Y as a second place. Repeat with an ineligible age and with the deadline passed — both refused.
+**Independent Test**: Sign in as parent A with a complete billing profile and two saved children. Register child X on an open Camp, select one extra, accept terms, submit twice. Exactly one registration exists for X; total equals base price + extra; snapshots retain the extra name and price. Register child Y as a second place. Repeat with a child outside the displayed age range — registration is still created. Repeat after the deadline — refused.
 
 **Acceptance Scenarios**:
 
@@ -154,7 +158,7 @@ An authenticated parent/guardian (the existing client) opens an open Camp with r
 2. **Given** a parent with no saved children yet, **When** they start registration, **Then** the child selector is empty until they add a child on the Children page. **(Amended 2026-09-10 C6)** The Submit registration card offers `+ Add new Child`, which opens My Children and returns to this Camp with the registration draft intact and the new child selected. There is no inline create-child mini-form. FR-012 still allows several children only via separate registrations.
 3. **Given** extras on the Camp, **When** the parent selects or deselects an extra before submit, **Then** the displayed total equals the Camp base price plus the prices of currently selected extras, and after submit those selected extras and their prices are stored with the registration. **(Amended 2026-09-10 C6)** Each extra on the Submit registration card shows name, price, and description (when set).
 4. **Given** no extras selected, **When** the parent submits a valid registration, **Then** the total equals the Camp base price.
-5. **Given** a Camp with a configured age range, **When** the selected child’s date of birth falls outside that range at the Camp start date, **Then** registration is refused and no chargeable registration is created.
+5. **Given** a Camp with a configured age range, **When** the selected child’s date of birth falls outside that range at the Camp start date, or date of birth is missing, **Then** registration is not refused for age. **(Amended 2026-09-24 C7)** The age range remains displayed. The child’s date of birth remains stored and is snapshotted on the registration when present. Deadline, unpublished, full, and other non-age refusals still apply.
 6. **Given** a Camp with eligibility described only as experience (no age range), **When** the parent submits with the required experience/level field completed on that child, **Then** registration is not refused solely for age.
 7. **Given** a successful submit, **When** the parent retries or double-submits the same registration, **Then** a second registration and a second invoice are not created.
 8. **Given** incomplete required fields or terms not accepted, **When** the parent submits, **Then** they see a clear validation error and no chargeable registration is created.
@@ -287,8 +291,8 @@ The academy can count four conversion steps: Camps page visit, registration star
 - A child is not a login and cannot sign in; invoices remain the parent’s financial documents, grouped by child for display.
 - Guest checkout without an account is refused; the parent must use the existing client profile so invoicing and isolation stay on F1.04/F1.03.
 - Incomplete billing profile: the existing completeness gate applies before a chargeable Camp registration is created, because the financial boundary bills the client profile.
-- Competition Camp (experience eligibility, no age range): age is still collected; age-range validation runs only when a range is configured.
-- Waitlist conversion of an ineligible child (now too old, Camp unpublished, or no remaining place) is refused; the next eligible entry may be considered.
+- Competition Camp (experience eligibility, no age range) and Camps with a configured age range: age is still collected and displayed. **(Amended 2026-09-24 C7)** A configured range does not refuse registration, including when date of birth is missing.
+- Waitlist conversion is refused when the Camp is unpublished, the registration window is closed, or no remaining place exists. **(Amended 2026-09-24 C7)** Age outside the displayed range is not a refusal.
 - Unpaid registration cancellation by the registering parent is allowed and releases capacity; paid cancellation, refunds, sibling discounts, academy-student pricing, and promo codes are out of scope.
 - Invoice email (existing F1.03 behaviour) and Camp confirmation email are different messages; success of one is not success of the other.
 - Historical registrations remain readable by the parent (own) and by admins after the Camp is unpublished or edited.
@@ -332,7 +336,7 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 - **FR-007**: A registration MUST be for exactly one saved child and MUST snapshot at least: child first name, child last name, child date of birth, padel level/experience, parent/guardian name, parent/guardian phone, parent/guardian email, emergency contact, allergies/important information, and acceptance of applicable terms. Parent contact fields MAY be pre-filled from the client profile. Child personal fields MUST come from the selected child record (editable before submit if the parent updates that child). Emergency contact (a usable name + phone the academy can call) is REQUIRED at submit time even when the stored child record leaves it empty.
 - **FR-008**: Terms acceptance MUST be persisted with timestamp and terms-version context consistent with existing reservation conventions. Registration MUST NOT proceed without acceptance.
 - **FR-008a**: When a parent opens Terms and Conditions from the registration flow, returning from the Terms page MUST navigate back to the page the terms were opened from — never the home page — and the registration draft (selected child, selected extras, terms state, membership claim, and other entered registration data) MUST be preserved so the parent continues without re-entering anything. **(Amended 2026-09-10 C6)** The same draft MUST be preserved when the parent uses `+ Add new Child` and returns from My Children.
-- **FR-009**: When a Camp defines an age range, the selected child’s age at the Camp start date MUST fall inside that range or registration MUST be refused. When no age range is configured, age MUST still be stored but MUST NOT by itself cause refusal.
+- **FR-009**: A Camp age range (`min_age` / `max_age`) is informational. **(Amended 2026-09-24 C7)** It MUST remain stored and shown on the public listing and Camp detail when set, and admins MUST still be able to configure it. The selected child’s date of birth MUST remain stored on the child and snapshotted on the registration when present. Registration MUST NOT be refused because the child’s age is outside that range or because date of birth is missing. Other refusals in FR-010 stay.
 - **FR-010**: Registration MUST be refused when the Camp is unpublished, the registration window is not open, the deadline has passed, or the Camp is full — unless the request is a waitlist join that is allowed under FR-024. Invalid or incomplete input MUST NOT create a chargeable registration.
 - **FR-011**: Repeated submission of the same registration intent MUST NOT create duplicate registrations or duplicate invoices (registration-level guard here; invoice-level idempotency is FR-030 — one mechanism per layer, not two).
 - **FR-012**: A parent MUST be able to register more than one child as **separate** registrations (one place and one invoice per child). One registration MUST cover exactly one child and exactly one Camp offering (multi-week-in-one-registration is out of scope).
@@ -407,14 +411,14 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 - **SC-003a**: A parent can add two children on the Children page, edit one child’s personal information, and see only those children — in under 3 minutes once signed in. A second parent cannot see the first parent’s children.
 - **SC-003b**: After two siblings are registered for Camps, the parent can open each child’s invoices from the Children page and reach the correct document for that child without seeing the other child’s invoices presented as that child’s.
 - **SC-004**: 100% of valid submissions for an open Camp with remaining places create exactly one registration for the selected child; 100% of retries of that same submission create zero additional registrations and zero additional invoices.
-- **SC-005**: 100% of registrations after the deadline, against a closed/unpublished Camp, or with a child outside a configured age range are refused with no chargeable registration.
+- **SC-005**: 100% of registrations after the deadline or against a closed/unpublished Camp are refused with no chargeable registration. **(Amended 2026-09-24 C7)** A child outside a configured age range, or with no date of birth, is not refused for that reason.
 - **SC-006**: With one remaining place and two concurrent valid registration attempts, at most one place-holding registration exists afterward; the public Camp then shows a full state such as `Complet / Ausgebucht`.
 - **SC-007**: 100% of valid chargeable registrations produce exactly one invoice through the existing financial boundary for the correct total; invoice creation never by itself marks the registration paid.
 - **SC-007a**: After a successful Camp submit, 100% of cases present that registration’s invoice in-app immediately (or a pending state if the document is not yet ready) with a proceed-to-pay path; the parent can later reopen the same invoice from the child profile and from My Payments.
 - **SC-008**: 100% of fully paid registrations result in exactly one confirmation email containing child name, Camp, dates, schedule/hours, total, extras, and practical information; a second reconciliation run sends zero additional confirmation emails.
 - **SC-009**: 100% of non-admin attempts to manage Camps, list all registrations, or export registrations are denied; 100% of parent attempts to read another family’s children, registrations, or child invoices are denied.
 - **SC-010**: After a configuration change to price or extras, previously stored registration totals still match what the parent was charged at submit time.
-- **SC-011**: A waitlist entry on a full Camp leaves remaining places unchanged; converting it succeeds only when a place and eligibility still exist.
+- **SC-011**: A waitlist entry on a full Camp leaves remaining places unchanged; converting it succeeds only when the Camp is still published, the registration window is open, and a place exists. **(Amended 2026-09-24 C7)** Age outside the displayed range does not block conversion.
 - **SC-012**: The four funnel steps can be counted in a test walkthrough without any child or parent PII appearing in the tracked payload.
 
 ---
@@ -426,7 +430,7 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 - Child personal information on the Children page is: first name, last name, date of birth, padel level/experience, allergies/important information, emergency contact. Parent billing name/phone/email/address stay on the parent profile.
 - The Children page is the ongoing home for those records and for per-child Camp invoices. Parents add children there, then select them during Camp registration (the registration form does not offer `+ Add new Child`). **(Amended 2026-09-09 C4)** Camp invoices are also listed on My Payments alongside lesson invoices; they are not stored as `bookings` rows.
 - “Membership payment experience” in this product is the Adult Memberships / lesson booking invoice preview (PDF + QR bank-transfer slip) and My Payments reopen path. There is no separate membership billing table or checkout.
-- Age is computed on the Camp **start date** in the academy’s local (Switzerland) calendar dates.
+- A Camp age range is informational display (`min_age` / `max_age` on the listing, detail, and admin form). Child date of birth stays on the child record and is snapshotted on the registration when present. It is not a registration gate. **(Amended 2026-09-24 C7)**
 - First Mini / Junior / Competition rows are operational seed/configuration, not feature logic.
 - `/trips` stays Spain travel marketing (`FEAT-TRP-001`). `/camps` is the new local/academy Camp registration product. Home/header navigation SHOULD expose Camps so the marketing URL is reachable without only a QR code; that is an additive public-nav change, not a replacement of Trips.
 - Waitlist conversion is **admin-triggered** in V1 (F1.16 itself leaves offer/timeout/notification open). Automatic “email the next parent an invoice” is not assumed.

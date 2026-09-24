@@ -180,9 +180,20 @@ Requires migration `0020_f125_camp_age_informational` applied. Do not drop date-
 | 16.3 | Parent submits one registration for a saved child younger or older than that Camp’s displayed age range (or with no date of birth) | One registration is created. It is not refused for age. Date of birth is snapshotted when present |
 | 16.4 | Parent submits after the deadline, or against an unpublished or full Camp | Still refused (`camp_closed`, `camp_not_published`, or `camp_full`) |
 
+## 17. Junior dynamic capacity (convergence 8, 2026-09-24)
+
+Requires migration `0022_f125_junior_dynamic_capacity` applied. Do not change the stored Junior capacity from 10 to 16.
+
+| Step | Action | Expected |
+|---|---|---|
+| 17.1 | Admin opens Junior week 1 and week 2 | Capacity field is still 10 |
+| 17.2 | Junior camp reaches 9 active registrations (one place left of 10) | Six more children can still register. The public card still shows 1 place left |
+| 17.3 | Junior camp reaches 16 active registrations | Card shows full (`Complet / Ausgebucht`). Another registration is refused (`camp_full`). Waitlist, if enabled, can open |
+| 17.4 | Mini or Competition camp reaches its configured capacity | No extra places. The next registration is refused |
+
 ## Acceptance mapping
 
-Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Scenario 17 covers C8: Junior week 1 and week 2 open six more places at one remaining, up to 16, while the card still shows one place left. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
 
 ## Validation log (2026-09-08)
 

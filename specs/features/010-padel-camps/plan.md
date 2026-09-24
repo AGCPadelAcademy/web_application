@@ -269,3 +269,11 @@ No new Edge Function. Do not drop `children.date_of_birth`, `camp_registrations.
 - **Client / Edge mapping**: `mapCampError` and `mapSubmitError` no longer treat `age_out_of_range` as a registration refusal. Other 409 codes stay.
 - **Unchanged display**: public “Ages …” lines, admin min/max fields, and child date of birth collection remain.
 
+## Evolution 2026-09-24, round 8 (Phase 21): Junior dynamic capacity
+
+No new Edge Function. Do not change stored `camps.max_capacity` (Junior stays 10). Live project already has `0021_f125_camp_registration_billing_on_delete`, so this migration is `0022`.
+
+- **Ceiling**: `camp_registration_ceiling` — Junior (`camp_type`) uses `max_capacity` until active registrations reach `max_capacity - 1`, then `max_capacity + 6` (16 when the stored limit is 10). Mini, Competition, and any other type stay on `max_capacity`.
+- **Register / waitlist**: `register_camp_child` raises `camp_full` at that ceiling. `guard_camp_waitlist_join` treats the camp as full at the same ceiling.
+- **Public list**: `camp_places_remaining` returns 1 for a Junior camp from 9 through 15 active registrations, and 0 at 16. `is_full` follows the ceiling.
+

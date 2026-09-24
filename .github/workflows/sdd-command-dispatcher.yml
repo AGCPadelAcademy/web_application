@@ -1,0 +1,50 @@
+name: SDD Command Dispatcher
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  process-sdd-command:
+    if: >-
+      github.event.issue.pull_request == null &&
+      startsWith(github.event.issue.title, 'F1.')
+    runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Parse SDD command
+        id: command
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+
+          command="$(printf '%s\n' "$COMMENT_BODY" | grep -Eo '^/sdd (plan|tasks|implement|converge)$' | head -n 1 || true)"
+
+          if [ -z "$command" ]; then
+            echo "has_command=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          stage="${command#/sdd }"
+
+          echo "has_command=true" >> "$GITHUB_OUTPUT"
+          echo "stage=${stage}" >> "$GITHUB_OUTPUT"
+
+      - name: Add SDD stage label
+        if: steps.command.outputs.has_command == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          STAGE: ${{ steps.command.outputs.stage }}
+        run: |
+          set -euo pipefail
+
+          gh issue edit "$ISSUE_NUMBER" \
+            --repo "$REPOSITORY" \
+            --add-label "sdd:${STAGE}"

@@ -321,7 +321,6 @@ export function mapCampError(message) {
     camp_full: 'This camp is full.',
     camp_closed: 'Registration is closed for this camp.',
     camp_not_published: 'This camp is not open for registration.',
-    age_out_of_range: 'This child is outside the camp age range.',
     duplicate_registration: 'This child is already registered for this camp.',
     profile_incomplete: 'Complete your billing profile before registering.',
     profile_inactive: INACTIVE_CLIENT_MESSAGE,

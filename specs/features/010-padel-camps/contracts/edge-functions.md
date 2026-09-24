@@ -28,7 +28,7 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 
 1. Resolve caller; require active profile and ownership of `child_id` (not archived).
 2. Require billing-profile completeness (first/last name, phone, address, postal code, city, country).
-3. Call `register_camp_child(...)` (data-model §Transactional capacity function) — atomic publication/window/eligibility/capacity insert with snapshots and extras.
+3. Call `register_camp_child(...)` (data-model §Transactional capacity function) — atomic publication/window/capacity insert with snapshots and extras. **(Amended 2026-09-24 C7)** Age range is not checked.
 4. Issue the invoice through the F1.03 financial boundary with idempotency key `camp-registration:{registrationId}:invoice:v1` and `api_reference` `agc:camp-registration:{registrationId}`; line items = Camp base + each selected extra.
 5. Email the Bexio invoice PDF via the existing mailer (FR-031). Mail failure is audited and does not fail the registration.
 6. Registration remains `pending_payment` / `pending`; payment is never implied by invoice creation.
@@ -37,7 +37,7 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 
 - `200 { "registration": { "id", "camp_id", "child_id", "status": "pending_payment", "total_amount", "currency" }, "document": { "id", "document_nr", "status": "issued", "total", "currency" } | null, "reused": false }`
   - **(C4)** The SPA uses `registration.id` to open `InvoicePreviewModal` immediately. `document` may be `null` when issuance is queued; the preview then shows a pending/not-ready state.
-- `409 { "error": "camp_full" | "camp_closed" | "camp_not_published" | "age_out_of_range" | "duplicate_registration" | "profile_incomplete" }`
+- `409 { "error": "camp_full" | "camp_closed" | "camp_not_published" | "duplicate_registration" | "profile_incomplete" }` **(Amended 2026-09-24 C7)** `age_out_of_range` is not a refusal. A configured age range is informational.
 - `401/403` auth/ownership • `502 { "error": "provider_unavailable" }` — registration exists; invoice issue enqueued in `billing_operations` for the worker.
 
 ---
@@ -77,11 +77,11 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 - `POST { "action": "list_registrations", "camp_id", "status"? }` — returns registrations with Camp, child, age, parent, phone, email, level, extras, total, payment status, registration date, and remaining places.
 - `POST { "action": "export_registrations", "camp_id" }` — returns the authorized registration rows as JSON (the FR-035 field set only); the frontend serializes them to CSV/Excel-compatible output in `src/lib/camps.js` (analysis A4).
 - `POST { "action": "list_waitlist", "camp_id" }` — deterministic order (`created_at` asc).
-- `POST { "action": "convert_waitlist", "entry_id" }` — revalidates eligibility and capacity via `register_camp_child`, then issues the invoice; refuses when full/ineligible.
+- `POST { "action": "convert_waitlist", "entry_id" }` — revalidates publication, window, and capacity via `register_camp_child`, then issues the invoice; refuses when unpublished, closed, or full. **(Amended 2026-09-24 C7)** Age outside the displayed range is not a refusal.
 
 ### Responses
 
-Action-specific `200 { … }`; `401/403` for non-admins; `409 camp_full | age_out_of_range | duplicate_registration` on invalid conversion.
+Action-specific `200 { … }`; `401/403` for non-admins; `409 camp_full | camp_closed | camp_not_published | duplicate_registration` on invalid conversion. **(Amended 2026-09-24 C7)** Age is not a conversion refusal.
 
 ---
 

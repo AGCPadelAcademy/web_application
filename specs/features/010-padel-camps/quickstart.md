@@ -169,9 +169,20 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 15.4 | Visitor opens `/camps` at ~375px | Flyer control is sized to the flyer (no oversized empty frame). Flyer stays visible and tappable |
 | 15.5 | Visitor or admin opens the flyer preview (phone and desktop) | Preview is the flyer only on a blurred background — no invoice-style dialog title. **X** is on the top-right of the image. Click outside or Escape returns to the previous state |
 
+## 16. Age range is informational (convergence 7, 2026-09-24)
+
+Requires migration `0020_f125_camp_age_informational` applied. Do not drop date-of-birth or min/max age columns.
+
+| Step | Action | Expected |
+|---|---|---|
+| 16.1 | Visitor opens `/camps` and a Camp detail page that has min/max age | “Ages …” line is still shown. Admin Camp form still has min/max age |
+| 16.2 | Parent opens a saved child | Date of birth is still stored and visible |
+| 16.3 | Parent submits one registration for a saved child younger or older than that Camp’s displayed age range (or with no date of birth) | One registration is created. It is not refused for age. Date of birth is snapshotted when present |
+| 16.4 | Parent submits after the deadline, or against an unpublished or full Camp | Still refused (`camp_closed`, `camp_not_published`, or `camp_full`) |
+
 ## Acceptance mapping
 
-Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
 
 ## Validation log (2026-09-08)
 

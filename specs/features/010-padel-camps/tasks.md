@@ -610,3 +610,33 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 ### Tests and documentation
 
 - [X] T129 Add a quickstart scenario: a saved child younger or older than the Camp’s displayed age range can still submit one registration; the Ages line and the child’s date of birth remain visible. Do not add an agent browser walkthrough per convergence-7 request §1 (missing)
+
+---
+
+## Phase 21: Convergence (round 8)
+
+**Source**: `/speckit-converge` run 2026-09-24 against the Convergence #8 request (Junior week 1 and week 2 dynamic capacity). Baseline: post-Convergence-#7 state (age range informational; `register_camp_child` still stops at `max_capacity`).
+
+**Baseline assessment (current spec vs code)**: FR-019, FR-020, FR-021, and SC-006 treat `camps.max_capacity` as a hard ceiling. `public.register_camp_child` raises `camp_full` when active registrations `>= max_capacity` (latest body in `supabase/migrations/0020_f125_camp_age_informational.sql`). `camp_public_list` exposes `places_remaining = max_capacity - active` and `is_full` at that ceiling (`0018`). `guard_camp_waitlist_join` refuses a waitlist join while `active < max_capacity` (`0014`). The public card shows `{places_remaining} places left` until `is_full`, then `Complet / Ausgebucht`. Stored Junior capacity stays **10**; it MUST NOT be rewritten to 16. Mini and Competition camps are unchanged.
+
+**Decisions 2026-09-24 (user-confirmed, round 8)**:
+
+1. Only Junior camps for week 1 and week 2 (`camp_type` Junior). Mini and Competition keep a hard `max_capacity`.
+2. The configured limit stays 10. Do not set `max_capacity` to 16.
+3. When one place remains against that 10 (9 active), open **6 more** places. Effective ceiling becomes 16. The “8 more” example in the request is superseded by this correction.
+4. While the dynamic window is open (9 through 15 active), the public card MUST keep showing one place remaining so the scarcity message stays. At 16 active the camp is full.
+5. `camp_full`, the full label, and waitlist eligibility use the effective ceiling (16 for those Junior camps, `max_capacity` for every other camp). Two concurrent submits MUST NOT both pass 16.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [ ] T130 Amend `spec.md` Clarifications (new Session), FR-019, FR-020, FR-021, and SC-006: Junior week 1 and week 2 keep configured capacity 10; when one place remains, six more registrations are accepted (effective ceiling 16) while the public card still shows one place remaining; full and waitlist start at 16. Other camps stay a hard `max_capacity` per convergence-8 request §1 (contradicts)
+- [ ] T131 Update `plan.md` and baseline docs (`requirements.md` capacity note): same Junior dynamic ceiling, implemented in `register_camp_child`, `camp_public_list`, and the waitlist guard. Do not change stored `max_capacity`. No new Edge Function per convergence-8 request §1 (partial)
+
+### Dynamic Junior capacity
+
+- [ ] T132 Add the next forward migration after the latest file in `supabase/migrations/` (use `0022` if `0021_f125_camp_registration_billing_on_delete.sql` is already present, otherwise `0021`) that replaces `register_camp_child` from the `0020` body so a Junior week 1/week 2 camp (`camp_type` Junior) accepts registrations until 16 once 9 are active, and still raises `camp_full` at that effective ceiling. Recompute `camp_public_list.places_remaining` / `is_full` so those camps show 1 place left from 9 through 15 active and full at 16. Point `guard_camp_waitlist_join` at the same ceiling. Do not `UPDATE` `max_capacity` from 10 to 16. Mini and Competition stay on `max_capacity`. Apply only when the user asks per convergence-8 request §1 (contradicts)
+
+### Tests and documentation
+
+- [ ] T133 Update automated coverage (FR-040): a Junior camp at 9 active registrations still accepts up to 16 and the public remaining-places value stays 1 until then; the 16th active registration makes it full; a Mini or Competition camp at `max_capacity` is still `camp_full`. Keep the last-place concurrency guarantee at the effective ceiling per convergence-8 request §1 (missing)
+- [ ] T134 Add a quickstart scenario for Junior week 1 and week 2: configured capacity stays 10; at one place remaining, six more children can register; the card still shows one place remaining until 16; Mini and Competition do not gain extra places. Do not add an agent browser walkthrough per convergence-8 request §1 (missing)

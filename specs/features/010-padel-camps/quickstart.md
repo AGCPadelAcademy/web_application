@@ -182,18 +182,18 @@ Requires migration `0020_f125_camp_age_informational` applied. Do not drop date-
 
 ## 17. Junior dynamic capacity (convergence 8, 2026-09-24)
 
-Requires migration `0022_f125_junior_dynamic_capacity` applied. Do not change the stored Junior capacity from 10 to 16.
+Requires migration `0023_f125_junior_places_countdown` applied. Do not change the stored Junior capacity from 10 to 16.
 
 | Step | Action | Expected |
 |---|---|---|
 | 17.1 | Admin opens Junior week 1 and week 2 | Capacity field is still 10 |
-| 17.2 | Junior camp reaches 9 active registrations (one place left of 10) | Six more children can still register. The public card still shows 1 place left |
-| 17.3 | Junior camp reaches 16 active registrations | Card shows full (`Complet / Ausgebucht`). Another registration is refused (`camp_full`). Waitlist, if enabled, can open |
+| 17.2 | Junior camp reaches 7 active registrations (3 places left of 10) | The ceiling is 16. The public card shows 3 places left, and it still shows 3 through 13 registrations |
+| 17.3 | Junior camp has 14, then 15, then 16 active registrations | The card shows 2, then 1, then full (`Complet / Ausgebucht`). The 16th registration is the last. Another is refused (`camp_full`). Waitlist, if enabled, can open |
 | 17.4 | Mini or Competition camp reaches its configured capacity | No extra places. The next registration is refused |
 
 ## Acceptance mapping
 
-Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Scenario 17 covers C8: Junior week 1 and week 2 open six more places at one remaining, up to 16, while the card still shows one place left. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Scenario 17 covers C9: Junior week 1 and week 2 open at 3 places remaining, show 3 through 13 registrations, then 2, 1, and the waitlist at 16. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
 
 ## Validation log (2026-09-08)
 

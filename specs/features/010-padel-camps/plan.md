@@ -277,3 +277,10 @@ No new Edge Function. Do not change stored `camps.max_capacity` (Junior stays 10
 - **Register / waitlist**: `register_camp_child` raises `camp_full` at that ceiling. `guard_camp_waitlist_join` treats the camp as full at the same ceiling.
 - **Public list**: `camp_places_remaining` returns 1 for a Junior camp from 9 through 15 active registrations, and 0 at 16. `is_full` follows the ceiling.
 
+## Evolution 2026-09-24, round 9 (Phase 22): Junior places countdown
+
+No new Edge Function. Do not change stored `camps.max_capacity`. Migration `0023` replaces the two helper functions from `0022`.
+
+- **Trigger**: Junior ceiling opens at `max_capacity - 3` (7 active when the stored limit is 10), not at one place remaining. Ceiling stays `max_capacity + 6` (16).
+- **Display**: 3 places from 7 through 13 active, 2 at 14, 1 at 15, full at 16. Waitlist still opens at 16. Mini and Competition stay a hard `max_capacity`.
+

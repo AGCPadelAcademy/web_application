@@ -640,3 +640,31 @@ The client’s V1 priority spans all P1 stories; the smallest demoable slice is:
 
 - [X] T133 Update automated coverage (FR-040): a Junior camp at 9 active registrations still accepts up to 16 and the public remaining-places value stays 1 until then; the 16th active registration makes it full; a Mini or Competition camp at `max_capacity` is still `camp_full`. Keep the last-place concurrency guarantee at the effective ceiling per convergence-8 request §1 (missing)
 - [X] T134 Add a quickstart scenario for Junior week 1 and week 2: configured capacity stays 10; at one place remaining, six more children can register; the card still shows one place remaining until 16; Mini and Competition do not gain extra places. Do not add an agent browser walkthrough per convergence-8 request §1 (missing)
+
+---
+
+## Phase 22: Convergence (round 9)
+
+**Source**: `/speckit-converge` run 2026-09-24 against the Convergence #9 request (Junior places display and trigger). Baseline: post-Convergence-#8 state (`0022_f125_junior_dynamic_capacity.sql`).
+
+**Baseline assessment (current spec vs code)**: FR-019 and SC-006 (amended C8) open the Junior ceiling when **one** place remains (`active >= max_capacity - 1`, so 9 active when the stored limit is 10) and `camp_places_remaining` returns **1** from that point through 15 active. `camp_registration_ceiling` then returns `max_capacity + 6` (16). Full and the waitlist still start at 16. Stored `max_capacity` is still 10 for Junior Camp Herbstferien Week 1 and Week 2. Mini and Competition stay a hard `max_capacity`.
+
+**Decisions 2026-09-24 (user-confirmed, round 9)**:
+
+1. Keep the stored limit at 10 and the effective ceiling at 16. Do not change `max_capacity`. Mini and Competition stay unchanged. At 16 active registrations the camp is full and the waitlist can open.
+2. The dynamic window opens at **3 places remaining** (7 active when the stored limit is 10), not at 1. This supersedes the C8 “one place remaining” trigger.
+3. Public remaining places: the real count while it is above 3. From 7 through 13 active, show **3**. At 14 active show **2**. At 15 active show **1**. At 16 show full.
+
+### Artifact alignment (converge is append-only — spec/plan edits happen here, not during assessment)
+
+- [ ] T135 Amend `spec.md` Clarifications (new Session), FR-019, and SC-006: Junior week 1 and week 2 still keep stored capacity 10 and an effective ceiling of 16, but the window opens at 3 places remaining. The card shows 3 places from 7 through 13 active registrations, 2 at 14, 1 at 15, and full at 16. This supersedes the C8 “show 1 until 16” rule per convergence-9 request §1 (contradicts)
+- [ ] T136 Update `plan.md` and baseline docs (`requirements.md` capacity note): same Junior trigger and remaining-places sequence in `camp_registration_ceiling` and `camp_places_remaining`. Do not change stored `max_capacity`. No new Edge Function per convergence-9 request §1 (partial)
+
+### Junior remaining-places display
+
+- [ ] T137 Add the next forward migration after `0022_f125_junior_dynamic_capacity.sql` that opens `camp_registration_ceiling` for `camp_type` Junior when active registrations reach `max_capacity - 3` (still `max_capacity + 6` after that, 16 when the stored limit is 10). Change `camp_places_remaining` so those camps show 3 from that point through 13 active, 2 at 14, 1 at 15, and 0 at 16. `register_camp_child` and `guard_camp_waitlist_join` keep using that ceiling, so the waitlist still opens at 16. Do not `UPDATE` `max_capacity`. Mini and Competition stay on `max_capacity`. Apply only when the user asks per convergence-9 request §1 (contradicts)
+
+### Tests and documentation
+
+- [ ] T138 Update automated coverage (FR-040) so a Junior camp at 7 active registrations already accepts up to 16 and the public remaining-places value is 3 through 13 active, 2 at 14, 1 at 15, and full at 16. Replace the C8 expectation that the value stays 1 from 9 through 15. A Mini or Competition camp at `max_capacity` is still `camp_full` per convergence-9 request §1 (contradicts)
+- [ ] T139 Add a quickstart scenario for Junior week 1 and week 2: configured capacity stays 10; at 3 places remaining the ceiling becomes 16; the card shows 3 places until 13 registrations, then 2, then 1, then the waitlist at 16. Mini and Competition do not gain extra places. Do not add an agent browser walkthrough per convergence-9 request §1 (missing)

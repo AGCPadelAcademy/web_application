@@ -206,7 +206,7 @@ No name/contact/DOB/allergy columns exist by design, so PII cannot be recorded. 
 
 | New column | Type | Constraints | Notes |
 |---|---|---|---|
-| `camp_registration_id` | uuid | NULL, UNIQUE, FK → `camp_registrations(id)` ON DELETE RESTRICT | idempotency anchor for camp invoices |
+| `camp_registration_id` | uuid | NULL, UNIQUE, FK → `camp_registrations(id)` ON DELETE CASCADE | idempotency anchor for camp invoices. **(Amended 2026-09-24)** CASCADE because the exactly-one-subject CHECK forbids SET NULL. Deleting the registration removes its `billing_documents` row. It does not cancel the invoice in Bexio. |
 
 New CHECK: exactly one of `booking_id` / `camp_registration_id` is set.
 
@@ -216,7 +216,7 @@ RLS owner clause extended: owner = `bookings.user_id` **or** the registration’
 
 | New column | Type | Constraints | Notes |
 |---|---|---|---|
-| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` | subject for camp retries |
+| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` ON DELETE SET NULL | subject for camp retries. **(Amended 2026-09-24)** `billing_document_id` is ON DELETE SET NULL so a cascaded document delete does not block the registration delete. |
 
 **Decision (2026-09-08, analysis I1):** the existing `kind` CHECK from migration `0003` is **altered** to add `camp_invoice_issue` and `camp_invoice_cancel`. Deterministic idempotency keys: `camp-registration:{id}:invoice:v1` (issue) and `camp-registration:{id}:invoice_cancel:v1` (cancel). Lesson kinds are unchanged.
 
@@ -224,7 +224,7 @@ RLS owner clause extended: owner = `bookings.user_id` **or** the registration’
 
 | New column | Type | Constraints | Notes |
 |---|---|---|---|
-| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` | audit subject |
+| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` ON DELETE SET NULL | audit subject |
 
 New event types: `camp.registration_submitted`, `camp.invoice.issued`, `camp.payment.reconciled`, `camp.confirmation.sent`, `camp.waitlist.joined`, `camp.waitlist.converted`.
 

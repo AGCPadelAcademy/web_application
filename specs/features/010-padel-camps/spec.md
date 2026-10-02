@@ -67,6 +67,10 @@
 
 - Q: Should Junior week 1 and week 2 raise the stored capacity from 10 to 16? → A: **No.** `max_capacity` stays 10. When one place remains (9 active), those Junior camps accept **6 more** registrations (effective ceiling 16). The public card keeps showing one place remaining until 16 active, then it is full. Mini, Competition, and every other type stay a hard `max_capacity`. The “8 more” example is superseded by the 6-more correction.
 
+### Session 2026-09-24 (round 9 — Junior places countdown)
+
+- Q: When does the Junior window open, and what does the card show? → A: **At 3 places remaining**, not 1. Stored capacity stays 10 and the ceiling stays 16. The card shows 3 places from 7 through 13 active registrations, 2 at 14, 1 at 15, and full (waitlist) at 16. This supersedes the round-8 “show 1 until 16” rule. Mini and Competition stay a hard `max_capacity`.
+
 ---
 
 ## Gap analysis (current → target)
@@ -357,7 +361,7 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 
 #### Capacity
 
-- **FR-019**: Available places MUST be derived from canonical **active** (place-holding) registrations against the Camp’s ceiling. A manually decremented counter MUST NOT be the sole authority. **(Amended 2026-09-24 C8)** For a Junior camp (`camp_type` Junior, week 1 and week 2), the stored `max_capacity` stays the configured limit (10). When one place remains against that limit, the effective ceiling becomes `max_capacity + 6` (16). Until that ceiling is reached, the public card MUST keep showing one place remaining. Every other camp uses `max_capacity` as a hard ceiling.
+- **FR-019**: Available places MUST be derived from canonical **active** (place-holding) registrations against the Camp’s ceiling. A manually decremented counter MUST NOT be the sole authority. **(Amended 2026-09-24 C9)** For a Junior camp (`camp_type` Junior, week 1 and week 2), the stored `max_capacity` stays 10. When 3 places remain (7 active), the effective ceiling becomes 16. The public card shows 3 places through 13 active registrations, 2 at 14, and 1 at 15. Every other camp uses `max_capacity` as a hard ceiling.
 - **FR-020**: Capacity enforcement MUST be concurrency-safe: two simultaneous valid registrations MUST NOT both pass the effective ceiling. **(Amended 2026-09-24 C8)** For Junior week 1 and week 2 that ceiling is 16 once the dynamic window is open. For every other camp it remains `max_capacity`.
 - **FR-021**: A full Camp MUST display a clear full state such as `Complet / Ausgebucht` and MUST reject further normal registrations. **(Amended 2026-09-24 C8)** A Junior camp is full at the effective ceiling (16), not at the stored 10. Waitlist eligibility uses that same ceiling.
 - **FR-022**: Cancelled or otherwise non-place-holding registrations MUST release capacity according to the registration lifecycle. Unpaid cancellation by the registering parent MUST be supported and MUST release the place. Paid cancellation/refund is out of scope.
@@ -416,7 +420,7 @@ Lesson booking (`001`), financial/accounting integration (`007` / F1.03), roles 
 - **SC-003b**: After two siblings are registered for Camps, the parent can open each child’s invoices from the Children page and reach the correct document for that child without seeing the other child’s invoices presented as that child’s.
 - **SC-004**: 100% of valid submissions for an open Camp with remaining places create exactly one registration for the selected child; 100% of retries of that same submission create zero additional registrations and zero additional invoices.
 - **SC-005**: 100% of registrations after the deadline or against a closed/unpublished Camp are refused with no chargeable registration. **(Amended 2026-09-24 C7)** A child outside a configured age range, or with no date of birth, is not refused for that reason.
-- **SC-006**: With one remaining place and two concurrent valid registration attempts, at most one place-holding registration exists afterward; the public Camp then shows a full state such as `Complet / Ausgebucht`. **(Amended 2026-09-24 C8)** Junior week 1 and week 2 are the exception: once one place remains against the stored 10, further registrations are accepted until 16, the card still shows one place remaining, and only the 16th active registration makes the camp full. Two concurrent attempts MUST NOT both pass 16.
+- **SC-006**: With one remaining place and two concurrent valid registration attempts, at most one place-holding registration exists afterward; the public Camp then shows a full state such as `Complet / Ausgebucht`. **(Amended 2026-09-24 C9)** Junior week 1 and week 2 open extra places at 3 remaining, accept registrations until 16, show 3 places through 13 active, 2 at 14, and 1 at 15. Only the 16th active registration makes the camp full and opens the waitlist. Two concurrent attempts MUST NOT both pass 16.
 - **SC-007**: 100% of valid chargeable registrations produce exactly one invoice through the existing financial boundary for the correct total; invoice creation never by itself marks the registration paid.
 - **SC-007a**: After a successful Camp submit, 100% of cases present that registration’s invoice in-app immediately (or a pending state if the document is not yet ready) with a proceed-to-pay path; the parent can later reopen the same invoice from the child profile and from My Payments.
 - **SC-008**: 100% of fully paid registrations result in exactly one confirmation email containing child name, Camp, dates, schedule/hours, total, extras, and practical information; a second reconciliation run sends zero additional confirmation emails.

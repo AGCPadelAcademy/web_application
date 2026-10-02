@@ -266,7 +266,7 @@ stateDiagram-v2
 
 1. Lock the Camp row `FOR UPDATE`.
 2. Revalidate: Camp exists, `is_published`, window open, deadline not passed, child belongs to `p_parent_id` and is not archived. **(Amended 2026-09-24 C7)** `min_age` / `max_age` and a missing date of birth do not refuse the insert. The function still snapshots `child_date_of_birth` when present. Signature is the six-argument form from `0017` (`p_member_price_claimed boolean`).
-3. Count active registrations (`pending_payment`,`confirmed`). If `count >= max_capacity` → raise `camp_full`.
+3. Count active registrations (`pending_payment`,`confirmed`). If `count >= camp_registration_ceiling(...)` → raise `camp_full`. **(Amended 2026-09-24 C8)** Junior (`camp_type`) ceiling is `max_capacity` until one place remains, then `max_capacity + 6`. Other types stay on `max_capacity`. `camp_public_list.places_remaining` stays 1 during the Junior window.
 4. Insert the registration with snapshots and computed totals; insert selected extras (validated active and belonging to the Camp).
 5. Return the registration id.
 

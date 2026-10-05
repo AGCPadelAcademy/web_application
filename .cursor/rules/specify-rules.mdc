@@ -52,7 +52,6 @@ or task files.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/features/010-padel-camps/plan.md
 <!-- SPECKIT END -->
 
 ## Hooks

@@ -95,8 +95,9 @@ Once a Membership is Active, the Client is recognized as a fixed participant of 
 
 1. **Given** an Active Membership for Client A and Group G, **When** Sessions are generated for G, **Then** A is recognized as a fixed participant of those Sessions.
 2. **Given** that Active Membership, **When** the system would otherwise create a normal Booking only to express the same fixed place, **Then** it MUST NOT create a duplicate reservation for A on that Session.
-3. **Given** a Membership that is not Active (Pending Payment, Paused, Cancelled, or Expired), **When** Sessions are generated for G, **Then** A is not treated as a current fixed participant from that Membership.
-4. **Given** two different Clients with Active Memberships in Group G, **When** Sessions are generated, **Then** both are recognized as distinct fixed participants (no collapsing of people).
+3. **Given** a Membership that is not Active (Pending Payment, Paused, Expired, or Cancelled whose FR-012 effective date has passed), **When** Sessions are generated for G, **Then** A is not treated as a current fixed participant from that Membership.
+4. **Given** a Cancelled Membership whose FR-012 effective date has NOT passed (still inside the already-paid month), **When** Sessions are generated for G, **Then** A remains a fixed participant until that effective date.
+5. **Given** two different Clients with Active Memberships in Group G, **When** Sessions are generated, **Then** both are recognized as distinct fixed participants (no collapsing of people).
 
 ---
 
@@ -123,7 +124,7 @@ An Admin cancels a Membership when the Client should no longer hold the recurrin
 
 **Why this priority**: Stopping the commitment without destroying history is a stated Definition of Done item.
 
-**Independent Test**: Cancel an Active Membership. Future Sessions of that Group no longer treat the Client as a fixed participant from this Membership. At least one historical Session/Booking/Attendance/Recovery record still exists unchanged. Student cannot cancel another person’s Membership.
+**Independent Test**: Cancel an Active Membership. Sessions of that Group generated after the FR-012 effective date no longer treat the Client as a fixed participant from this Membership; Sessions up to the effective date still do. At least one historical Session/Booking/Attendance/Recovery record still exists unchanged. Student cannot cancel another person’s Membership.
 
 **Acceptance Scenarios**:
 
@@ -231,7 +232,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - **SC-003**: After Admin activation, 100% of generated Sessions of the linked Group in a subsequent check recognize that Client as a fixed participant; a non-Active Membership yields 0% recognition from that Membership.
 - **SC-004**: Activating or attaching a Membership never produces a second overlapping Booking for the same Client and Session solely to represent the fixed place (duplicate count = 0).
 - **SC-005**: After a single Session cancellation, 100% of inspected Memberships remain in the same lifecycle state they had before that cancellation, and the Group assignment is still present.
-- **SC-006**: After Admin Membership cancellation, future Sessions of that Group no longer treat the Client as a fixed participant from that Membership, while 100% of previously stored historical Session, Booking, Attendance, and Recovery records for that Client still exist.
+- **SC-006**: After Admin Membership cancellation, Sessions of that Group generated after the FR-012 effective date no longer treat the Client as a fixed participant from that Membership, while 100% of previously stored historical Session, Booking, Attendance, and Recovery records for that Client still exist.
 - **SC-007**: 100% of undefined lifecycle transitions are refused; every successful state change has an audit entry that a reviewer can match to actor and from/to states.
 - **SC-008**: 100% of Client B attempts to read or change Client A’s Membership are denied; Client A can still see their own Membership state on the first try.
 - **SC-009**: No new card-payment path and no generic credit balance appear in Membership create, activate, Session cancel, or Membership cancel checks.

@@ -14,6 +14,18 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-10-05
+
+Answers given by the product owner on GitHub issue #14 (CLARIFICATION REQUIRED thread).
+
+- Q: What happens to the live `/lessons` catalogue "Adult Memberships" products when F1.09 ships? → A: **Option A — Keep them separate.** `/lessons` booking stays; F1.09 is an Admin-created Group commitment beside it.
+- Q: When Admin cancels a Membership, when does the fixed Group place actually stop? → A: **Option B — End of the already-paid month.** The place continues through the current billed period.
+- Q: Can an Admin pause/resume a Membership in F1.09 V1? → A: **Option A — Operable now.** Admin can Pause (fixed place stops) and resume to Active.
+
+---
+
 ## Gap analysis (current → target)
 
 Inspected: GitHub issue #14 (authoritative), constitution, project context, baseline requirements (`FEAT-LES-002`, unused memberships/credits, `BC-CAMP-002`), domain model §2.8–2.9, live unused `memberships` / `credits` tables, `/lessons` catalogue grouping, Terms “Membership Cancellation Conditions”, F1.04 field-protection, F1.08 Groups (#13), F1.10 Sessions (#15), F1.11 Booking (#16), F1.12 adult cancellations (#17), F1.13 Recovery (#18), F1.25 Camps (#36), F1.26 automatic collection (#54). Confirmed unless marked assumption.
@@ -25,10 +37,10 @@ Inspected: GitHub issue #14 (authoritative), constitution, project context, base
 | Lifecycle: Pending Payment, Active, Paused, Cancelled, Expired | Unused table has a boolean `active` only. | **Add** those five states, reject invalid transitions, and keep an auditable history of valid changes. |
 | Manual Admin activation | No activation workflow. Lesson “Adult Memberships” on `/lessons` are catalogue products booked like any lesson (`is_subscription = true`). | **Add** Admin-only create + manual activate. Automatic activation from confirmed payment is **out** (Phase 2 / F1.26). |
 | Cancelling one Session does not cancel the Membership | No customer cancel action (copy-only 48 h). F1.12 will own adult Session cancellation. | **Guarantee** the Membership and Group assignment stay intact when a single Session is cancelled. Delegate the cancellation/Recovery rules to F1.12 / F1.13. |
-| Membership cancellation stops future participation; history remains | Live Terms require 30-day notice (by the 1st of the previous month), no refund, otherwise auto-renew. **Not enforced** in the application. | **Add** Admin cancellation that stops future participation and preserves historical Sessions, Bookings, Attendance, and Recovery. Exact effective-date vs Terms notice is **[NEEDS CLARIFICATION]**. |
+| Membership cancellation stops future participation; history remains | Live Terms require 30-day notice (by the 1st of the previous month), no refund, otherwise auto-renew. **Not enforced** in the application. | **Add** Admin cancellation that stops future participation at the **end of the already-paid month** (Q2, Option B) and preserves historical Sessions, Bookings, Attendance, and Recovery. The Terms notice rule stays unenforced. |
 | Academy closures keep the Group assignment | No closure product. | **Keep** the fixed Group assignment across academy closures. Money adjustments belong to pricing/financial features, not here. |
 | Authorization | Students cannot write academy-controlled membership/group fields (F1.04 FR-004). Admins manage clients. Coaches have roster-only access. Unused memberships table allows the owner to read their own row. | **Admin-only** create / activate / pause / cancel / expire operations unless a later explicit rule says otherwise. Clients may view their own Membership. Coaches do not get unrestricted Membership management. Server-side authorization is authoritative. |
-| Catalogue label “Adult Memberships” | `/lessons` splits cards into Adult Memberships vs Individual Sessions (`FEAT-LES-002`). Those are bookable lesson products with invoices, not Group places. | **Do not silently replace** that live revenue path. Relationship is **[NEEDS CLARIFICATION]**. |
+| Catalogue label “Adult Memberships” | `/lessons` splits cards into Adult Memberships vs Individual Sessions (`FEAT-LES-002`). Those are bookable lesson products with invoices, not Group places. | **Keep separate** (Q1, Option A): the `/lessons` booking path stays; F1.09 is an Admin-created Group commitment beside it. |
 | Camp academy-member price | F1.25: parent self-declares membership; F1.25 spec promises F1.09 will auto-check Active (and Pending Payment) membership at Camp registration. **Not in issue #14.** | **Out of this issue’s scope.** Do not implement the Camp handover here unless product later adds it to F1.09. |
 
 **Does not replace** `001` (lesson catalogue/booking), `007` (Bexio/invoices), `005`/`009` (client identity), or `006`/`008` (roles). Neighboring features F1.08, F1.10, F1.11, F1.12, F1.13, F1.26 remain the owners of Groups, Sessions, Booking, Session cancellation, Recovery, and automatic collection.
@@ -134,7 +146,7 @@ The academy can tell which state a Membership is in. Illegal jumps (for example 
 
 1. **Given** a Membership in a given state, **When** an unauthorized or undefined transition is requested, **Then** the request is refused and the stored state is unchanged.
 2. **Given** a valid Admin transition, **When** it completes, **Then** an audit record exists with actor, time, previous state, and new state.
-3. **Given** a Paused Membership (if Pause is operational in this slice — FR-011), **When** an Admin resumes it to Active, **Then** the Client is again a fixed participant and the transition is auditable.
+3. **Given** a Paused Membership, **When** an Admin resumes it to Active, **Then** the Client is again a fixed participant and the transition is auditable.
 4. **Given** an Expired Membership, **When** anyone requests ordinary activation or pause, **Then** the transition is refused (a new Membership may be created instead if US1 allows it).
 
 ---
@@ -164,7 +176,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - Academy closure days do not clear the Group assignment on an Active or Paused Membership; whether a particular Session exists that day is owned by the calendar/closures features.
 - Individual Session cancellation, late cancellation, and No Show do not change Membership state.
 - Cancelled and Expired are terminal for that Membership record; returning the person to the Group requires a new Membership (or an explicit Admin correction path, which this spec does not add).
-- If Pause is not operational in this slice (FR-011), the Paused state still exists in the model so later work can use it, but Admin cannot move a Membership into Pause yet.
+- Pause is Admin-operable in this slice (Q3, Option A): pausing an Active Membership stops the fixed place while Paused; resuming returns the Membership to Active. Clients cannot self-pause.
 - Payment recorded in accounting without Admin activation does not grant a fixed place.
 - Direct identifier guessing or hidden-button bypass is denied the same way as the UI.
 - Unused credit-token balances MUST NOT be consulted or incremented to represent a Membership place or a cancelled Session.
@@ -177,7 +189,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 
 - **FR-001**: An adult Membership MUST be associated with exactly one Client and exactly one recurring Group. The Client MUST be the existing application profile (F1.04). The Group MUST be the academy’s recurring Group (F1.08). The system MUST NOT invent a second person record or a second Group merely to store the Membership.
 - **FR-002**: A Membership MUST NOT be a generic credit wallet, token balance, or remaining-class counter. Recovery entitlements stay owned by F1.13.
-- **FR-003**: Only an Admin MAY create, activate, pause (if operational), cancel, or expire a Membership, unless a later approved rule explicitly grants another actor those operations. Students, coaches, and visitors MUST NOT perform those operations, including by calling the backend directly.
+- **FR-003**: Only an Admin MAY create, activate, pause, resume, cancel, or expire a Membership, unless a later approved rule explicitly grants another actor those operations. Students, coaches, and visitors MUST NOT perform those operations, including by calling the backend directly.
 - **FR-004**: Membership creation MUST refuse a missing/invalid Client, a missing/invalid Group, a deactivated Client, or a second live Membership for the same Client and same Group.
 - **FR-005**: Supported lifecycle states are **Pending Payment**, **Active**, **Paused**, **Cancelled**, and **Expired**. Invalid transitions MUST be rejected. Valid changes MUST be auditable (actor, time, previous state, new state).
 - **FR-006**: Membership activation in this slice MUST be an explicit Admin action. Confirmed payment MUST NOT by itself activate the Membership. Automatic activation from confirmed payment is deferred (Phase 2 / F1.26).
@@ -185,13 +197,13 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - **FR-008**: Fixed-place participation MUST integrate with the canonical Session and Booking model so that the Membership does not create duplicate fixed participants or duplicate Bookings for the same Client and Session. Group capacity, Session generation, and Booking concurrency remain owned by F1.08, F1.10, and F1.11 respectively.
 - **FR-009**: Cancelling an individual Session MUST NOT cancel the Membership, MUST NOT remove the recurring Group assignment, and MUST NOT delete historical Sessions, Bookings, Attendance, or Recovery. Session-cancellation eligibility and Recovery creation MUST be delegated to F1.12 and F1.13.
 - **FR-010**: Admin cancellation of a Membership MUST stop future participation from that Membership according to FR-012, MUST NOT delete historical Sessions, Bookings, Attendance, or Recovery, and MAY leave Recovery entitlements that were generated while the Membership was Active.
-- **FR-011**: Pause [NEEDS CLARIFICATION: is Pause an Admin-operable action in this F1.09 slice, or only a reserved state for later?]. Until answered, the state exists in the model; do not assume Clients can self-pause.
-- **FR-012**: When a Membership is cancelled, future fixed-place participation stops on an effective date [NEEDS CLARIFICATION: immediate on Admin cancel; end of the already-paid month; or the live Terms rule — notice by the 1st of the previous month, no refund, otherwise the month renews?]. Historical participation before that date remains.
+- **FR-011**: Pause MUST be Admin-operable in this slice (Q3, Option A): an Admin MAY pause an Active Membership — the fixed place stops while Paused — and MAY resume a Paused Membership to Active. Clients MUST NOT self-pause.
+- **FR-012**: When a Membership is cancelled, future fixed-place participation MUST stop at the **end of the already-paid month** (Q2, Option B): the Client keeps the fixed place through the current billed period, and generated Sessions after that period no longer treat the Client as a fixed participant from this Membership. Historical participation before that date remains. The live Terms notice rule (by the 1st of the previous month) is NOT enforced in this slice.
 - **FR-013**: Academy closures MUST NOT clear the Membership’s Group assignment. Financial adjustments for closed days belong to pricing/financial workflows, not this feature.
 - **FR-014**: Clients MAY view their own Memberships (Group and state). They MUST NOT view another Client’s Membership. Coaches MUST NOT receive unrestricted Membership administration. F1.04 deactivation MUST prevent a new live fixed place until the Client is active again; historical Membership rows remain attached to the same Client.
 - **FR-015**: Authorization for FR-003–FR-014 MUST be enforced on the server. Hiding a control is not sufficient.
 - **FR-016**: This feature MUST remain compatible with the existing invoice / bank-transfer architecture (no Stripe/card payments). It MUST NOT add a second accounting system and MUST NOT treat invoice issue as Membership activation.
-- **FR-017**: Live `/lessons` catalogue grouping “Adult Memberships” vs “Individual Sessions” [NEEDS CLARIFICATION: remain a separate bookable lesson product; become the commercial SKU that an Admin then turns into an F1.09 Group Membership; or be replaced by F1.09?]. Until answered, F1.09 MUST NOT remove or rename that catalogue path.
+- **FR-017**: The live `/lessons` catalogue grouping “Adult Memberships” vs “Individual Sessions” MUST remain a separate bookable lesson-product path (Q1, Option A). F1.09 Memberships are Admin-created Group commitments beside it; this slice MUST NOT remove, rename, replace, or auto-convert that catalogue path, and buying a catalogue “Adult Membership” product MUST NOT by itself create an F1.09 Membership.
 - **FR-018**: Camp member-price automatic check, member-only Camp price display, and pending-membership-payment Camp admin flags are **not** requirements of issue #14. They stay with F1.25’s interim self-declaration until a later approved handover.
 - **FR-019**: Level and Club rules MUST be reused from their owning features (F1.05, F1.07) when a Group already carries them. Membership MUST NOT implement a second level-comparison or club-assignment algorithm.
 - **FR-020**: Existing lesson bookings, Camp registrations, invoices, and client profiles MUST keep working unchanged except for the additive Membership behaviour above.
@@ -206,7 +218,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - **Booking** — canonical reservation of a concrete Session (F1.11). Membership fixed-place must not duplicate it.
 - **Recovery** — domain entitlement from a valid Session cancellation (F1.13). May outlive a cancelled Membership; not a Membership credit.
 - **Audit record** — who changed a Membership, when, from which state to which state.
-- **Lesson catalogue “Adult Memberships”** — existing `/lessons` products with `is_subscription = true`. Distinct from the F1.09 Membership entity until FR-017 is answered.
+- **Lesson catalogue “Adult Memberships”** — existing `/lessons` products with `is_subscription = true`. Confirmed distinct from the F1.09 Membership entity (Q1, Option A): a separate bookable product path that does not create or become an F1.09 Membership.
 
 ---
 
@@ -223,7 +235,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - **SC-007**: 100% of undefined lifecycle transitions are refused; every successful state change has an audit entry that a reviewer can match to actor and from/to states.
 - **SC-008**: 100% of Client B attempts to read or change Client A’s Membership are denied; Client A can still see their own Membership state on the first try.
 - **SC-009**: No new card-payment path and no generic credit balance appear in Membership create, activate, Session cancel, or Membership cancel checks.
-- **SC-010**: Existing `/lessons` booking and invoice flow for current catalogue products still completes for a returning student after this feature is present (no re-registration, no broken Book Now), unless FR-017 later explicitly retires that path.
+- **SC-010**: Existing `/lessons` booking and invoice flow for current catalogue products still completes for a returning student after this feature is present (no re-registration, no broken Book Now); the catalogue path remains separate per FR-017.
 
 ---
 
@@ -235,8 +247,8 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - Starting state on create is **Pending Payment** unless the Admin is explicitly activating in the same authorized operation.
 - A “live” Membership for duplicate-place checks means Pending Payment, Active, or Paused. Cancelled and Expired do not block a later new Membership for the same Client+Group.
 - Clients cannot self-serve subscribe in this slice (Admin-only create), matching issue #14. F1.26 may later add client auto-pay opt-in without changing that default until product says so.
-- Manual activation workflow, until FR-011/FR-012/FR-017 answers land: Admin opens the Membership and confirms activation. No extra payment-proof UI is required here; the academy may use existing invoice/bank tools out of band.
-- Live Terms (monthly adult membership: notice by the 1st of the previous month, no refund, else auto-renew) are **published academy policy** but **not enforced** today. They are an option for FR-012, not silently implemented.
+- Manual activation workflow: Admin opens the Membership and confirms activation. No extra payment-proof UI is required here; the academy may use existing invoice/bank tools out of band.
+- Live Terms (monthly adult membership: notice by the 1st of the previous month, no refund, else auto-renew) are **published academy policy** but **not enforced** today. FR-012 is resolved to end of the already-paid month (Q2, Option B); the stricter Terms notice rule remains unenforced — see Discrepancies.
 - F1.26 owns automatic collection and the payment-confirmed signal; F1.09 owns the state machine that signal will later drive.
 - Coach access stays F1.02 roster semantics; this spec does not add a coach Membership-admin screen.
 - English UI copy may say “Membership”; the GitHub title remains “Memberships de adultos”.
@@ -265,7 +277,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 - Stripe, card payments, or a second payment processor.
 - Generic credit wallet, token earn/redeem, or remaining-class counters.
 - Implementing Group CRUD, Session generation, Booking concurrency, Session cancellation rules, Recovery expiry, Attendance persistence, Level algorithms, or Club management.
-- Replacing or converting the live `/lessons` “Adult Memberships” catalogue until FR-017 is answered.
+- Replacing or converting the live `/lessons` “Adult Memberships” catalogue (Q1, Option A: keep separate).
 - Camp member-price automatic membership detection (F1.25 handover) — not in issue #14.
 - Client self-service purchase of a Group Membership.
 - Kids semesters, trials, one-off classes, waitlist, or trips/tournaments.
@@ -275,7 +287,7 @@ The Client can see that they have a Membership, which Group it is for, and wheth
 
 ## Compatibility
 
-- Preserve `/lessons` catalogue and booking (`001`) unless FR-017 later directs a controlled replacement.
+- Preserve `/lessons` catalogue and booking (`001`); Q1 (Option A) keeps that path separate from F1.09.
 - Preserve F1.03 invoice/QR/bank-transfer; invoice issue ≠ Membership Active.
 - Preserve F1.04 profile-as-client; Membership attaches to that profile.
 - Preserve F1.02 server-side authorization; Membership is academy-controlled (students cannot write it — already named in F1.04 FR-004).
@@ -293,7 +305,7 @@ These are recorded so planning does not “fix” them by inventing a hybrid pro
 2. **Baseline TODO `memberships-credits`**: “tokens from weeks-in-month and academy-open; academy redeems into classes.” **Superseded for adult Memberships** by issue #14. Token redeem is not F1.09.
 3. **F1.08 “Group can contain fixed participants”** vs **F1.09 “Active Membership gives the fixed place”**: treated as one adult place with two layers (Membership = commercial source; Group roster = operational list), not two independent adult rosters. If product instead wants Group-only rosters with Membership as billing-only, that would contradict issue #14’s objective and must be an explicit change to the issue.
 4. **F1.25 FR-017a handover** (auto Active/Pending-Payment check at Camp registration) is a Camps commitment **not present** in issue #14. Left out of F1.09 requirements (FR-018).
-5. **Live Terms** specify a 30-day / 1st-of-previous-month cancellation notice that the app does not enforce. Mapped to FR-012 clarification rather than silently coded.
+5. **Live Terms** specify a 30-day / 1st-of-previous-month cancellation notice that the app does not enforce. FR-012 is resolved to **end of the already-paid month** (Q2, Option B); the stricter Terms notice rule remains unenforced and is not silently coded.
 
 ---
 
@@ -301,7 +313,7 @@ These are recorded so planning does not “fix” them by inventing a hybrid pro
 
 | ID | Covered? |
 |---|---|
-| FEAT-LES-002 (catalogue Adult Memberships) | Preserved pending FR-017 |
+| FEAT-LES-002 (catalogue Adult Memberships) | Preserved (FR-017 resolved: keep separate) |
 | FEAT-BKG-* lesson booking | Preserved (FR-020) |
 | XR-005 no Stripe | Preserved (FR-016) |
 | BC-CAMP-002 member-price self-declare | Unchanged (FR-018) |
@@ -311,10 +323,10 @@ These are recorded so planning does not “fix” them by inventing a hybrid pro
 
 ## Open questions
 
-Tracked as `[NEEDS CLARIFICATION]` (max 3). Also posted on GitHub issue #14 as **CLARIFICATION REQUIRED**.
+All three `[NEEDS CLARIFICATION]` markers were resolved on 2026-10-05 via GitHub issue #14 (see Clarifications):
 
-1. **FR-017 — live catalogue “Adult Memberships”**: remain separate lesson products; become the SKU that feeds an F1.09 Membership; or be replaced?
-2. **FR-012 — cancellation effective date**: immediate; end of paid month; or live Terms (notice by the 1st of the previous month, no refund, else renew)?
-3. **FR-011 — Pause**: Admin-operable in this slice, or reserved state only?
+1. **FR-017 — live catalogue “Adult Memberships”**: **Option A — keep them separate.** `/lessons` booking stays; F1.09 is an Admin-created Group commitment beside it.
+2. **FR-012 — cancellation effective date**: **Option B — end of the already-paid month.** The place continues through the current billed period; the live Terms notice rule stays unenforced.
+3. **FR-011 — Pause**: **Option A — operable now.** Admin can Pause (fixed place stops) and resume to Active.
 
-Related items **not** given a marker (defaults in Assumptions / Non-goals): Camp F1.25 handover stays out; automatic activation stays out; unused credit-token model stays out; Groups/Sessions remain neighboring owners.
+Related items never given a marker (defaults in Assumptions / Non-goals): Camp F1.25 handover stays out; automatic activation stays out; unused credit-token model stays out; Groups/Sessions remain neighboring owners.

@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,6 +32,6 @@
 ## Notes
 
 - Validated 2026-09-17. Gap analysis names live catalogue behaviour, unused membership/credit records, and neighboring F1 issues because brownfield rules require discovery against baseline and GitHub issue #14. User stories, functional requirements, and success criteria stay in business language.
-- **Three `[NEEDS CLARIFICATION]` markers remain** (limit 3, highest impact). They are the live `/lessons` “Adult Memberships” relationship (FR-017), Membership-cancellation effective date (FR-012), and whether Pause is operable in this slice (FR-011). Posted on issue #14 as **CLARIFICATION REQUIRED**. Do not run `/speckit-plan` as if those were settled.
+- **All three `[NEEDS CLARIFICATION]` markers resolved 2026-10-05** via product-owner answers on issue #14: live `/lessons` “Adult Memberships” stay separate (FR-017, Q1 Option A), cancellation takes effect at end of the already-paid month (FR-012, Q2 Option B), and Pause is Admin-operable in this slice (FR-011, Q3 Option A). Recorded in spec §Clarifications.
 - Remaining FRs are testable with the documented defaults (Admin-only create/activate, no credit wallet, no automatic payment activation, Camp handover out of scope).
 - Adjacent F1.08 / F1.10 / F1.11 are called out as owners, not specified here.

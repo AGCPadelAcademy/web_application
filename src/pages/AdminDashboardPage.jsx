@@ -6,6 +6,7 @@ import { isCoachAssignmentAvailable } from '@/lib/coachAssignments';
 import IntegrationsPanel from '@/components/admin/IntegrationsPanel';
 import ClientManagementPanel from '@/components/admin/ClientManagementPanel';
 import CampManagementPanel from '@/components/admin/CampManagementPanel';
+import ClubManagementPanel from '@/components/admin/ClubManagementPanel';
 
 const AdminDashboard = () => {
   const [coachAssignmentReady, setCoachAssignmentReady] = useState(false);
@@ -28,12 +29,15 @@ const AdminDashboard = () => {
       <div className="px-6 py-12 md:py-24 max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold font-serif mb-2">Admin Dashboard</h1>
-          <p className="text-gray-400">Manage clients, camps, coach assignments, and the Bexio accounting integration.</p>
+          <p className="text-gray-400">Manage clients, clubs, camps, coach assignments, and the Bexio accounting integration.</p>
         </div>
           <Tabs defaultValue="clients" className="w-full">
             <TabsList className="bg-gray-900 border border-gray-800 mb-8 p-1 rounded-xl">
               <TabsTrigger value="clients" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Client management
+              </TabsTrigger>
+              <TabsTrigger value="clubs" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
+                Clubs
               </TabsTrigger>
               <TabsTrigger value="camps" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Camps
@@ -50,6 +54,9 @@ const AdminDashboard = () => {
             
             <TabsContent value="clients" className="mt-0">
               <ClientManagementPanel />
+            </TabsContent>
+            <TabsContent value="clubs" className="mt-0">
+              <ClubManagementPanel />
             </TabsContent>
             <TabsContent value="camps" className="mt-0">
               <CampManagementPanel />

@@ -58,13 +58,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T004 [P] [US1] Add failing Vitest coverage in `src/lib/clubs.test.js` for catalogue list select/order, create and update allow-lists (`name`, `location`, `phone`, `email` only), blank-name and duplicate-name messages, permission-error mapping, and the absence of a delete export, matching contracts/clubs.md §§2, 4, 5, and 7
+- [X] T004 [P] [US1] Add failing Vitest coverage in `src/lib/clubs.test.js` for catalogue list select/order, create and update allow-lists (`name`, `location`, `phone`, `email` only), blank-name and duplicate-name messages, permission-error mapping, and the absence of a delete export, matching contracts/clubs.md §§2, 4, 5, and 7
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Implement `listClubs`, `createClub`, and `updateClub` in `src/lib/clubs.js` against `public.clubs` using the existing Supabase client and the contracts/clubs.md column lists and operator messages
-- [ ] T006 [US1] Create `src/components/admin/ClubManagementPanel.jsx` with the catalogue (name, place, status), create/edit form, empty and error states, and save through `src/lib/clubs.js`. Do not add a delete control
-- [ ] T007 [US1] Add a Clubs tab to `src/pages/AdminDashboardPage.jsx` that renders `ClubManagementPanel`, and mention clubs in the page description. Keep the clients, camps, Bexio, and coach-assignment tabs and the existing `/admin/integrations` route
+- [X] T005 [US1] Implement `listClubs`, `createClub`, and `updateClub` in `src/lib/clubs.js` against `public.clubs` using the existing Supabase client and the contracts/clubs.md column lists and operator messages
+- [X] T006 [US1] Create `src/components/admin/ClubManagementPanel.jsx` with the catalogue (name, place, status), create/edit form, empty and error states, and save through `src/lib/clubs.js`. Do not add a delete control
+- [X] T007 [US1] Add a Clubs tab to `src/pages/AdminDashboardPage.jsx` that renders `ClubManagementPanel`, and mention clubs in the page description. Keep the clients, camps, Bexio, and coach-assignment tabs and the existing `/admin/integrations` route
 
 **Checkpoint**: US1 is demonstrable on its own. An admin can create and correct a club. The screen does not deactivate or delete it yet.
 
@@ -78,12 +78,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T008 [P] [US2] Extend `src/lib/clubs.test.js` with failing cases for `setClubActive(true|false)` sending only `is_active`, an already-matching status update, and a non-admin failure that leaves status unchanged, per contracts/clubs.md §6
+- [X] T008 [P] [US2] Extend `src/lib/clubs.test.js` with failing cases for `setClubActive(true|false)` sending only `is_active`, an already-matching status update, and a non-admin failure that leaves status unchanged, per contracts/clubs.md §6
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Implement `setClubActive` in `src/lib/clubs.js` so the payload is only `is_active` and errors use the same operator messages as T005
-- [ ] T010 [US2] Add activate and deactivate actions to `src/components/admin/ClubManagementPanel.jsx`. Keep inactive clubs in the list, allow detail edits while inactive, and still omit every delete control
+- [X] T009 [US2] Implement `setClubActive` in `src/lib/clubs.js` so the payload is only `is_active` and errors use the same operator messages as T005
+- [X] T010 [US2] Add activate and deactivate actions to `src/components/admin/ClubManagementPanel.jsx`. Keep inactive clubs in the list, allow detail edits while inactive, and still omit every delete control
 
 **Checkpoint**: US1 and US2 both work. Stopping use of a club does not remove it.
 
@@ -97,12 +97,12 @@
 
 ### Tests for User Story 3
 
-- [ ] T011 [P] [US3] Extend `src/lib/clubs.test.js` with failing cases that `listClubsForNewUse` queries `clubs_for_new_use` for `id`, `name`, `location` only, and that `src/lib/clubs.js` does not call `profiles`, `bookings`, `lessons`, or `camps`, per contracts/clubs.md §§3, 8, and 9
+- [X] T011 [P] [US3] Extend `src/lib/clubs.test.js` with failing cases that `listClubsForNewUse` queries `clubs_for_new_use` for `id`, `name`, `location` only, and that `src/lib/clubs.js` does not call `profiles`, `bookings`, `lessons`, or `camps`, per contracts/clubs.md §§3, 8, and 9
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Implement `listClubsForNewUse` in `src/lib/clubs.js` exactly as contracts/clubs.md §3. Do not add a public RPC wrapper for `private.club_is_selectable_for_new_use`
-- [ ] T013 [US3] Show the active-only new-use set from `listClubsForNewUse` in `src/components/admin/ClubManagementPanel.jsx`, separate from the full catalogue. Do not add group, session, coach-roster, or client home-club fields
+- [X] T012 [US3] Implement `listClubsForNewUse` in `src/lib/clubs.js` exactly as contracts/clubs.md §3. Do not add a public RPC wrapper for `private.club_is_selectable_for_new_use`
+- [X] T013 [US3] Show the active-only new-use set from `listClubsForNewUse` in `src/components/admin/ClubManagementPanel.jsx`, separate from the full catalogue. Do not add group, session, coach-roster, or client home-club fields
 
 **Checkpoint**: All three stories work. Later features have one catalogue and one active-club rule, and this feature did not start scheduling or billing.
 
@@ -112,8 +112,8 @@
 
 **Purpose**: Run the automated gate and leave the live journeys for the user.
 
-- [ ] T014 [P] Run `npm run lint`, `npm test`, and `npm run build` from the repository root. Fix failures caused by this feature in `src/lib/clubs.js`, `src/lib/clubs.test.js`, `src/components/admin/ClubManagementPanel.jsx`, and `src/pages/AdminDashboardPage.jsx`
-- [ ] T015 [P] Record in `specs/features/011-club-management/quickstart.md` that §§4–7 remain manual checks for the user. State that `supabase/migrations/0024_f107_club_management.sql` and `tests/sql/0024_f107_club_management.test.sql` stay unapplied until the user explicitly asks
+- [X] T014 [P] Run `npm run lint`, `npm test`, and `npm run build` from the repository root. Fix failures caused by this feature in `src/lib/clubs.js`, `src/lib/clubs.test.js`, `src/components/admin/ClubManagementPanel.jsx`, and `src/pages/AdminDashboardPage.jsx`
+- [X] T015 [P] Record in `specs/features/011-club-management/quickstart.md` that §§4–7 remain manual checks for the user. State that `supabase/migrations/0024_f107_club_management.sql` and `tests/sql/0024_f107_club_management.test.sql` stay unapplied until the user explicitly asks
 - [ ] T016 If the user explicitly asks to apply the migration, apply `supabase/migrations/0024_f107_club_management.sql` to the live project, execute `tests/sql/0024_f107_club_management.test.sql`, and fix failures only in those two files. If the user has not asked, leave this task unchecked and do not connect to the live database
 
 ---

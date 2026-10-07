@@ -4,7 +4,7 @@
 **Contract**: [contracts/clubs.md](contracts/clubs.md)
 **Data model**: [data-model.md](data-model.md)
 
-The automated gate is lint, unit tests, and the production build. The journeys below are for a person to check in the live app after that gate passes. There is one Supabase project. Name any club created for a check so it is obviously test data, then deactivate it.
+The automated gate is lint, unit tests, and the production build. Sections 4–7 below remain manual checks for a person in the live app. There is one Supabase project. `supabase/migrations/0024_f107_club_management.sql` and `tests/sql/0024_f107_club_management.test.sql` stay unapplied until you explicitly ask to apply them. Name any club created for a check so it is obviously test data, then deactivate it.
 
 ## 1. Prerequisites
 

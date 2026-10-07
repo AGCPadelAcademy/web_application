@@ -113,15 +113,15 @@ Later group and session work can point at this Club and must not invent another 
 ### Functional Requirements
 
 - **FR-001**: The system MUST provide one Club as the only location record for academy operations. Groups, sessions, bookings, and later pricing MUST reference that Club when they need a location, and MUST NOT introduce a second club or location catalogue.
-- **FR-002**: An authenticated admin MUST be able to create a club, view every club, and update an existing club’s identifying information.
+- **FR-002**: An active admin MUST be able to create a club, view every club, and update an existing club’s identifying information. An inactive admin MUST NOT.
 - **FR-003**: A club MUST have a name. The name is required, must not be blank or only spaces, and must be unique among clubs when compared without regard to letter case or surrounding spaces.
 - **FR-004**: A club MAY include a location description (address or place) and contact information (phone, email, or both). These MAY be empty.
 - **FR-005**: A club MUST be either active or inactive. A newly created club is active.
-- **FR-006**: An authenticated admin MUST be able to deactivate an active club and reactivate an inactive club.
+- **FR-006**: An active admin MUST be able to deactivate an active club and reactivate an inactive club. An inactive admin MUST NOT.
 - **FR-007**: Deactivation and reactivation MUST keep the same club identity. The system MUST NOT delete a club, and MUST NOT delete or reassign historical groups, sessions, bookings, attendance, or financial records because a club was deactivated or edited.
 - **FR-008**: A deactivated club MUST NOT be selectable for a new operation that requires an active club. Historical records that already name that club remain readable under their existing authorization.
 - **FR-009**: Students, coaches, people with no operational role, and signed-out visitors MUST NOT create, update, activate, or deactivate clubs. The refusal MUST hold when they bypass the club screen. Hiding the screen is not sufficient.
-- **FR-010**: Only admins MUST be able to open the club catalogue. Other people MUST NOT browse the list of clubs from this feature.
+- **FR-010**: Only an active admin MUST be able to open the club catalogue. Other people, including an inactive admin, MUST NOT browse the list of clubs from this feature.
 - **FR-011**: When groups exist, each group MUST have exactly one home Club. A group MUST NOT belong to more than one club.
 - **FR-012**: A session that belongs to a group MUST use that group’s Club. A session that does not belong to a group MUST reference exactly one Club directly. This feature does not allow a grouped session to take place at a different club from its group.
 - **FR-013**: Clients MUST NOT be owned by a club. This feature MUST NOT add a home-club assignment on the client.
@@ -156,7 +156,7 @@ Later group and session work can point at this Club and must not invent another 
 
 > **Assumption:** No Club entity exists today. The footer address (Durisolstrasse 3, 5612 Villmergen, plus phone and email) is public contact copy under `FEAT-PUB-003`, not a managed club. Admins create clubs explicitly. That address is not imported as a club.
 
-> **Assumption:** “Admin” is the existing admin role from F1.02. Students and coaches are the other live roles. The unused accounting role cannot manage clubs.
+> **Assumption:** “Admin” means an active admin, the same active-admin rule as F1.02 after F1.04. An inactive admin, a student, a coach, and the unused accounting role cannot create, view, update, activate, or deactivate clubs. Hiding the screen is not sufficient.
 
 > **Assumption:** Required operational identity is the unique club name plus active/inactive status. Address and contact details are optional and can be completed later. No opening hours, court list, or price list is stored on the club in this feature (issue open decision on operational rules: those rules belong to later scheduling and pricing features).
 

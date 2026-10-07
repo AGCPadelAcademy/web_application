@@ -40,7 +40,7 @@
 
 ### Tests for the foundation
 
-- [ ] T002 Encode the plan.md RLS / trigger checklist and quickstart.md §3 in `tests/sql/0024_f107_club_management.test.sql` (or the renumbered file from T001): RLS enabled, `is_active` default true, unique index on `lower(name)`, `anon` denied, `authenticated` select/insert/update without delete, no DELETE policy, BEFORE DELETE trigger, security-invoker `clubs_for_new_use`, `private.club_is_selectable_for_new_use(uuid)` not executable by `anon`, and no new club column on `profiles`, `bookings`, `lessons`, or `camps`. Include a temporary child table with `ON DELETE RESTRICT` that is dropped before the script finishes
+- [ ] T002 Encode every item in the plan.md RLS / trigger checklist and quickstart.md §3 in `tests/sql/0024_f107_club_management.test.sql` (or the renumbered file from T001). The file must assert all of the following: `public.clubs` exists with RLS enabled and `is_active` defaulting to true; the unique index is on `lower(name)`; `anon` has no table, view, or function privileges; `authenticated` has select, insert, and update but not delete; there is no DELETE policy and BEFORE DELETE raises; an active admin can insert, update, deactivate, and reactivate; a student, coach, accounting user, inactive admin, and anonymous caller cannot read or change the catalogue; a blank or whitespace-only name is rejected; `Club Norte` and `club norte` cannot both exist; location, phone, and email may be null; changing `id` is rejected; deactivate then reactivate keeps the same `id`; `clubs_for_new_use` is security invoker, returns only active clubs, and is empty for a non-admin; `private.club_is_selectable_for_new_use(uuid)` is true for an active id, false for an inactive or unknown id, and not executable by `anon`; a temporary child row with `ON DELETE RESTRICT` still points at the club after deactivation, delete of the club fails, and the temporary table is dropped before the script finishes; `profiles`, `bookings`, `lessons`, and `camps` have no new club column; public footer, contact, and terms text are unchanged
 
 ### Foundation implementation
 
@@ -113,7 +113,8 @@
 **Purpose**: Run the automated gate and leave the live journeys for the user.
 
 - [ ] T014 [P] Run `npm run lint`, `npm test`, and `npm run build` from the repository root. Fix failures caused by this feature in `src/lib/clubs.js`, `src/lib/clubs.test.js`, `src/components/admin/ClubManagementPanel.jsx`, and `src/pages/AdminDashboardPage.jsx`
-- [ ] T015 [P] Record in `specs/features/011-club-management/quickstart.md` that §§4–7 remain manual checks for the user, and that `supabase/migrations/0024_f107_club_management.sql` is not applied to the live project unless the user explicitly asks
+- [ ] T015 [P] Record in `specs/features/011-club-management/quickstart.md` that §§4–7 remain manual checks for the user. State that `supabase/migrations/0024_f107_club_management.sql` and `tests/sql/0024_f107_club_management.test.sql` stay unapplied until the user explicitly asks
+- [ ] T016 If the user explicitly asks to apply the migration, apply `supabase/migrations/0024_f107_club_management.sql` to the live project, execute `tests/sql/0024_f107_club_management.test.sql`, and fix failures only in those two files. If the user has not asked, leave this task unchecked and do not connect to the live database
 
 ---
 
@@ -124,7 +125,7 @@
 - **Setup (Phase 1)**: No dependencies
 - **Foundational (Phase 2)**: Depends on T001. Blocks every user story
 - **User Stories (Phases 3–5)**: Depend on Phase 2. They share `src/lib/clubs.js`, `src/lib/clubs.test.js`, and `src/components/admin/ClubManagementPanel.jsx`, so they run in order US1 → US2 → US3
-- **Polish (Phase 6)**: Depends on the desired stories being complete
+- **Polish (Phase 6)**: Depends on the desired stories being complete. T016 also depends on T002 and T003, and stays unchecked until the user explicitly asks to apply the migration
 
 ### User Story Dependencies
 
@@ -183,7 +184,7 @@ One implementer should take the stories in order. The shared `clubs` service and
 
 ## Notes
 
-- Do not apply the migration to the live Supabase project unless the user explicitly asks
+- Do not apply the migration to the live Supabase project unless the user explicitly asks. T016 is that request; leave it unchecked otherwise
 - Do not add a delete API, a group table, a session table, a client home club, or a coach-club roster
 - Leave `src/components/layout/Footer.jsx`, `src/pages/ContactPage.jsx`, and `src/pages/TermsPage.jsx` unchanged
 - Browser checks in quickstart.md §§4–7 stay with the user. The implementation gate is `npm run lint`, `npm test`, and `npm run build`

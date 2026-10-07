@@ -161,7 +161,7 @@ Add a **Clubs** tab beside the existing dashboard tabs. The panel lists name, pl
 
 ## RLS / trigger verification checklist
 
-Run the static assertions in `tests/sql/0024_f107_club_management.test.sql`. Run actor checks only with marked test clubs, then deactivate or leave them clearly named as test data. The single live project is production.
+Author every assertion below in `tests/sql/0024_f107_club_management.test.sql` during implementation. Do not apply `supabase/migrations/0024_f107_club_management.sql` or execute that SQL file against the live project unless the user explicitly asks. The implementation gate remains `npm run lint`, `npm test`, and `npm run build`. When the user does ask, apply the migration, run the SQL file, then deactivate or clearly name any test clubs. The single live project is production.
 
 - [ ] `public.clubs` exists, RLS enabled, `is_active` defaults to true, name is required
 - [ ] Unique index is on `lower(name)`

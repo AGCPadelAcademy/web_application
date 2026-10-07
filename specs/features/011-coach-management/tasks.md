@@ -26,7 +26,7 @@
 
 **Purpose**: Lock the migration filename before any schema edit.
 
-- [ ] T001 Compare `supabase/migrations/` (latest local file `supabase/migrations/0023_f125_junior_places_countdown.sql`) with the remote migration list. Use `supabase/migrations/0024_f106_coach_management.sql` and `tests/sql/0024_f106_coach_management.test.sql` only if `0024` is free; otherwise pick the next free number and use that same number in both paths
+- [X] T001 Compare `supabase/migrations/` (latest local file `supabase/migrations/0023_f125_junior_places_countdown.sql`) with the remote migration list. Use `supabase/migrations/0024_f106_coach_management.sql` and `tests/sql/0024_f106_coach_management.test.sql` only if `0024` is free; otherwise pick the next free number and use that same number in both paths
 
 **Checkpoint**: The migration filename is safe for the target project.
 
@@ -40,12 +40,12 @@
 
 ### Tests for the foundation
 
-- [ ] T002 [P] Encode the plan.md trigger checklist in `tests/sql/0024_f106_coach_management.test.sql` in two parts. Static queries, safe on any database: the function body contains `is_active`; `is_coach()` still requires `is_active`; no new Coach, Group, attendance, or payroll table; no new profile or booking DELETE. Commented JWT transactions, run only on a test project: an admin assigns an active Coach; an inactive Coach raises `coach_id must reference an active coach` and the row stays unchanged; a student raises the existing non-coach error; a non-admin cannot change `coach_id` or set `profiles.role` to `coach`; deactivating a Coach does not change `bookings.coach_id`; an update that leaves `coach_id` unchanged succeeds while that Coach is inactive; clearing `coach_id` keeps the booking; an inactive Coach’s `session_roster` read returns no rows and, after reactivation, the still-assigned rows return
+- [X] T002 [P] Encode the plan.md trigger checklist in `tests/sql/0024_f106_coach_management.test.sql` in two parts. Static queries, safe on any database: the function body contains `is_active`; `is_coach()` still requires `is_active`; no new Coach, Group, attendance, or payroll table; no new profile or booking DELETE. Commented JWT transactions, run only on a test project: an admin assigns an active Coach; an inactive Coach raises `coach_id must reference an active coach` and the row stays unchanged; a student raises the existing non-coach error; a non-admin cannot change `coach_id` or set `profiles.role` to `coach`; deactivating a Coach does not change `bookings.coach_id`; an update that leaves `coach_id` unchanged succeeds while that Coach is inactive; clearing `coach_id` keeps the booking; an inactive Coach’s `session_roster` read returns no rows and, after reactivation, the still-assigned rows return
 
 ### Foundation implementation
 
-- [ ] T003 Replace `public.prevent_non_admin_coach_assignment()` in `supabase/migrations/0024_f106_coach_management.sql` per data-model.md §3 and contracts/coach-management.md §5: keep security invoker, empty `search_path`, and admin-only changes; require `role = 'coach' AND is_active` when `coach_id` is inserted or changed to a non-null value; raise `coach_id must reference an active coach` for an inactive Coach; keep the existing non-coach and non-admin errors; do not clear `coach_id` from a profile trigger; do not change `is_coach()`, roster grants, or profile RLS; reload the Data API schema cache
-- [ ] T004 Apply `supabase/migrations/0024_f106_coach_management.sql` only on a separate test project, run `tests/sql/0024_f106_coach_management.test.sql`, and fix feature-caused failures in those two files. If no test project is configured, do not apply the migration to production; record that blocker in `specs/features/011-coach-management/quickstart.md` and stop before story work
+- [X] T003 Replace `public.prevent_non_admin_coach_assignment()` in `supabase/migrations/0024_f106_coach_management.sql` per data-model.md §3 and contracts/coach-management.md §5: keep security invoker, empty `search_path`, and admin-only changes; require `role = 'coach' AND is_active` when `coach_id` is inserted or changed to a non-null value; raise `coach_id must reference an active coach` for an inactive Coach; keep the existing non-coach and non-admin errors; do not clear `coach_id` from a profile trigger; do not change `is_coach()`, roster grants, or profile RLS; reload the Data API schema cache
+- [X] T004 Apply `supabase/migrations/0024_f106_coach_management.sql` only on a separate test project, run `tests/sql/0024_f106_coach_management.test.sql`, and fix feature-caused failures in those two files. If no test project is configured, do not apply the migration to production; record that blocker in `specs/features/011-coach-management/quickstart.md` and stop before story work
 
 **Checkpoint**: A new assignment requires an active Coach. Deactivation leaves existing `coach_id` values in place.
 
@@ -59,12 +59,12 @@
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Add a failing Vitest case in `src/lib/clientManagement.test.js` that `updateClientRole` to `coach` for another user sends only `{ role: 'coach' }`, and that `listClients({ role: 'coach' })` filters `role` to `coach`
+- [X] T005 [P] [US1] Add a failing Vitest case in `src/lib/clientManagement.test.js` that `updateClientRole` to `coach` for another user sends only `{ role: 'coach' }`, and that `listClients({ role: 'coach' })` filters `role` to `coach`
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Create `src/components/admin/CoachManagementPanel.jsx` that lists Coaches with `listClients({ role: 'coach' })`, edits permitted personal fields with `updateClientPersonalFields`, and promotes an existing `student` or `admin` with `updateClientRole(..., 'coach')`. Reuse the client-management search, paging, form controls, and error toasts. Default the status filter to all Coaches, with active and inactive as narrower choices, so a later deactivation does not remove the person from the list. Do not add a create-login or invite action, and do not add a write path in `src/lib/clientManagement.js`
-- [ ] T007 [US1] Add a Coaches tab to `src/pages/AdminDashboardPage.jsx` that renders `src/components/admin/CoachManagementPanel.jsx` for the existing admin route, without removing Client management, Camps, Bexio, or Coach assignment
+- [X] T006 [US1] Create `src/components/admin/CoachManagementPanel.jsx` that lists Coaches with `listClients({ role: 'coach' })`, edits permitted personal fields with `updateClientPersonalFields`, and promotes an existing `student` or `admin` with `updateClientRole(..., 'coach')`. Reuse the client-management search, paging, form controls, and error toasts. Default the status filter to all Coaches, with active and inactive as narrower choices, so a later deactivation does not remove the person from the list. Do not add a create-login or invite action, and do not add a write path in `src/lib/clientManagement.js`
+- [X] T007 [US1] Add a Coaches tab to `src/pages/AdminDashboardPage.jsx` that renders `src/components/admin/CoachManagementPanel.jsx` for the existing admin route, without removing Client management, Camps, Bexio, or Coach assignment
 
 **Checkpoint**: US1 is testable from the admin dashboard. Existing Coaches appear with no backfill.
 
@@ -78,7 +78,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Add activate and deactivate actions to `src/components/admin/CoachManagementPanel.jsx` using `updateClientStatus` only. Do not update `bookings` from this panel. Surface the existing self-deactivation and last-admin errors. An inactive Coach remains in the list
+- [X] T008 [US2] Add activate and deactivate actions to `src/components/admin/CoachManagementPanel.jsx` using `updateClientStatus` only. Do not update `bookings` from this panel. Surface the existing self-deactivation and last-admin errors. An inactive Coach remains in the list
 
 **Checkpoint**: US2 is demonstrable on the Coaches tab. History retention is the foundational trigger, not a second update.
 
@@ -92,7 +92,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T009 [P] [US3] Check `src/pages/ProfileManagementPage.jsx`, `src/pages/CoachRosterPage.jsx`, `src/lib/sessionRoster.js`, and `src/lib/sessionRoster.test.js` against contracts/coach-management.md §§4 and 6. Do not add a screen or a participant field. Change one of those files only if a Coach can edit role or status, or if the roster select adds a field beyond identity and phone. The inactive-roster and reactivation results are asserted by the commented JWT section of `tests/sql/0024_f106_coach_management.test.sql`, not by this review
+- [X] T009 [P] [US3] Check `src/pages/ProfileManagementPage.jsx`, `src/pages/CoachRosterPage.jsx`, `src/lib/sessionRoster.js`, and `src/lib/sessionRoster.test.js` against contracts/coach-management.md §§4 and 6. Do not add a screen or a participant field. Change one of those files only if a Coach can edit role or status, or if the roster select adds a field beyond identity and phone. The inactive-roster and reactivation results are asserted by the commented JWT section of `tests/sql/0024_f106_coach_management.test.sql`, not by this review
 
 **Checkpoint**: US3 stays on the current profile page and `/coach/roster` route. No new Coach screen.
 
@@ -106,12 +106,12 @@
 
 ### Tests for User Story 4
 
-- [ ] T010 [P] [US4] Update `src/lib/coachAssignments.test.js` so `listCoachProfiles` must filter `is_active` true as well as `role` coach, and `coachAssignmentErrorMessage` maps `coach_id must reference an active coach` to a stable admin message. Confirm the new assertions fail before T011
+- [X] T010 [P] [US4] Update `src/lib/coachAssignments.test.js` so `listCoachProfiles` must filter `is_active` true as well as `role` coach, and `coachAssignmentErrorMessage` maps `coach_id must reference an active coach` to a stable admin message. Confirm the new assertions fail before T011
 
 ### Implementation for User Story 4
 
-- [ ] T011 [US4] In `src/lib/coachAssignments.js`, limit `listCoachProfiles` to active Coaches and map the inactive-coach error in `coachAssignmentErrorMessage`. Extend the assignment load so each booking can display its current Coach name even when that Coach is inactive, without listing other inactive Coaches as new choices
-- [ ] T012 [US4] Update `src/components/admin/CoachAssignmentPanel.jsx` so the select options are active Coaches plus the current assignee when that assignee is inactive. Do not clear `coach_id` while loading. Keep admin-only save behavior through `updateBookingCoachId`
+- [X] T011 [US4] In `src/lib/coachAssignments.js`, limit `listCoachProfiles` to active Coaches and map the inactive-coach error in `coachAssignmentErrorMessage`. Extend the assignment load so each booking can display its current Coach name even when that Coach is inactive, without listing other inactive Coaches as new choices
+- [X] T012 [US4] Update `src/components/admin/CoachAssignmentPanel.jsx` so the select options are active Coaches plus the current assignee when that assignee is inactive. Do not clear `coach_id` while loading. Keep admin-only save behavior through `updateBookingCoachId`
 
 **Checkpoint**: US4 is independently testable against the foundational trigger. One Coach per occurrence remains.
 
@@ -121,8 +121,8 @@
 
 **Purpose**: Quality gate and handoff. No new product surface.
 
-- [ ] T013 [P] Run `npm run lint`, `npm test`, and `npm run build` from `package.json` and fix feature-caused failures in `src/lib/coachAssignments.js`, `src/lib/coachAssignments.test.js`, `src/lib/clientManagement.test.js`, `src/components/admin/CoachManagementPanel.jsx`, `src/components/admin/CoachAssignmentPanel.jsx`, and `src/pages/AdminDashboardPage.jsx`
-- [ ] T014 Record in `specs/features/011-coach-management/quickstart.md` which automated checks passed and leave §4 journeys for the user. Do not edit `specs/baseline-system/` until the user accepts the feature
+- [X] T013 [P] Run `npm run lint`, `npm test`, and `npm run build` from `package.json` and fix feature-caused failures in `src/lib/coachAssignments.js`, `src/lib/coachAssignments.test.js`, `src/lib/clientManagement.test.js`, `src/components/admin/CoachManagementPanel.jsx`, `src/components/admin/CoachAssignmentPanel.jsx`, and `src/pages/AdminDashboardPage.jsx`
+- [X] T014 Record in `specs/features/011-coach-management/quickstart.md` which automated checks passed and leave §4 journeys for the user. Do not edit `specs/baseline-system/` until the user accepts the feature
 
 ---
 

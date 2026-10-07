@@ -75,9 +75,23 @@ These are for the user in the live app after the quality gate passes.
 8. As C, assigned only to one booking, the roster shows that booking’s participant identity and phone, not another booking, and not admin or billing screens.
 9. Student booking, client management, camps, and Bexio admin entry still open for their existing roles.
 
-## 5. Regression boundaries
+## 5. Automated gate (2026-10-07)
+
+Passed in this workspace:
+
+- `npm run lint`
+- `npm test` (121 passed, 2 skipped)
+- `npm run build` with placeholder Supabase env vars
+
+Remote migration history ends at `0023_f125_junior_places_countdown`. `0024` is unused. No `SUPABASE_TEST_URL` is configured, so `supabase/migrations/0024_f106_coach_management.sql` was not applied to production. The commented JWT section in `tests/sql/0024_f106_coach_management.test.sql` is still waiting on a test project.
+
+Own-profile and roster screens were checked against the contract and left unchanged: role and status stay read-only, and the roster select stays identity and phone.
+
+## 6. Regression boundaries
 
 - Existing Coach profiles remain Coaches.
 - Deactivation deletes nothing.
 - Payroll, availability, Groups, and attendance stay absent.
 - Participant fields stay identity and phone.
+
+Section 4 remains for the user in the live app. Apply the migration on a test project before those journeys. Do not treat this file as baseline-system refresh; that waits until the feature is accepted.

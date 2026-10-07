@@ -68,6 +68,21 @@ describe('admin updates', () => {
     expect(ASSIGNABLE_ROLES).toEqual(['student', 'coach', 'admin']);
   });
 
+  it('lists coaches and promotes another person to coach', async () => {
+    const chain = makeChain({ data: [{ id: 'u2', role: 'coach' }], error: null, count: 1 });
+    mockSupabase.from.mockReturnValue(chain);
+
+    await listClients({ role: 'coach' });
+    expect(chain.eq).toHaveBeenCalledWith('role', 'coach');
+
+    await updateClientRole('u2', 'coach', 'admin');
+    const payload = chain.update.mock.calls[0][0];
+    expect(payload.role).toBe('coach');
+    expect(payload).not.toHaveProperty('email');
+    expect(payload).not.toHaveProperty('is_active');
+    expect(payload).not.toHaveProperty('first_name');
+  });
+
   it('refuses own-role and accounting assignments before the request', async () => {
     await expect(updateClientRole('self', 'coach', 'self')).rejects.toThrow('own role');
     await expect(updateClientRole('u2', 'accounting', 'self')).rejects.toThrow('Bexio');

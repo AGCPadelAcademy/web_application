@@ -123,6 +123,13 @@ const CoachAssignmentPanel = () => {
                       {coach.full_name || 'Coach'}
                     </option>
                   ))}
+                  {booking.coach_id && !coaches.some((coach) => coach.id === booking.coach_id) && (
+                    <option value={booking.coach_id}>
+                      {booking.coach_is_active === false
+                        ? `${booking.coach_full_name || 'Coach'} (inactive)`
+                        : (booking.coach_full_name || 'Coach')}
+                    </option>
+                  )}
                 </select>
               </td>
             </tr>

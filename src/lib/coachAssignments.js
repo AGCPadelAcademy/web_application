@@ -30,6 +30,9 @@ export function coachAssignmentErrorMessage(error) {
   if (raw.includes('only an administrator can change coach assignment')) {
     return 'Only an administrator can change coach assignment.';
   }
+  if (raw.includes('coach_id must reference an active coach')) {
+    return 'That coach is inactive. Choose an active coach or clear the assignment.';
+  }
   if (raw.includes('coach_id must reference a profile with role coach')) {
     return 'That profile is not a coach. Choose a coach or clear the assignment.';
   }
@@ -41,6 +44,7 @@ export async function listCoachProfiles() {
     .from('profiles')
     .select('id, full_name')
     .eq('role', 'coach')
+    .eq('is_active', true)
     .order('full_name', { ascending: true });
 
   if (error) throw error;
@@ -56,22 +60,29 @@ export async function listBookingsForAssignment({ limit = 80 } = {}) {
 
   if (error) throw error;
   const rows = data ?? [];
-  const userIds = [...new Set(rows.map((row) => row.user_id).filter(Boolean))];
-  if (userIds.length === 0) {
-    return rows.map((row) => ({ ...row, participant_full_name: 'Student' }));
+  const profileIds = [...new Set(rows.flatMap((row) => [row.user_id, row.coach_id]).filter(Boolean))];
+  if (profileIds.length === 0) {
+    return rows.map((row) => ({
+      ...row,
+      participant_full_name: 'Student',
+      coach_full_name: null,
+      coach_is_active: null,
+    }));
   }
 
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name')
-    .in('id', userIds);
+    .select('id, full_name, is_active')
+    .in('id', profileIds);
 
   if (profileError) throw profileError;
 
-  const names = Object.fromEntries((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const byId = Object.fromEntries((profiles ?? []).map((profile) => [profile.id, profile]));
   return rows.map((row) => ({
     ...row,
-    participant_full_name: names[row.user_id] || 'Student',
+    participant_full_name: byId[row.user_id]?.full_name || 'Student',
+    coach_full_name: row.coach_id ? (byId[row.coach_id]?.full_name || 'Coach') : null,
+    coach_is_active: row.coach_id ? byId[row.coach_id]?.is_active === true : null,
   }));
 }
 

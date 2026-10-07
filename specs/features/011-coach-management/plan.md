@@ -132,7 +132,7 @@ Create one migration only after checking that `0024` is free in the remote migra
 ### 2. Admin Coach directory
 
 - Add a Coaches tab on `AdminDashboardPage`. It does not depend on the `coach_id` column probe.
-- `CoachManagementPanel` lists with `listClients({ role: 'coach' })` and the existing search, status filter, and page size.
+- `CoachManagementPanel` lists with `listClients({ role: 'coach' })`, the existing search, and a status filter whose default is all Coaches. Active and inactive are optional narrower filters. Page size stays bounded at the existing client-directory default.
 - Edit permitted personal fields with `updateClientPersonalFields`. Activate or deactivate with `updateClientStatus`. Both already hit the profile mutation guard.
 - Promote from a search of existing non-coach people (`student` or `admin`) through `updateClientRole(..., 'coach')`. Do not add a create-login or invite action. `accounting` stays unassignable. Self-role change and last-active-admin refusal stay server-side.
 - After promotion, the person appears in the Coach list. People who already have `role = 'coach'` appear with no data repair.

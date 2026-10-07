@@ -40,7 +40,7 @@
 
 ### Tests for the foundation
 
-- [ ] T002 [P] Encode the plan.md trigger checklist as read-only assertions in `tests/sql/0024_f106_coach_management.test.sql`: function body contains `is_active`; unchanged `coach_id` is not revalidated; inactive-coach, non-coach, and non-admin failures use the contract error texts; deactivation does not update `bookings.coach_id`; clear-to-null keeps the booking; no new Coach, Group, attendance, or payroll table
+- [ ] T002 [P] Encode the plan.md trigger checklist in `tests/sql/0024_f106_coach_management.test.sql` in two parts. Static queries, safe on any database: the function body contains `is_active`; `is_coach()` still requires `is_active`; no new Coach, Group, attendance, or payroll table; no new profile or booking DELETE. Commented JWT transactions, run only on a test project: an admin assigns an active Coach; an inactive Coach raises `coach_id must reference an active coach` and the row stays unchanged; a student raises the existing non-coach error; a non-admin cannot change `coach_id` or set `profiles.role` to `coach`; deactivating a Coach does not change `bookings.coach_id`; an update that leaves `coach_id` unchanged succeeds while that Coach is inactive; clearing `coach_id` keeps the booking; an inactive Coach’s `session_roster` read returns no rows and, after reactivation, the still-assigned rows return
 
 ### Foundation implementation
 
@@ -63,7 +63,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Create `src/components/admin/CoachManagementPanel.jsx` that lists Coaches with `listClients({ role: 'coach' })`, edits permitted personal fields with `updateClientPersonalFields`, and promotes an existing `student` or `admin` with `updateClientRole(..., 'coach')`. Reuse the client-management search, paging, form controls, and error toasts. Do not add a create-login or invite action, and do not add a write path in `src/lib/clientManagement.js`
+- [ ] T006 [US1] Create `src/components/admin/CoachManagementPanel.jsx` that lists Coaches with `listClients({ role: 'coach' })`, edits permitted personal fields with `updateClientPersonalFields`, and promotes an existing `student` or `admin` with `updateClientRole(..., 'coach')`. Reuse the client-management search, paging, form controls, and error toasts. Default the status filter to all Coaches, with active and inactive as narrower choices, so a later deactivation does not remove the person from the list. Do not add a create-login or invite action, and do not add a write path in `src/lib/clientManagement.js`
 - [ ] T007 [US1] Add a Coaches tab to `src/pages/AdminDashboardPage.jsx` that renders `src/components/admin/CoachManagementPanel.jsx` for the existing admin route, without removing Client management, Camps, Bexio, or Coach assignment
 
 **Checkpoint**: US1 is testable from the admin dashboard. Existing Coaches appear with no backfill.
@@ -92,7 +92,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T009 [P] [US3] Check `src/pages/ProfileManagementPage.jsx`, `src/pages/CoachRosterPage.jsx`, `src/lib/sessionRoster.js`, and `src/lib/sessionRoster.test.js` against contracts/coach-management.md §§4 and 6. Change one of those files only if it lets a Coach edit role or status, shows roster rows for an inactive Coach, or adds a participant field beyond identity and phone
+- [ ] T009 [P] [US3] Check `src/pages/ProfileManagementPage.jsx`, `src/pages/CoachRosterPage.jsx`, `src/lib/sessionRoster.js`, and `src/lib/sessionRoster.test.js` against contracts/coach-management.md §§4 and 6. Do not add a screen or a participant field. Change one of those files only if a Coach can edit role or status, or if the roster select adds a field beyond identity and phone. The inactive-roster and reactivation results are asserted by the commented JWT section of `tests/sql/0024_f106_coach_management.test.sql`, not by this review
 
 **Checkpoint**: US3 stays on the current profile page and `/coach/roster` route. No new Coach screen.
 

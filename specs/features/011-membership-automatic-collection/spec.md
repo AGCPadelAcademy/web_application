@@ -14,6 +14,17 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-10-07
+
+- Q: When a Direct Debit collection for a Membership period is already submitted and not yet confirmed, what should the client be able to do with the QR invoice? → A: Hide QR pay in the app for that period. If both the debit and a bank transfer still settle (for example because the invoice was already emailed), keep one paid outcome and surface the extra receipt to Admins. No refund UI.
+- Q: When the client or Admin stops auto-pay while a Direct Debit collection is already submitted, what happens to that collection? → A: Let it finish. Stop auto-pay blocks only later periods. If that debit confirms, the period is paid.
+- Q: After a mandate is rejected or revoked, who can start a new authorization proposal? → A: The client or an Admin can explicitly request one new authorization proposal. It is a new attempt. The rejected or revoked mandate is never treated as active.
+- Q: When a client is deactivated after a mandate is already active, may AGC still collect later Membership periods? → A: No new Direct Debit collections. A collection already submitted may finish. History stays readable. A new opt-in is refused.
+
+---
+
 ## Gap analysis (current → target)
 
 Inspected: GitHub issue #54, F1.09 issue #14, constitution, project context, domain model, baseline requirements (`WF-007`, `XR-005`, `FEAT-PAY-*`), F1.03 (`007`), F1.25 (`010`) billing extension, unused `memberships` / `credits` tables, live payment path. Confirmed unless marked assumption.
@@ -61,7 +72,7 @@ After opt-in, AGC requests a Direct Debit **authorization proposal** through the
 
 **Why this priority**: Collection is illegal/impossible without a mandate. This slice proves the authorization path without depending on a billing period running.
 
-**Independent Test**: Opt in once; exactly one proposal exists. Retry the same opt-in; still one proposal. Status moves from proposal sent to active after simulated bank approval, and to rejected/unsupported without marking anything paid.
+**Independent Test**: Opt in once; exactly one proposal exists. Retry the same opt-in; still one proposal. Status moves from proposal sent to active after simulated bank approval, and to rejected/unsupported without marking anything paid. After rejection or revocation, an explicit new request from the client or an Admin creates one new attempt and does not treat the old mandate as active.
 
 **Acceptance Scenarios**:
 
@@ -71,6 +82,7 @@ After opt-in, AGC requests a Direct Debit **authorization proposal** through the
 4. **Given** the payer’s institution does not support eBill Direct Debit, **When** the channel reports that, **Then** status is **unsupported bank**, auto-pay is unavailable, and QR / invoice payment is offered.
 5. **Given** the client or bank rejects or later revokes the mandate, **When** AGC learns that status, **Then** further Direct Debit collections MUST NOT be submitted and QR / invoice remains the payment path.
 6. **Given** any mandate record, **When** it is stored, **Then** AGC NEVER stores full bank login credentials. IBAN or eBill recipient identifiers are collected only if the contracted channel requires them, under existing PII and authorization rules.
+7. **Given** a mandate is rejected or revoked, **When** the client or an Admin explicitly requests a new authorization proposal, **Then** AGC creates one new attempt and does not treat the rejected or revoked mandate as active. Repeating that request while the new attempt is in flight correlates to it and does not create another.
 
 ---
 
@@ -105,37 +117,41 @@ When automatic collection is unavailable, the client pays the F1.03 invoice by Q
 1. **Given** the client did not opt in, **When** a Membership period is billed, **Then** payment is by QR / invoice and no Direct Debit collection is submitted.
 2. **Given** unsupported bank, missing mandate, or revoked/rejected mandate, **When** the client views payment status, **Then** they see that auto-pay is unavailable and can pay the invoice by QR / bank transfer.
 3. **Given** a lesson booking invoice, **When** Membership auto-pay is enabled for that client, **Then** the lesson invoice path is unchanged.
+4. **Given** a Direct Debit collection has been submitted for a Membership period and is not yet confirmed, **When** the client views payment for that period, **Then** QR pay is not offered in the app. If both that debit and a bank transfer still settle, the period is paid once and Admins can see the extra receipt, with no refund UI.
 
 ---
 
 ### User Story 5 - Failed collection, reclaim, and stop (Priority: P2)
 
-A failed or rejected collection does not silently activate or extend a Membership. Client reclaim / objection is handled in eBill; AGC does not invent a second money-movement UI. When F1.03 or the partner reports a reversal, AGC surfaces it to Admins and stops treating the period as paid. Stopping auto-pay in AGC stops further collection submissions. Mandate revocation at the bank is detected and also stops collections. What happens to an already-Active Membership (pause vs stay Active until period end) is owned by F1.09 — this feature MUST NOT invent a second cancellation policy.
+A failed or rejected collection does not silently activate or extend a Membership. Client reclaim / objection is handled in eBill; AGC does not invent a second money-movement UI. When F1.03 or the partner reports a reversal, AGC surfaces it to Admins and stops treating the period as paid. Stopping auto-pay in AGC stops collection submissions for later periods. A collection already submitted is allowed to finish, and if it confirms, that period is paid. Mandate revocation at the bank is detected and also stops later collections. What happens to an already-Active Membership (pause vs stay Active until period end) is owned by F1.09 — this feature MUST NOT invent a second cancellation policy.
 
 **Why this priority**: Silent activation on failure, or continuing to collect after stop/revoke, would be financially and legally wrong.
 
-**Independent Test**: Simulate failed collection, reversal, in-app stop, and bank revocation. Confirm no activation/extension on failure, Admin visibility of reversal, and no further collection submissions after stop or revoke.
+**Independent Test**: Simulate failed collection, reversal, in-app stop, and bank revocation. Confirm no activation/extension on failure, Admin visibility of reversal, and no new collection submissions for later periods after stop or revoke. An already-submitted collection is still allowed to finish.
 
 **Acceptance Scenarios**:
 
 1. **Given** a failed or rejected collection, **When** AGC records it, **Then** the Membership is not activated or extended because of that attempt, and the period is not treated as paid.
 2. **Given** a reported reclaim/reversal from the accounting system or the collection channel, **When** AGC records it, **Then** Admins can see it and the period is no longer treated as paid.
-3. **Given** the client or Admin stops auto-pay in AGC, **When** later billing periods run, **Then** no further Direct Debit collection submissions are made (QR / invoice remains available).
+3. **Given** the client or Admin stops auto-pay in AGC, **When** later billing periods run, **Then** no further Direct Debit collection submissions are made (QR / invoice remains available). A collection already submitted for the current period is allowed to finish, and if it confirms, that period is paid.
 4. **Given** the mandate is revoked in the bank, **When** AGC learns that status, **Then** further collections stop. Effect on an already-Active Membership follows F1.09; this feature does not invent pause/cancel rules.
+5. **Given** a client is deactivated, **When** a later Membership period is billed or someone tries to opt in, **Then** no new Direct Debit collection is submitted and the new opt-in is refused. A collection already submitted may finish. Mandate and invoice history stays readable.
 
 ---
 
 ### Edge Cases
 
 - Opt-in while a proposal is already in flight: retry correlates; no second proposal.
-- Opt-in after a previous rejection: a new proposal MAY be requested; it MUST be a new correlated attempt, not a silent reuse of a rejected mandate as if it were active.
+- Opt-in after rejection or revocation: the client or an Admin may explicitly request one new authorization proposal. It is a new attempt. The rejected or revoked mandate is never treated as active. Repeating the request while that new attempt is in flight correlates to it.
 - Channel not configured: auto-pay is not offered; QR remains.
-- Client opts in, then pays the same period by QR before Direct Debit confirms: at most one paid outcome for that period; no second collection after the period is already paid.
+- Client opts in, then pays the same period by QR before a Direct Debit collection is submitted: at most one paid outcome; no collection is submitted after the period is already paid.
+- After a Direct Debit collection is submitted and not yet confirmed: QR pay is hidden in the app for that period. If both the debit and a bank transfer still settle, the period is paid once, the extra receipt is visible to Admins, and AGC does not add a refund UI.
+- Stop auto-pay while a collection is already submitted: that collection is allowed to finish and, if it confirms, the period is paid. No new collection is submitted for a later period.
 - Duplicate job runs / double-click / worker restart: still one invoice and one collection per period.
 - Partner timeout after the collection was actually created: recovery MUST find the existing collection instead of submitting a second one.
 - Stale status webhook or poll older than current AGC state: ignored for overwrite.
 - IBAN / recipient id required by the channel but missing: proposal is not sent; client/Admin sees a clear completion request; no paid flag.
-- Admin sets auto-pay for a deactivated client: follow F1.04 — deactivated clients cannot start new financial commitments; existing history remains readable.
+- Deactivated client: no new Direct Debit collection is submitted, and a new opt-in is refused. A collection already submitted may finish, and if it confirms, that period is paid. Mandate and invoice history stays readable.
 - Partial accounting payment vs full Direct Debit confirmation: the period is paid only when the canonical financial position is fully paid (same spirit as 007 partial-payment rules).
 - Reversal after F1.09 already consumed payment-confirmed: this feature marks the period no longer paid and surfaces the reversal; F1.09 owns any Membership lifecycle reaction (do not invent one here).
 - Kids semester and Camp registration: MUST NOT be billed by this V1 collection job even if a later reuse of the mandate mapping is designed.
@@ -163,7 +179,7 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 - **FR-006**: After opt-in, AGC MUST request a Direct Debit authorization proposal through the contracted issuer channel. AGC MUST NOT connect to SIX directly.
 - **FR-007**: AGC MUST persist a durable, provider-neutral mandate mapping: AGC client and Membership, external mandate/Biller references, status, timestamps, and failure reason when known.
 - **FR-008**: Mandate status MUST at least distinguish: not requested, proposal sent, active, rejected, revoked, failed, unsupported bank.
-- **FR-009**: Opt-in MUST create exactly one authorization proposal for that Membership/client; retries MUST correlate to the existing proposal.
+- **FR-009**: Opt-in MUST create exactly one authorization proposal for that Membership/client; retries of the same attempt MUST correlate to the existing proposal. After that mandate is rejected or revoked, the client or an Admin MAY explicitly request one new authorization proposal. That request is a new attempt and MUST NOT treat the rejected or revoked mandate as active. Retries of the new request MUST correlate to it until that attempt itself ends as rejected or revoked.
 - **FR-010**: Sending a proposal or having an active mandate MUST NOT by itself mark the Membership or a period as paid, and MUST NOT by itself mark the Membership Active.
 - **FR-011**: AGC MUST NEVER store full bank credentials. IBAN or eBill recipient identifiers MAY be collected only if the contracted channel requires them, under existing PII rules and server-side authorization.
 - **FR-012**: Partner, eBill Web, accounting, and bank credentials MUST stay server-side. Least-privilege access to mandate and collection operations. Do not log tokens, full account numbers, or unnecessary financial PII. External identifiers are not authorization credentials.
@@ -183,16 +199,18 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 
 #### Fallback, failure, stop
 
-- **FR-023**: Automatic collection MUST be unavailable — and QR / invoice used instead — when: the client did not opt in; the payer’s institution does not support eBill Direct Debit; the mandate is missing, rejected, or revoked; or the issuer channel is not configured.
+- **FR-023**: Automatic collection MUST be unavailable — and QR / invoice used instead — when: the client did not opt in; the payer’s institution does not support eBill Direct Debit; the mandate is missing, rejected, or revoked; or the issuer channel is not configured. Once a Direct Debit collection has been submitted for a period and is not yet confirmed, AGC MUST hide QR pay for that period in the app.
+- **FR-023a**: If both that submitted collection and a bank transfer still settle, the period MUST be recorded as paid once, the extra receipt MUST be visible to Admins, and AGC MUST NOT add a refund or second money-movement UI.
 - **FR-024**: AGC MUST show a clear, honest status in those cases (for example: waiting for bank mandate approval; auto-pay unavailable at your bank; pay by invoice).
 - **FR-025**: A failed or rejected collection MUST NOT activate or extend a Membership and MUST NOT mark the period paid.
 - **FR-026**: Client reclaim / objection is handled in eBill. AGC MUST NOT invent a second money-movement or refund UI. When F1.03 or the partner reports a reversal, AGC MUST surface it to Admins and MUST NOT keep treating the period as paid.
-- **FR-027**: Stopping auto-pay in AGC MUST stop further collection submissions. Detected bank-side mandate revocation MUST also stop collections. Effect on an already-Active Membership is owned by F1.09; this feature MUST NOT invent a second cancellation or pause policy.
+- **FR-027**: Stopping auto-pay in AGC MUST stop collection submissions for later periods. A collection already submitted MUST be allowed to finish, and if it confirms, that period is paid. Detected bank-side mandate revocation MUST also stop later collections. Effect on an already-Active Membership is owned by F1.09; this feature MUST NOT invent a second cancellation or pause policy.
 - **FR-028**: No card payments, Stripe, TWINT PSP checkout, or generic credit-wallet model. Membership remains a Group fixed-place (F1.09); Recovery remains a domain entitlement (F1.13).
 
 #### Authorization, reuse, tests
 
 - **FR-029**: Clients MUST see only their own mandate and collection status. Admins MAY see academy-wide operational status. Non-Admins MUST NOT perform Admin collection operations. Backend authorization is authoritative (F1.02).
+- **FR-029a**: When a client is deactivated, AGC MUST NOT submit a new Direct Debit collection and MUST refuse a new automatic-collection opt-in. A collection already submitted MAY finish, and a confirmed result marks that period paid. Mandate and invoice history MUST stay readable.
 - **FR-030**: The mandate/collection mapping SHOULD be reusable later by Kids-semester or other chargeable types without copying mandate logic into those domains. Kids (F1.18 / F1.20) and Camps (F1.25) are **not** V1 of this feature.
 - **FR-031**: Mandate uniqueness, duplicate-collection prevention, fallback-to-QR, reversal visibility, authorization isolation, and payment-confirmed → F1.09 signal paths MUST be covered by this feature’s tests and belong in F1.24 integration/regression coverage.
 
@@ -215,15 +233,16 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 ### Measurable Outcomes
 
 - **SC-001**: An authorized client or Admin can complete automatic-collection opt-in from AGC in under 2 minutes without being instructed to configure Automatic transaction / standing approval in e-banking.
-- **SC-002**: 100% of opt-ins produce at most one authorization proposal per Membership/client across retries.
+- **SC-002**: 100% of opt-ins produce at most one in-flight authorization proposal per Membership/client across retries. An explicit new request after rejection or revocation creates one new attempt and never reuses the rejected or revoked mandate as active.
 - **SC-003**: 0% of “proposal sent” or “mandate active” events, by themselves, mark a Membership period paid or the Membership Active.
 - **SC-004**: 100% of billing periods with an active mandate produce at most one invoice and at most one collection request, including after retries.
-- **SC-005**: After confirmed collection/reconciliation, the period is marked paid and F1.09 can observe the payment-confirmed signal within one synchronization interval (target ≤ 1 hour), with 0 double-paid periods over any rolling 30-day window.
+- **SC-005**: After confirmed collection/reconciliation, the period is marked paid and F1.09 can observe the payment-confirmed signal within one synchronization interval (target ≤ 1 hour), with 0 double-paid periods over any rolling 30-day window. A period that receives both a confirmed collection and a bank transfer is still one paid period, and the extra receipt is visible to Admins.
 - **SC-006**: 100% of failed/rejected collections leave the Membership not activated or extended by that attempt.
 - **SC-007**: 100% of unsupported-bank, missing-mandate, revoked-mandate, not-opted-in, and unconfigured-channel cases offer QR / invoice payment with an honest status in AGC.
 - **SC-008**: 100% of unauthorized attempts to view or change another client’s mandate or collection status are denied.
 - **SC-009**: Lesson invoices remain payable and reconcilable exactly as today; 0 lesson invoices are submitted as Direct Debit collections by this feature.
-- **SC-010**: After stop-auto-pay in AGC or detected bank revocation, 0 further Direct Debit collections are submitted for that Membership.
+- **SC-010**: After stop-auto-pay in AGC or detected bank revocation, 0 further Direct Debit collections are submitted for later periods of that Membership. A collection already submitted before the stop is allowed to finish, and a confirmed result still marks that period paid.
+- **SC-011**: After a client is deactivated, 0 new Direct Debit collections are submitted and 0 new automatic-collection opt-ins succeed. A collection already submitted may finish. Mandate and invoice history remains readable.
 
 ---
 
@@ -294,6 +313,6 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 
 ## Open questions
 
-None blocking. Defaults are in Assumptions. Use `/speckit-clarify` if the academy wants: (1) AKB-payers-only even when the channel could support other banks; (2) this feature to flip Membership to Active itself instead of signalling F1.09; (3) client-only or Admin-only opt-in (not both).
+None blocking. The 2026-10-07 clarification session resolved in-flight QR pay, stop-auto-pay, a new mandate attempt after rejection or revocation, and collection after client deactivation. These remain documented assumptions, not blockers: (1) any payer bank the channel reports as supporting eBill Direct Debit, with QR fallback otherwise; (2) this feature signals payment-confirmed and does not itself flip Membership to Active; (3) both the client and an Admin may opt in.
 
 Issuer channel (AKB eBill Web vs network partner) remains a **planning** decision after AKB confirmation, not a specification blocker.

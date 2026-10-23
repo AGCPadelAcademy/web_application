@@ -60,14 +60,14 @@
 ### Tests for User Story 1
 
 - [ ] T011 [P] [US1] Write failing Deno tests in `supabase/functions/membership-set-collection-method/index.test.ts` for 403 non-owner, 409 `client_inactive`, 409 `collection_channel_not_configured` leaving method `qr_invoice`, successful `qr_invoice` with `stopped_at`, and no period status change (contracts/edge-functions.md)
-- [ ] T012 [P] [US1] Write failing Vitest tests in `src/lib/membershipCollection.test.js` for the `membership-set-collection-method` JSON body and for rejection of the phrases “Automatic transaction”, “standing approval”, and “standing order”
+- [X] T012 [P] [US1] Write failing Vitest tests in `src/lib/membershipCollection.test.js` for the `membership-set-collection-method` JSON body and for rejection of the phrases “Automatic transaction”, “standing approval”, and “standing order”
 
 ### Implementation for User Story 1
 
 - [ ] T013 [US1] Implement `supabase/functions/membership-set-collection-method/index.ts`: JWT via `auth.getUser`, owner or `canAdminister` from `supabase/functions/_shared/profile-access.ts`, service-role writes, and the response table in contracts/edge-functions.md (no mandate insert while the channel is unconfigured)
-- [ ] T014 [US1] Implement `setCollectionMethod` in `src/lib/membershipCollection.js` using the explicit session JWT invoke pattern from `src/lib/billing.js`
-- [ ] T015 [US1] Add the signed-in client’s collection-method control to `src/pages/PaymentsPage.jsx`, reading `collection_subjects` and `collection_methods` under RLS and showing the unconfigured-channel copy from contracts/edge-functions.md
-- [ ] T016 [US1] Add `src/components/admin/MembershipCollectionsPanel.jsx` and register a Collections tab in `src/pages/AdminDashboardPage.jsx` so an Admin can set the method for a client through `src/lib/membershipCollection.js`
+- [X] T014 [US1] Implement `setCollectionMethod` in `src/lib/membershipCollection.js` using the explicit session JWT invoke pattern from `src/lib/billing.js`
+- [X] T015 [US1] Add the signed-in client’s collection-method control to `src/pages/PaymentsPage.jsx`, reading `collection_subjects` and `collection_methods` under RLS and showing the unconfigured-channel copy from contracts/edge-functions.md
+- [X] T016 [US1] Add `src/components/admin/MembershipCollectionsPanel.jsx` and register a Collections tab in `src/pages/AdminDashboardPage.jsx` so an Admin can set the method for a client through `src/lib/membershipCollection.js`
 
 **Checkpoint**: User Story 1 is functional — the choice is stored, opt-in is refused while the channel is unconfigured, and QR payment remains
 
@@ -88,8 +88,8 @@
 - [ ] T018 [US2] Implement the attempt rules in `supabase/functions/_shared/billing/mandate-attempts.ts` so `supabase/functions/_shared/billing/mandate-attempts.test.ts` passes
 - [ ] T019 [US2] Implement `supabase/functions/membership-request-mandate/index.ts` per contracts/edge-functions.md, using `supabase/functions/_shared/billing/mandate-attempts.ts` and `supabase/functions/_shared/billing/collection-channel.ts`
 - [ ] T020 [US2] Extend `supabase/functions/membership-set-collection-method/index.ts` so a configured channel creates the first `proposal_sent` attempt and a repeat while `proposal_sent` does not insert another row; production wiring still uses `UnconfiguredCollectionChannel`
-- [ ] T021 [US2] Add `requestNewMandate` to `src/lib/membershipCollection.js` and cover its request body in `src/lib/membershipCollection.test.js`
-- [ ] T022 [US2] Show the latest mandate status on `src/pages/PaymentsPage.jsx` using the English copy table in contracts/edge-functions.md, without treating `proposal_sent` or `active` as paid
+- [X] T021 [US2] Add `requestNewMandate` to `src/lib/membershipCollection.js` and cover its request body in `src/lib/membershipCollection.test.js`
+- [X] T022 [US2] Show the latest mandate status on `src/pages/PaymentsPage.jsx` using the English copy table in contracts/edge-functions.md, without treating `proposal_sent` or `active` as paid
 
 **Checkpoint**: User Stories 1 and 2 work — one proposal attempt is tracked and a new attempt requires an explicit request
 
@@ -128,13 +128,13 @@
 
 ### Tests for User Story 4
 
-- [ ] T032 [P] [US4] Extend `src/lib/billing.test.js` so a membership document posts `membership_period_intent_id` and honors `qr_pay_hidden`, and so the existing lesson and camp document calls stay unchanged
+- [X] T032 [P] [US4] Extend `src/lib/billing.test.js` so a membership document posts `membership_period_intent_id` and honors `qr_pay_hidden`, and so the existing lesson and camp document calls stay unchanged
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] Add the membership-period document helper to `src/lib/billing.js`, posting `{ "membership_period_intent_id": "..." }` to `billing-invoice-document`
+- [X] T033 [US4] Add the membership-period document helper to `src/lib/billing.js`, posting `{ "membership_period_intent_id": "..." }` to `billing-invoice-document`
 - [ ] T034 [US4] Extend `supabase/functions/billing-invoice-document/index.ts` to accept exactly one of booking id, camp registration id, or `membership_period_intent_id`, enforce owner-or-admin, and return `"qr_pay_hidden": true` when a `collection_requests` row for that intent is `submitted` (contracts/edge-functions.md)
-- [ ] T035 [US4] In `src/pages/PaymentsPage.jsx`, hide the Membership period pay action when `qr_pay_hidden` is true and show the fallback copy from contracts/edge-functions.md; leave the lesson and camp blocks in that file unchanged
+- [X] T035 [US4] In `src/pages/PaymentsPage.jsx`, hide the Membership period pay action when `qr_pay_hidden` is true and show the fallback copy from contracts/edge-functions.md; leave the lesson and camp blocks in that file unchanged
 
 **Checkpoint**: QR fallback and the hidden in-flight pay action work without changing lesson or camp payments
 
@@ -154,7 +154,7 @@
 
 - [ ] T037 [US5] Extend `supabase/functions/_shared/billing/membership-collection-policy.ts` and `supabase/functions/membership-collection-run/index.ts` so stop and deactivation skip new submissions and do not cancel a `submitted` collection (research R-06)
 - [ ] T038 [US5] Extend `supabase/functions/_shared/billing/reconciliation-service.ts` so a reversal sets the intent `reversed` and inserts one `payment_reversed` signal, and a second settlement sets `duplicate_receipt` without a second `payment_confirmed` (contracts/membership-billing.md)
-- [ ] T039 [US5] Extend `src/components/admin/MembershipCollectionsPanel.jsx` with read-only lists of failed or rejected collections, reversals, and duplicate receipts for every client; keep non-admin reads on own rows only via RLS
+- [X] T039 [US5] Extend `src/components/admin/MembershipCollectionsPanel.jsx` with read-only lists of failed or rejected collections, reversals, and duplicate receipts for every client; keep non-admin reads on own rows only via RLS
 
 **Checkpoint**: Failure, reversal, stop, and deactivation match the 2026-10-07 clarifications
 
@@ -247,6 +247,7 @@ After Phase 2:
 ## Notes
 
 - Production wiring uses `UnconfiguredCollectionChannel` only. A real AKB or network-partner adapter is out of this task list.
+- Frontend tasks T012, T014–T016, T021, T022, T032, T033, T035, and T039 are implemented. The migration, Edge Functions, and collection run remain open. My Payments hides the membership block, and Admin hides the Collections tab, until `collection_subjects` exists.
 - Do not write `public.memberships` or `public.credits`.
 - Do not add a Membership Active/Paused/Cancelled column or a refund UI.
 - Apply `supabase/migrations/0020_f126_membership_automatic_collection.sql` only after an explicit user request. Confirm the number is still free before applying.

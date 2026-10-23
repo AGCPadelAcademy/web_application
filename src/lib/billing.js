@@ -60,7 +60,7 @@ export const runBexioReconciliation = () =>
 
 // Fetch the Bexio PDF as a blob URL for in-app preview (US3).
 // functions.invoke JSON-parses the body, so this uses a raw fetch instead.
-export async function fetchInvoicePdfBlob(bookingId) {
+async function requestInvoiceDocument(body) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) {
     throw new Error('You must be signed in.');
@@ -68,58 +68,65 @@ export async function fetchInvoicePdfBlob(bookingId) {
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const res = await fetch(`${supabaseUrl}/functions/v1/billing-invoice-document`, {
+  return fetch(`${supabaseUrl}/functions/v1/billing-invoice-document`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       apikey: supabaseAnonKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ booking_id: bookingId }),
+    body: JSON.stringify(body),
   });
+}
 
-  if (!res.ok) {
-    let detail = `Invoice document request failed (${res.status})`;
-    try {
-      const parsed = await res.json();
-      detail = parsed?.message || parsed?.error || detail;
-    } catch { /* body is not JSON */ }
-    throw new Error(detail);
-  }
+async function throwInvoiceDocumentError(res) {
+  let detail = `Invoice document request failed (${res.status})`;
+  try {
+    const parsed = await res.json();
+    detail = parsed?.message || parsed?.error || detail;
+  } catch { /* body is not JSON */ }
+  throw new Error(detail);
+}
 
+function responseHeader(res, name) {
+  if (!res?.headers || typeof res.headers.get !== 'function') return '';
+  return res.headers.get(name) || res.headers.get(name.toLowerCase()) || '';
+}
+
+export async function fetchInvoicePdfBlob(bookingId) {
+  const res = await requestInvoiceDocument({ booking_id: bookingId });
+  if (!res.ok) await throwInvoiceDocumentError(res);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }
 
 export async function fetchCampInvoicePdfBlob(registrationId) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error('You must be signed in.');
-  }
+  const res = await requestInvoiceDocument({ camp_registration_id: registrationId });
+  if (!res.ok) await throwInvoiceDocumentError(res);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const res = await fetch(`${supabaseUrl}/functions/v1/billing-invoice-document`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: supabaseAnonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ camp_registration_id: registrationId }),
-  });
+// Membership-period invoice. Posts only membership_period_intent_id.
+// qr_pay_hidden may arrive as JSON or as the x-qr-pay-hidden header on a PDF.
+export async function fetchMembershipPeriodDocument(intentId) {
+  const res = await requestInvoiceDocument({ membership_period_intent_id: intentId });
+  if (!res.ok) await throwInvoiceDocumentError(res);
 
-  if (!res.ok) {
-    let detail = `Invoice document request failed (${res.status})`;
-    try {
-      const parsed = await res.json();
-      detail = parsed?.message || parsed?.error || detail;
-    } catch { /* body is not JSON */ }
-    throw new Error(detail);
+  const contentType = responseHeader(res, 'content-type');
+  if (contentType.includes('application/json')) {
+    const parsed = await res.json();
+    return {
+      qrPayHidden: parsed?.qr_pay_hidden === true,
+      previewUrl: null,
+    };
   }
 
   const blob = await res.blob();
-  return URL.createObjectURL(blob);
+  return {
+    qrPayHidden: responseHeader(res, 'x-qr-pay-hidden') === 'true',
+    previewUrl: URL.createObjectURL(blob),
+  };
 }
 
 // Public cutover flag (FR-017): true when the Bexio integration is connected.

@@ -14,7 +14,11 @@ const { mockSupabase } = vi.hoisted(() => ({
 
 vi.mock('@/lib/customSupabaseClient', () => ({ supabase: mockSupabase }));
 
-import { fetchCampInvoicePdfBlob, fetchInvoicePdfBlob } from '@/lib/billing';
+import {
+  fetchCampInvoicePdfBlob,
+  fetchInvoicePdfBlob,
+  fetchMembershipPeriodDocument,
+} from '@/lib/billing';
 
 describe('fetchInvoicePdfBlob', () => {
   beforeEach(() => {
@@ -77,5 +81,70 @@ describe('fetchCampInvoicePdfBlob', () => {
       }),
     );
     expect(url).toBe('blob:camp-pdf');
+  });
+});
+
+describe('fetchMembershipPeriodDocument', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:membership-pdf') });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('posts membership_period_intent_id and honors a JSON qr_pay_hidden flag', async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'application/json' : null) },
+      json: () => Promise.resolve({ qr_pay_hidden: true }),
+    });
+
+    const result = await fetchMembershipPeriodDocument('intent-1');
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/billing-invoice-document'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+        body: JSON.stringify({ membership_period_intent_id: 'intent-1' }),
+      }),
+    );
+    expect(result).toEqual({ qrPayHidden: true, previewUrl: null });
+  });
+
+  it('honors x-qr-pay-hidden on a membership PDF and still returns the preview', async () => {
+    const blob = new Blob(['%PDF'], { type: 'application/pdf' });
+    fetch.mockResolvedValue({
+      ok: true,
+      headers: {
+        get: (name) => {
+          const key = name.toLowerCase();
+          if (key === 'content-type') return 'application/pdf';
+          if (key === 'x-qr-pay-hidden') return 'true';
+          return null;
+        },
+      },
+      blob: () => Promise.resolve(blob),
+    });
+
+    const result = await fetchMembershipPeriodDocument('intent-2');
+
+    expect(result).toEqual({ qrPayHidden: true, previewUrl: 'blob:membership-pdf' });
+  });
+
+  it('returns a preview when membership QR pay is still offered', async () => {
+    const blob = new Blob(['%PDF'], { type: 'application/pdf' });
+    fetch.mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/pdf' },
+      blob: () => Promise.resolve(blob),
+    });
+
+    const result = await fetchMembershipPeriodDocument('intent-3');
+
+    expect(result.qrPayHidden).toBe(false);
+    expect(result.previewUrl).toBe('blob:membership-pdf');
   });
 });

@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, MapPin } from 'lucide-react';
+import { Phone, Mail, MapPin, Instagram } from 'lucide-react';
 import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
+
+const INSTAGRAM_URL = 'https://www.instagram.com/agc.padelacademy/';
 
 const Footer = () => {
   return <footer className="bg-gray-900/50 border-t border-gray-800 text-gray-400 pt-16 pb-8 px-6 md:px-10">
@@ -19,6 +21,18 @@ const Footer = () => {
             </div>
           </div>
         <p className="text-sm">Professional padel training for all levels in a modern facility.</p>
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-white mb-2">Social media</p>
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 hover:text-green-400 transition-colors"
+          >
+            <Instagram className="w-5 h-5" />
+            <span>Instagram</span>
+          </a>
+        </div>
 
         </div>
 

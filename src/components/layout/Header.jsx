@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
-import { publicNavLinks } from '@/lib/featureFlags';
+import { NAV_BOOK_NOW_ENABLED, publicNavLinks } from '@/lib/featureFlags';
 
 const NAV_LINKS = publicNavLinks([
   { to: '/', label: 'Home', end: true },
@@ -162,11 +162,13 @@ const Header = () => {
       </nav>
 
       <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
-        <Link to="/lessons">
-          <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
-            Book Now
-          </Button>
-        </Link>
+        {NAV_BOOK_NOW_ENABLED && (
+          <Link to="/lessons">
+            <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
+              Book Now
+            </Button>
+          </Link>
+        )}
         {/* Visual only. The chosen flag stays on the button. The page language does not change. The theme button only swaps its icon. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

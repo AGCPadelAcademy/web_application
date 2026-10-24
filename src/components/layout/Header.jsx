@@ -40,6 +40,8 @@ const LANGUAGES = [
   { code: 'EN', label: 'English' },
   { code: 'ES', label: 'Español' },
   { code: 'DE', label: 'Deutsch' },
+  { code: 'FR', label: 'Français' },
+  { code: 'IT', label: 'Italiano' },
 ];
 
 const LanguageFlag = ({ code }) => {
@@ -58,6 +60,24 @@ const LanguageFlag = ({ code }) => {
         <rect width="24" height="16" fill="#ffce00" />
         <rect width="24" height="10.67" fill="#dd0000" />
         <rect width="24" height="5.33" fill="#000" />
+      </svg>
+    );
+  }
+  if (code === 'FR') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#ed2939" />
+        <rect width="16" height="16" fill="#fff" />
+        <rect width="8" height="16" fill="#002395" />
+      </svg>
+    );
+  }
+  if (code === 'IT') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#ce2b37" />
+        <rect width="16" height="16" fill="#fff" />
+        <rect width="8" height="16" fill="#009246" />
       </svg>
     );
   }
@@ -80,6 +100,7 @@ const Header = () => {
   const [profile, setProfile] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [themeIcon, setThemeIcon] = useState('sun');
+  const [languageCode, setLanguageCode] = useState('EN');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -144,23 +165,28 @@ const Header = () => {
             Book Now
           </Button>
         </Link>
-        {/* Visual only. Choosing a language does not translate the site. The theme button only swaps its icon. */}
+        {/* Visual only. The chosen flag stays on the button. The page language does not change. The theme button only swaps its icon. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="outline"
               className="border-gray-600 hover:bg-gray-800 text-white w-11 h-10 p-0"
-              aria-label="Language, English"
+              aria-label={`Language, ${LANGUAGES.find((language) => language.code === languageCode)?.label || 'English'}`}
             >
-              <LanguageFlag code="EN" />
+              <LanguageFlag code={languageCode} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[4.5rem]" align="end">
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="end">
             {LANGUAGES.map(({ code, label }) => (
-              <DropdownMenuItem key={code} className="focus:bg-gray-800 justify-center" aria-label={label}>
+              <DropdownMenuItem
+                key={code}
+                className="focus:bg-gray-800 gap-2"
+                aria-label={label}
+                onSelect={() => setLanguageCode(code)}
+              >
                 <LanguageFlag code={code} />
-                <span className="sr-only">{label}</span>
+                <span className="text-sm font-medium">{code}</span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

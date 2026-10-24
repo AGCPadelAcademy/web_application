@@ -78,7 +78,7 @@ const Header = () => {
       transition={{ duration: 0.6 }}
       className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 md:px-10 py-4 bg-background/80 backdrop-blur-sm border-b border-gray-800"
     >
-      <Link to="/" className="flex items-center gap-1.5 min-w-0">
+      <Link to="/" className="flex items-center gap-1 min-w-0">
         <img
           src="/logo.png"
           alt=""

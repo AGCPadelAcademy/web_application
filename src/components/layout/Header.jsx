@@ -23,15 +23,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
+import { publicNavLinks } from '@/lib/featureFlags';
 
-const NAV_LINKS = [
+const NAV_LINKS = publicNavLinks([
   { to: '/', label: 'Home', end: true },
   { to: '/lessons', label: 'Lessons' },
   { to: '/camps', label: 'Camps' },
   { to: '/trips', label: 'Trips' },
   { to: '/tournaments', label: 'Tournaments' },
   { to: '/contact', label: 'Contact' },
-];
+]);
 
 const Header = () => {
   const { user, signOut, loading, role } = useAuth();

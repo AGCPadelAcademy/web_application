@@ -3,6 +3,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Phone, Mail, MapPin } from 'lucide-react';
+import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
 const Footer = () => {
   const {
@@ -41,7 +42,9 @@ const Footer = () => {
             <li><Link to="/lessons" className="hover:text-green-400 transition-colors">Lessons</Link></li>
             <li><Link to="/camps" className="hover:text-green-400 transition-colors">Camps</Link></li>
             <li><Link to="/trips" className="hover:text-green-400 transition-colors">Trips</Link></li>
-            <li><Link to="/tournaments" className="hover:text-green-400 transition-colors">Tournaments</Link></li>
+            {TOURNAMENTS_ENABLED && (
+              <li><Link to="/tournaments" className="hover:text-green-400 transition-colors">Tournaments</Link></li>
+            )}
             <li><Link to="/contact" className="hover:text-green-400 transition-colors">Contact</Link></li>
             <li><Link to="/terms" className="hover:text-green-400 transition-colors flex items-center gap-2">Terms & Conditions</Link></li>
           </ul>

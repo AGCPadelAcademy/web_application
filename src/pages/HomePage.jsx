@@ -2,13 +2,21 @@ import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
 const HomePage = () => {
   return (
     <>
       <Helmet>
         <title>AGC Padel Academy - Home</title>
-        <meta name="description" content="Welcome to AGC Padel Academy. Learn from the best, compete in our tournaments and travel with us." />
+        <meta
+          name="description"
+          content={
+            TOURNAMENTS_ENABLED
+              ? 'Welcome to AGC Padel Academy. Learn from the best, compete in our tournaments and travel with us.'
+              : 'Welcome to AGC Padel Academy. Learn from the best and travel with us.'
+          }
+        />
       </Helmet>
       <div className="relative isolate overflow-hidden bg-background">
         <div className="absolute inset-0 -z-10 h-full w-full bg-background bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
@@ -32,9 +40,11 @@ const HomePage = () => {
                 <Link to="/lessons">
                   <Button size="lg" className="bg-green-500 font-bold text-black hover:bg-green-600">Book a lesson</Button>
                 </Link>
-                <Link to="/tournaments" className="text-sm font-semibold leading-6 text-white">
-                  View Tournaments <span aria-hidden="true">→</span>
-                </Link>
+                {TOURNAMENTS_ENABLED && (
+                  <Link to="/tournaments" className="text-sm font-semibold leading-6 text-white">
+                    View Tournaments <span aria-hidden="true">→</span>
+                  </Link>
+                )}
               </div>
             </motion.div>
           </div>
@@ -48,11 +58,13 @@ const HomePage = () => {
             <h2 className="text-base font-semibold leading-7 text-green-400">Our Services</h2>
             <p className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl font-serif">Everything you need for your padel</p>
             <p className="mt-6 text-lg leading-8 text-gray-300">
-              From personalized classes and competitive tournaments to unique padel trips.
+              {TOURNAMENTS_ENABLED
+                ? 'From personalized classes and competitive tournaments to unique padel trips.'
+                : 'From personalized classes to unique padel trips.'}
             </p>
           </div>
           <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
+            <dl className={`grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none ${TOURNAMENTS_ENABLED ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
               <div className="flex flex-col">
                 <dt className="text-base font-semibold leading-7 text-white">Lessons for everyone</dt>
                 <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-300">
@@ -62,15 +74,17 @@ const HomePage = () => {
                   </p>
                 </dd>
               </div>
-              <div className="flex flex-col">
-                <dt className="text-base font-semibold leading-7 text-white">Exciting Tournaments</dt>
-                <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-300">
-                  <p className="flex-auto">Compete in the AGC Tournament circuit throughout the year and win incredible prizes.</p>
-                  <p className="mt-6">
-                    <Link to="/tournaments" className="text-sm font-semibold leading-6 text-green-400">View tournaments <span aria-hidden="true">→</span></Link>
-                  </p>
-                </dd>
-              </div>
+              {TOURNAMENTS_ENABLED && (
+                <div className="flex flex-col">
+                  <dt className="text-base font-semibold leading-7 text-white">Exciting Tournaments</dt>
+                  <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-300">
+                    <p className="flex-auto">Compete in the AGC Tournament circuit throughout the year and win incredible prizes.</p>
+                    <p className="mt-6">
+                      <Link to="/tournaments" className="text-sm font-semibold leading-6 text-green-400">View tournaments <span aria-hidden="true">→</span></Link>
+                    </p>
+                  </dd>
+                </div>
+              )}
               <div className="flex flex-col">
                 <dt className="text-base font-semibold leading-7 text-white">Padel Trips</dt>
                 <dd className="mt-1 flex flex-auto flex-col text-base leading-7 text-gray-300">

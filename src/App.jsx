@@ -23,6 +23,7 @@ import ChildProfilePage from '@/pages/ChildProfilePage';
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
+import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
 const AppLayout = () => (
   <div className="min-h-screen bg-background text-white flex flex-col w-full">
@@ -47,7 +48,10 @@ function App() {
             <Route path="trips" element={<TripsPage />} />
             <Route path="camps" element={<CampsPage />} />
             <Route path="camps/:slug" element={<CampDetailPage />} />
-            <Route path="tournaments" element={<TournamentsPage />} />
+            <Route
+              path="tournaments"
+              element={TOURNAMENTS_ENABLED ? <TournamentsPage /> : <Navigate to="/" replace />}
+            />
             <Route path="contact" element={<ContactPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="terms" element={<TermsPage />} />

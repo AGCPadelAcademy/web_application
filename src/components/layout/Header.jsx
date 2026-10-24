@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -37,10 +37,43 @@ const NAV_LINKS = publicNavLinks([
 ]);
 
 const LANGUAGES = [
-  { code: 'EN', flag: '🇬🇧' },
-  { code: 'ES', flag: '🇪🇸' },
-  { code: 'DE', flag: '🇩🇪' },
+  { code: 'EN', label: 'English' },
+  { code: 'ES', label: 'Español' },
+  { code: 'DE', label: 'Deutsch' },
 ];
+
+const LanguageFlag = ({ code }) => {
+  const clipId = useId();
+  if (code === 'ES') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#c60b1e" />
+        <rect y="4" width="24" height="8" fill="#ffc400" />
+      </svg>
+    );
+  }
+  if (code === 'DE') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#ffce00" />
+        <rect width="24" height="10.67" fill="#dd0000" />
+        <rect width="24" height="5.33" fill="#000" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 60 30" className="w-6 h-4 rounded-sm" aria-hidden="true">
+      <clipPath id={clipId}>
+        <path d="M0,0 v30 h60 v-30 z" />
+      </clipPath>
+      <path d="M0,0 v30 h60 v-30 z" fill="#012169" />
+      <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6" />
+      <path d="M0,0 L60,30 M60,0 L0,30" clipPath={`url(#${clipId})`} stroke="#C8102E" strokeWidth="4" />
+      <path d="M30,0 v30 M0,15 h60" stroke="#fff" strokeWidth="10" />
+      <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" strokeWidth="6" />
+    </svg>
+  );
+};
 
 const Header = () => {
   const { user, signOut, loading, role } = useAuth();
@@ -117,18 +150,17 @@ const Header = () => {
             <Button
               type="button"
               variant="outline"
-              className="border-gray-600 hover:bg-gray-800 text-white px-2 md:px-3"
-              aria-label="Language, EN"
+              className="border-gray-600 hover:bg-gray-800 text-white w-11 h-10 p-0"
+              aria-label="Language, English"
             >
-              <span aria-hidden="true" className="text-base leading-none">🇬🇧</span>
-              <span className="ml-1.5 text-sm font-medium">EN</span>
+              <LanguageFlag code="EN" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="end">
-            {LANGUAGES.map(({ code, flag }) => (
-              <DropdownMenuItem key={code} className="focus:bg-gray-800 gap-2">
-                <span aria-hidden="true" className="text-base leading-none">{flag}</span>
-                <span>{code}</span>
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[4.5rem]" align="end">
+            {LANGUAGES.map(({ code, label }) => (
+              <DropdownMenuItem key={code} className="focus:bg-gray-800 justify-center" aria-label={label}>
+                <LanguageFlag code={code} />
+                <span className="sr-only">{label}</span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

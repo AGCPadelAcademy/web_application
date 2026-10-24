@@ -19,20 +19,18 @@ const Footer = () => {
   return <footer className="bg-gray-900/50 border-t border-gray-800 text-gray-400 pt-16 pb-8 px-6 md:px-10">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         <div className="md:col-span-1">
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-              <span className="text-black font-bold text-lg">A</span>
-            </div>
+          <div className="flex items-center gap-1 mb-4">
+            <img
+              src="/logo.png"
+              alt=""
+              className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+            />
             <div>
               <p className="text-xl font-bold text-white">AGC Padel</p>
               <p className="text-sm text-gray-400">Academy</p>
             </div>
           </div>
         <p className="text-sm">Professional padel training for all levels in a modern facility.</p>
-        <p className="text-sm mt-4">
-          Technical feedback regarding the website only:
-          josafesf2@gmail.com
-        </p>
 
         </div>
 
@@ -79,11 +77,8 @@ const Footer = () => {
           </form>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-800 text-center text-sm text-gray-400 space-y-1">
+      <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-800 text-center text-sm text-gray-400">
         <p>&copy; {new Date().getFullYear()} AGC Padel Academy. All rights reserved.</p>
-        <p className="text-xs">
-          Page design & development — Joan Sabater Ferré (external collaborator)
-        </p>
       </div>
 
     </footer>;

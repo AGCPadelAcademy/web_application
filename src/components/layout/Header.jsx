@@ -177,7 +177,7 @@ const Header = () => {
               <LanguageFlag code={languageCode} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="end">
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="center">
             {LANGUAGES.map(({ code, label }) => (
               <DropdownMenuItem
                 key={code}

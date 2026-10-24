@@ -36,6 +36,8 @@ const NAV_LINKS = publicNavLinks([
   { to: '/contact', label: 'Contact' },
 ]);
 
+const softControl = 'transition-all duration-200 ease-out hover:scale-105 active:scale-[0.97]';
+
 const LANGUAGES = [
   { code: 'EN', label: 'English' },
   { code: 'ES', label: 'Español' },
@@ -171,17 +173,19 @@ const Header = () => {
             <Button
               type="button"
               variant="outline"
-              className="border-gray-600 hover:bg-gray-800 text-white w-11 h-10 p-0"
+              className={`border-gray-600 hover:bg-gray-800 text-white w-11 h-10 p-0 ${softControl}`}
               aria-label={`Language, ${LANGUAGES.find((language) => language.code === languageCode)?.label || 'English'}`}
             >
-              <LanguageFlag code={languageCode} />
+              <span key={languageCode} className="animate-in fade-in zoom-in-95 duration-200">
+                <LanguageFlag code={languageCode} />
+              </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="center">
             {LANGUAGES.map(({ code, label }) => (
               <DropdownMenuItem
                 key={code}
-                className="focus:bg-gray-800 gap-2"
+                className="focus:bg-gray-800 gap-2 transition-colors duration-200"
                 aria-label={label}
                 onSelect={() => setLanguageCode(code)}
               >
@@ -195,11 +199,15 @@ const Header = () => {
         <Button
           type="button"
           variant="outline"
-          className="border-gray-600 hover:bg-gray-800 text-white w-10 h-10 p-0"
+          className={`border-gray-600 hover:bg-gray-800 text-white w-10 h-10 p-0 ${softControl}`}
           aria-label={themeIcon === 'sun' ? 'Sun' : 'Moon'}
           onClick={() => setThemeIcon((current) => (current === 'sun' ? 'moon' : 'sun'))}
         >
-          {themeIcon === 'sun' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {themeIcon === 'sun' ? (
+            <Sun key="sun" className="w-5 h-5 animate-in fade-in zoom-in-95 duration-200" />
+          ) : (
+            <Moon key="moon" className="w-5 h-5 animate-in fade-in zoom-in-95 duration-200" />
+          )}
         </Button>
 
         {loading ? (

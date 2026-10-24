@@ -73,7 +73,7 @@ const ProfileManagementPage = () => {
   const fetchError = profileError ? "Could not load your profile details." : null;
 
   return (
-    <div className="min-h-screen bg-gray-950 py-12 px-4 sm:px-6 lg:px-8 text-gray-100 flex justify-center w-full">
+    <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8 text-gray-100 flex justify-center w-full">
       <Helmet><title>My Profile - AGC Padel Academy</title></Helmet>
       
       <div className="w-full max-w-4xl bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-6 sm:p-10">

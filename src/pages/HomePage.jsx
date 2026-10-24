@@ -10,8 +10,8 @@ const HomePage = () => {
         <title>AGC Padel Academy - Home</title>
         <meta name="description" content="Welcome to AGC Padel Academy. Learn from the best, compete in our tournaments and travel with us." />
       </Helmet>
-      <div className="relative isolate overflow-hidden bg-gray-900">
-        <div className="absolute inset-0 -z-10 h-full w-full bg-black bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
+      <div className="relative isolate overflow-hidden bg-background">
+        <div className="absolute inset-0 -z-10 h-full w-full bg-background bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]">
             <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-green-400 opacity-20 blur-[100px]"></div>
         </div>
         
@@ -42,7 +42,7 @@ const HomePage = () => {
       </div>
       
        {/* Services Section */}
-      <section className="py-24 sm:py-32 bg-black">
+      <section className="py-24 sm:py-32 bg-background">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl lg:text-center">
             <h2 className="text-base font-semibold leading-7 text-green-400">Our Services</h2>

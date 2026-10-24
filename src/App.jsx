@@ -25,7 +25,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
 
 const AppLayout = () => (
-  <div className="min-h-screen bg-black text-white flex flex-col w-full">
+  <div className="min-h-screen bg-background text-white flex flex-col w-full">
     <Header />
     <main className="flex-grow flex flex-col w-full">
       <Outlet />

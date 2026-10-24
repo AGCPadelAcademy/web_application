@@ -29,6 +29,8 @@ import { NAV_BOOK_NOW_ENABLED, publicNavLinks } from '@/lib/featureFlags';
 
 const NAV_LINKS = publicNavLinks([
   { to: '/', label: 'Home', end: true },
+  { to: '/home1', label: 'Home 1' },
+  { to: '/home2', label: 'Home 2' },
   { to: '/lessons', label: 'Lessons' },
   { to: '/camps', label: 'Camps' },
   { to: '/trips', label: 'Trips' },

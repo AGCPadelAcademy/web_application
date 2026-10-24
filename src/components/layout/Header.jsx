@@ -78,11 +78,11 @@ const Header = () => {
       transition={{ duration: 0.6 }}
       className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 md:px-10 py-4 bg-background/80 backdrop-blur-sm border-b border-gray-800"
     >
-      <Link to="/" className="flex items-center gap-3 min-w-0">
+      <Link to="/" className="flex items-center gap-0 min-w-0">
         <img
           src="/logo.png"
           alt=""
-          className="w-14 h-14 md:w-16 md:h-16 rounded-lg object-cover flex-shrink-0"
+          className="w-14 h-14 md:w-16 md:h-16 rounded-lg object-cover flex-shrink-0 -mr-2.5 md:-mr-3.5"
         />
         <div>
           <p className="text-xl font-bold text-white">AGC Padel</p>

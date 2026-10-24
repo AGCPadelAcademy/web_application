@@ -277,7 +277,7 @@ const Header = () => {
           </DropdownMenu>
         ) : (
           <Link to="/login">
-            <Button variant="outline" className="border-gray-600 hover:bg-gray-800 text-white px-3 md:px-4">
+            <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
               Login
             </Button>
           </Link>

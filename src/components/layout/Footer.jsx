@@ -37,28 +37,19 @@ const Footer = () => {
         </div>
 
         <div>
-          <p className="font-semibold text-white mb-4">Contact information</p>
+          <p className="font-semibold text-white mb-4">Contact</p>
           <ul className="space-y-3">
             <li className="flex items-start space-x-3">
               <MapPin className="w-5 h-5 mt-1 text-green-400 flex-shrink-0" />
-              <span>
-                <span className="block text-white text-sm font-medium">Our Academy</span>
-                Durisolstrasse 3, 5612 Villmergen
-              </span>
+              <span>Durisolstrasse 3, 5612 Villmergen</span>
             </li>
             <li className="flex items-center space-x-3">
               <Phone className="w-5 h-5 text-green-400" />
-              <span>
-                <span className="block text-white text-sm font-medium">Call Us</span>
-                <a href="tel:+41766114061" className="hover:text-green-400 transition-colors">+41 76 611 40 61</a>
-              </span>
+              <span>+41 76 611 40 61</span>
             </li>
             <li className="flex items-center space-x-3">
               <Mail className="w-5 h-5 text-green-400" />
-              <span>
-                <span className="block text-white text-sm font-medium">Write to Us</span>
-                <a href="mailto:agcpadelacademy@gmail.com" className="hover:text-green-400 transition-colors">agcpadelacademy@gmail.com</a>
-              </span>
+              <span>agcpadelacademy@gmail.com</span>
             </li>
           </ul>
         </div>

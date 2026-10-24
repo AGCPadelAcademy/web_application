@@ -12,7 +12,8 @@ import {
   SlidersHorizontal,
   Users,
   Menu,
-  Globe,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,10 +36,17 @@ const NAV_LINKS = publicNavLinks([
   { to: '/contact', label: 'Contact' },
 ]);
 
+const LANGUAGES = [
+  { code: 'EN', flag: '🇬🇧' },
+  { code: 'ES', flag: '🇪🇸' },
+  { code: 'DE', flag: '🇩🇪' },
+];
+
 const Header = () => {
   const { user, signOut, loading, role } = useAuth();
   const [profile, setProfile] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [themeIcon, setThemeIcon] = useState('sun');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -103,38 +111,38 @@ const Header = () => {
             Book Now
           </Button>
         </Link>
-        {/* Visual only. Language and theme are not wired yet. */}
+        {/* Visual only. Choosing a language does not translate the site. The theme button only swaps its icon. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
               variant="outline"
               className="border-gray-600 hover:bg-gray-800 text-white px-2 md:px-3"
-              aria-label="Language"
+              aria-label="Language, EN"
             >
-              <Globe className="w-4 h-4" />
+              <span aria-hidden="true" className="text-base leading-none">🇬🇧</span>
               <span className="ml-1.5 text-sm font-medium">EN</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[8rem]" align="end">
-            <DropdownMenuItem className="focus:bg-gray-800">English</DropdownMenuItem>
-            <DropdownMenuItem className="focus:bg-gray-800">Español</DropdownMenuItem>
-            <DropdownMenuItem className="focus:bg-gray-800">Deutsch</DropdownMenuItem>
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="end">
+            {LANGUAGES.map(({ code, flag }) => (
+              <DropdownMenuItem key={code} className="focus:bg-gray-800 gap-2">
+                <span aria-hidden="true" className="text-base leading-none">{flag}</span>
+                <span>{code}</span>
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="flex items-center" role="group" aria-label="Theme">
-          <button
-            type="button"
-            aria-label="Black theme"
-            className="h-10 w-8 rounded-l-md border border-gray-600 bg-black"
-          />
-          <button
-            type="button"
-            aria-label="White theme"
-            className="h-10 w-8 rounded-r-md border border-l-0 border-gray-600 bg-white"
-          />
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="border-gray-600 hover:bg-gray-800 text-white w-10 h-10 p-0"
+          aria-label={themeIcon === 'sun' ? 'Sun' : 'Moon'}
+          onClick={() => setThemeIcon((current) => (current === 'sun' ? 'moon' : 'sun'))}
+        >
+          {themeIcon === 'sun' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </Button>
 
         {loading ? (
           <Loader2 className="w-6 h-6 animate-spin text-green-500" />

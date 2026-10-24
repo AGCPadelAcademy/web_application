@@ -4,6 +4,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 import HomePage from '@/pages/HomePage';
+import Home1Page from '@/pages/Home1Page';
+import Home2Page from '@/pages/Home2Page';
 import LessonsPage from '@/pages/LessonsPage';
 import TripsPage from '@/pages/TripsPage';
 import TournamentsPage from '@/pages/TournamentsPage';
@@ -44,6 +46,8 @@ function App() {
           <Route path="/" element={<AppLayout />}>
 
             <Route index element={<HomePage />} />
+            <Route path="home1" element={<Home1Page />} />
+            <Route path="home2" element={<Home2Page />} />
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="trips" element={<TripsPage />} />
             <Route path="camps" element={<CampsPage />} />

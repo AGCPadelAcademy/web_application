@@ -35,7 +35,7 @@ const TripsPage = () => {
         <title>AGC Padel Academy - Trips to Ebro Delta</title>
         <meta name="description" content="Join our exclusive padel trips to the Ebro Delta. All-inclusive packages with training, hotel and unique activities." />
       </Helmet>
-      <div className="px-6 py-12 md:py-24 bg-black">
+      <div className="px-6 py-12 md:py-24 bg-background">
         <div className="max-w-7xl mx-auto">
           <motion.div initial={{
           opacity: 0,

@@ -13,7 +13,7 @@ const TermsPage = () => {
         <meta name="description" content="Terms and conditions, cancellation policy and privacy policy for AGC Padel Academy." />
       </Helmet>
       
-      <div className="min-h-screen bg-black text-white px-6 py-12 md:py-24">
+      <div className="min-h-screen bg-background text-white px-6 py-12 md:py-24">
         <motion.div initial={{
         opacity: 0,
         y: 20

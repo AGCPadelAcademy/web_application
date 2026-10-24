@@ -4,6 +4,8 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 import HomePage from '@/pages/HomePage';
+import Home1Page from '@/pages/Home1Page';
+import Home2Page from '@/pages/Home2Page';
 import LessonsPage from '@/pages/LessonsPage';
 import TripsPage from '@/pages/TripsPage';
 import TournamentsPage from '@/pages/TournamentsPage';
@@ -23,9 +25,10 @@ import ChildProfilePage from '@/pages/ChildProfilePage';
 
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
+import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
 const AppLayout = () => (
-  <div className="min-h-screen bg-black text-white flex flex-col w-full">
+  <div className="min-h-screen bg-background text-white flex flex-col w-full">
     <Header />
     <main className="flex-grow flex flex-col w-full">
       <Outlet />
@@ -43,11 +46,16 @@ function App() {
           <Route path="/" element={<AppLayout />}>
 
             <Route index element={<HomePage />} />
+            <Route path="home1" element={<Home1Page />} />
+            <Route path="home2" element={<Home2Page />} />
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="trips" element={<TripsPage />} />
             <Route path="camps" element={<CampsPage />} />
             <Route path="camps/:slug" element={<CampDetailPage />} />
-            <Route path="tournaments" element={<TournamentsPage />} />
+            <Route
+              path="tournaments"
+              element={TOURNAMENTS_ENABLED ? <TournamentsPage /> : <Navigate to="/" replace />}
+            />
             <Route path="contact" element={<ContactPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="terms" element={<TermsPage />} />

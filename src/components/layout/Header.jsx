@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -12,6 +12,8 @@ import {
   SlidersHorizontal,
   Users,
   Menu,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,20 +25,86 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
+import { NAV_BOOK_NOW_ENABLED, publicNavLinks } from '@/lib/featureFlags';
 
-const NAV_LINKS = [
+const NAV_LINKS = publicNavLinks([
   { to: '/', label: 'Home', end: true },
+  { to: '/home1', label: 'Home 1' },
+  { to: '/home2', label: 'Home 2' },
   { to: '/lessons', label: 'Lessons' },
   { to: '/camps', label: 'Camps' },
   { to: '/trips', label: 'Trips' },
   { to: '/tournaments', label: 'Tournaments' },
   { to: '/contact', label: 'Contact' },
+]);
+
+const softIcon = 'inline-flex transition-transform duration-200 ease-out group-hover:scale-110 group-active:scale-90';
+
+const LANGUAGES = [
+  { code: 'EN', label: 'English' },
+  { code: 'ES', label: 'Español' },
+  { code: 'DE', label: 'Deutsch' },
+  { code: 'FR', label: 'Français' },
+  { code: 'IT', label: 'Italiano' },
 ];
+
+const LanguageFlag = ({ code }) => {
+  const clipId = useId();
+  if (code === 'ES') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#c60b1e" />
+        <rect y="4" width="24" height="8" fill="#ffc400" />
+      </svg>
+    );
+  }
+  if (code === 'DE') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#ffce00" />
+        <rect width="24" height="10.67" fill="#dd0000" />
+        <rect width="24" height="5.33" fill="#000" />
+      </svg>
+    );
+  }
+  if (code === 'FR') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#ed2939" />
+        <rect width="16" height="16" fill="#fff" />
+        <rect width="8" height="16" fill="#002395" />
+      </svg>
+    );
+  }
+  if (code === 'IT') {
+    return (
+      <svg viewBox="0 0 24 16" className="w-6 h-4 rounded-sm" aria-hidden="true">
+        <rect width="24" height="16" fill="#ce2b37" />
+        <rect width="16" height="16" fill="#fff" />
+        <rect width="8" height="16" fill="#009246" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 60 30" className="w-6 h-4 rounded-sm" aria-hidden="true">
+      <clipPath id={clipId}>
+        <path d="M0,0 v30 h60 v-30 z" />
+      </clipPath>
+      <path d="M0,0 v30 h60 v-30 z" fill="#012169" />
+      <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6" />
+      <path d="M0,0 L60,30 M60,0 L0,30" clipPath={`url(#${clipId})`} stroke="#C8102E" strokeWidth="4" />
+      <path d="M30,0 v30 M0,15 h60" stroke="#fff" strokeWidth="10" />
+      <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" strokeWidth="6" />
+    </svg>
+  );
+};
 
 const Header = () => {
   const { user, signOut, loading, role } = useAuth();
   const [profile, setProfile] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [themeIcon, setThemeIcon] = useState('sun');
+  const [languageCode, setLanguageCode] = useState('EN');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -75,12 +143,14 @@ const Header = () => {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 md:px-10 py-4 bg-black/80 backdrop-blur-sm border-b border-gray-800"
+      className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 md:px-10 py-4 bg-background/80 backdrop-blur-sm border-b border-gray-800"
     >
-      <Link to="/" className="flex items-center space-x-2 min-w-0">
-        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-          <span className="text-black font-bold text-lg">A</span>
-        </div>
+      <Link to="/" className="flex items-center gap-1 min-w-0">
+        <img
+          src="/logo.png"
+          alt=""
+          className="w-14 h-14 md:w-16 md:h-16 rounded-lg object-cover flex-shrink-0"
+        />
         <div>
           <p className="text-xl font-bold text-white">AGC Padel</p>
           <p className="text-sm text-gray-400">Academy</p>
@@ -94,11 +164,60 @@ const Header = () => {
       </nav>
 
       <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
-        <Link to="/lessons">
-          <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
-            Book Now
-          </Button>
-        </Link>
+        {NAV_BOOK_NOW_ENABLED && (
+          <Link to="/lessons">
+            <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
+              Book Now
+            </Button>
+          </Link>
+        )}
+        {/* Visual only. The chosen flag stays on the button. The page language does not change. The theme button only swaps its icon. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="group border-gray-600 hover:bg-gray-800 text-white w-11 h-10 p-0"
+              aria-label={`Language, ${LANGUAGES.find((language) => language.code === languageCode)?.label || 'English'}`}
+            >
+              <span key={languageCode} className="inline-flex animate-in fade-in duration-200">
+                <span className={softIcon}>
+                  <LanguageFlag code={languageCode} />
+                </span>
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[5.5rem]" align="center">
+            {LANGUAGES.map(({ code, label }) => (
+              <DropdownMenuItem
+                key={code}
+                className="focus:bg-gray-800 gap-2 transition-colors duration-200"
+                aria-label={label}
+                onSelect={() => setLanguageCode(code)}
+              >
+                <LanguageFlag code={code} />
+                <span className="text-sm font-medium">{code}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="group border-gray-600 hover:bg-gray-800 text-white w-10 h-10 p-0"
+          aria-label={themeIcon === 'sun' ? 'Sun' : 'Moon'}
+          onClick={() => setThemeIcon((current) => (current === 'sun' ? 'moon' : 'sun'))}
+        >
+          <span className={softIcon}>
+            {themeIcon === 'sun' ? (
+              <Sun key="sun" className="w-5 h-5 animate-in fade-in duration-200" />
+            ) : (
+              <Moon key="moon" className="w-5 h-5 animate-in fade-in duration-200" />
+            )}
+          </span>
+        </Button>
+
         {loading ? (
           <Loader2 className="w-6 h-6 animate-spin text-green-500" />
         ) : user && profile ? (
@@ -162,7 +281,7 @@ const Header = () => {
           </DropdownMenu>
         ) : (
           <Link to="/login">
-            <Button variant="outline" className="border-gray-600 hover:bg-gray-800 text-white px-3 md:px-4">
+            <Button className="bg-green-500 hover:bg-green-600 text-black font-bold px-3 md:px-6 py-2 rounded-lg">
               Login
             </Button>
           </Link>

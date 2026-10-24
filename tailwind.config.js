@@ -20,7 +20,7 @@ module.exports = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
+        background: 'hsl(var(--background) / <alpha-value>)',
         foreground: 'hsl(var(--foreground))',
         primary: {
           DEFAULT: 'hsl(var(--primary))',
@@ -49,6 +49,19 @@ module.exports = {
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
+        },
+        // Night slate. Green, yellow, and red stay on the default palette.
+        white: '#f3f6f9',
+        gray: {
+          200: '#e7eef6',
+          300: '#cbd5e1',
+          400: '#96a8bc',
+          500: '#7f95ab',
+          600: '#52708f',
+          700: '#3d5874',
+          800: '#28384c',
+          900: '#1c2736',
+          950: '#0f151c',
         },
       },
       borderRadius: {

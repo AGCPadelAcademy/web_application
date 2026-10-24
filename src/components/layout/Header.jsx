@@ -78,9 +78,11 @@ const Header = () => {
       className="sticky top-0 z-50 flex items-center justify-between gap-2 px-4 md:px-10 py-4 bg-background/80 backdrop-blur-sm border-b border-gray-800"
     >
       <Link to="/" className="flex items-center space-x-2 min-w-0">
-        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-          <span className="text-black font-bold text-lg">A</span>
-        </div>
+        <img
+          src="/logo.png"
+          alt=""
+          className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+        />
         <div>
           <p className="text-xl font-bold text-white">AGC Padel</p>
           <p className="text-sm text-gray-400">Academy</p>

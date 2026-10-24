@@ -1,21 +1,9 @@
 import { Link } from 'react-router-dom';
-import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Phone, Mail, MapPin } from 'lucide-react';
 import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
 const Footer = () => {
-  const {
-    toast
-  } = useToast();
-  const handleSubscribe = e => {
-    e.preventDefault();
-    toast({
-      title: "🚧 Thanks for subscribing!",
-      description: "Well, not really. This feature isn't implemented yet! 🚀"
-    });
-  };
   return <footer className="bg-gray-900/50 border-t border-gray-800 text-gray-400 pt-16 pb-8 px-6 md:px-10">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         <div className="md:col-span-1">
@@ -49,32 +37,38 @@ const Footer = () => {
         </div>
 
         <div>
-          <p className="font-semibold text-white mb-4">Contact</p>
+          <p className="font-semibold text-white mb-4">Contact information</p>
           <ul className="space-y-3">
             <li className="flex items-start space-x-3">
               <MapPin className="w-5 h-5 mt-1 text-green-400 flex-shrink-0" />
-              <span>Durisolstrasse 3, 5612 Villmergen </span>
+              <span>
+                <span className="block text-white text-sm font-medium">Our Academy</span>
+                Durisolstrasse 3, 5612 Villmergen
+              </span>
             </li>
             <li className="flex items-center space-x-3">
               <Phone className="w-5 h-5 text-green-400" />
-              <span>+41 76 611 40 61</span>
+              <span>
+                <span className="block text-white text-sm font-medium">Call Us</span>
+                <a href="tel:+41766114061" className="hover:text-green-400 transition-colors">+41 76 611 40 61</a>
+              </span>
             </li>
             <li className="flex items-center space-x-3">
               <Mail className="w-5 h-5 text-green-400" />
-              <span>agcpadelacademy@gmail.com</span>
+              <span>
+                <span className="block text-white text-sm font-medium">Write to Us</span>
+                <a href="mailto:agcpadelacademy@gmail.com" className="hover:text-green-400 transition-colors">agcpadelacademy@gmail.com</a>
+              </span>
             </li>
-        </ul>
+          </ul>
         </div>
 
         <div>
-          <p className="font-semibold text-white mb-4">Newsletter</p>
-          <p className="mb-4 text-sm">Subscribe to receive the latest news and offers.</p>
-          <form onSubmit={handleSubscribe} className="flex space-x-2">
-            <Input type="email" placeholder="Your email" className="bg-gray-800 border-gray-700 text-white" />
-            <Button type="submit" className="bg-green-500 hover:bg-green-600 text-black font-bold">
-              Go
-            </Button>
-          </form>
+          <p className="font-semibold text-white mb-4">Contact me</p>
+          <p className="mb-4 text-sm">Questions about lessons, trips, or the academy? Send a message and we will reply.</p>
+          <Button asChild className="bg-green-500 hover:bg-green-600 text-black font-bold">
+            <Link to="/contact">Contact me</Link>
+          </Button>
         </div>
       </div>
       <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-800 text-center text-sm text-gray-400">

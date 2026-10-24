@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Users,
   Menu,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -102,6 +103,39 @@ const Header = () => {
             Book Now
           </Button>
         </Link>
+        {/* Visual only. Language and theme are not wired yet. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-gray-600 hover:bg-gray-800 text-white px-2 md:px-3"
+              aria-label="Language"
+            >
+              <Globe className="w-4 h-4" />
+              <span className="ml-1.5 text-sm font-medium">EN</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="bg-gray-900 border-gray-700 text-white min-w-[8rem]" align="end">
+            <DropdownMenuItem className="focus:bg-gray-800">English</DropdownMenuItem>
+            <DropdownMenuItem className="focus:bg-gray-800">Español</DropdownMenuItem>
+            <DropdownMenuItem className="focus:bg-gray-800">Deutsch</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="flex items-center" role="group" aria-label="Theme">
+          <button
+            type="button"
+            aria-label="Black theme"
+            className="h-10 w-8 rounded-l-md border border-gray-600 bg-black"
+          />
+          <button
+            type="button"
+            aria-label="White theme"
+            className="h-10 w-8 rounded-r-md border border-l-0 border-gray-600 bg-white"
+          />
+        </div>
+
         {loading ? (
           <Loader2 className="w-6 h-6 animate-spin text-green-500" />
         ) : user && profile ? (

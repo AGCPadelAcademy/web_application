@@ -32,6 +32,7 @@
 ## Notes
 
 - Validated 2026-09-17. Gap analysis names live catalogue behaviour, unused membership/credit records, and neighboring F1 issues because brownfield rules require discovery against baseline and GitHub issue #14. User stories, functional requirements, and success criteria stay in business language.
-- **All three `[NEEDS CLARIFICATION]` markers resolved 2026-10-05** via product-owner answers on issue #14: live `/lessons` “Adult Memberships” stay separate (FR-017, Q1 Option A), cancellation takes effect at end of the already-paid month (FR-012, Q2 Option B), and Pause is Admin-operable in this slice (FR-011, Q3 Option A). Recorded in spec §Clarifications.
-- Remaining FRs are testable with the documented defaults (Admin-only create/activate, no credit wallet, no automatic payment activation, Camp handover out of scope).
+- **All three `[NEEDS CLARIFICATION]` markers resolved 2026-10-05** via product-owner answers on issue #14: live `/lessons` “Adult Memberships” stay separate (FR-017, Q1 Option A), and Pause is Admin-operable in this slice (FR-011, Q3 Option A). Recorded in spec §Clarifications.
+- **Billing rules confirmed 2026-10-31**: one chargeable month on the 1st (FR-021); a 10% fee of that month’s price on the next 1st if unpaid, with the place ending at the end of the unpaid month (FR-022); the owning client may cancel, on time through the 20th and still accepted after the 20th with the next month charged (FR-012). Plan and tasks are not updated in this pass.
+- Remaining FRs are testable with the documented defaults (Admin-only create/activate, client cancel of their own Membership, no credit wallet, no automatic payment activation, Camp handover out of scope).
 - Adjacent F1.08 / F1.10 / F1.11 are called out as owners, not specified here.

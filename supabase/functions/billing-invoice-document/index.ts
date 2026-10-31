@@ -32,7 +32,7 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Expose-Headers": "content-disposition",
+  "Access-Control-Expose-Headers": "content-disposition, x-qr-pay-hidden",
 };
 
 function json(body: unknown, status = 200): Response {
@@ -79,22 +79,32 @@ async function loadConfig(): Promise<BexioConfig> {
   return (row.config ?? {}) as unknown as BexioConfig;
 }
 
-async function readSubjectIds(req: Request): Promise<{ bookingId: string | null; campRegistrationId: string | null }> {
+async function readSubjectIds(req: Request): Promise<{
+  bookingId: string | null;
+  campRegistrationId: string | null;
+  membershipPeriodIntentId: string | null;
+}> {
   const url = new URL(req.url);
-  const bookingFromQuery = url.searchParams.get("booking_id");
-  const campFromQuery = url.searchParams.get("camp_registration_id");
-  if (bookingFromQuery || campFromQuery) {
-    return { bookingId: bookingFromQuery, campRegistrationId: campFromQuery };
-  }
-  if (req.method === "GET") return { bookingId: null, campRegistrationId: null };
-  const body = (await req.json().catch(() => ({}))) as {
-    booking_id?: string;
-    camp_registration_id?: string;
+  const fromQuery = {
+    bookingId: url.searchParams.get("booking_id"),
+    campRegistrationId: url.searchParams.get("camp_registration_id"),
+    membershipPeriodIntentId: url.searchParams.get("membership_period_intent_id"),
   };
-  return {
-    bookingId: body.booking_id ?? null,
-    campRegistrationId: body.camp_registration_id ?? null,
-  };
+  const source = (fromQuery.bookingId || fromQuery.campRegistrationId || fromQuery.membershipPeriodIntentId || req.method === "GET")
+    ? fromQuery
+    : await (async () => {
+      const body = (await req.json().catch(() => ({}))) as {
+        booking_id?: string;
+        camp_registration_id?: string;
+        membership_period_intent_id?: string;
+      };
+      return {
+        bookingId: body.booking_id ?? null,
+        campRegistrationId: body.camp_registration_id ?? null,
+        membershipPeriodIntentId: body.membership_period_intent_id ?? null,
+      };
+    })();
+  return source;
 }
 
 Deno.serve(async (req: Request) => {
@@ -107,14 +117,32 @@ Deno.serve(async (req: Request) => {
     const caller = await resolveCaller(req);
     if (!caller) return json({ error: "unauthenticated" }, 401);
 
-    const { bookingId, campRegistrationId } = await readSubjectIds(req);
-    if (!bookingId && !campRegistrationId) {
-      return json({ error: "booking_id or camp_registration_id required" }, 422);
+    const { bookingId, campRegistrationId, membershipPeriodIntentId } = await readSubjectIds(req);
+    const subjectCount = [bookingId, campRegistrationId, membershipPeriodIntentId].filter(Boolean).length;
+    if (subjectCount !== 1) {
+      return json({ error: "exactly one invoice subject is required" }, 422);
     }
 
     let ownerId: string | null = null;
     let documentQuery = "";
-    if (campRegistrationId) {
+    let qrPayHidden = false;
+    if (membershipPeriodIntentId) {
+      const intents = await dbSelect(
+        "membership_period_intents",
+        `id=eq.${membershipPeriodIntentId}&select=subject_id`,
+      );
+      const intent = intents[0];
+      if (!intent) return json({ error: "no_document", message: "membership period not found" }, 404);
+      const subjects = await dbSelect("collection_subjects", `id=eq.${intent.subject_id}&select=client_id`);
+      if (!subjects[0]) return json({ error: "no_document" }, 404);
+      ownerId = String(subjects[0].client_id);
+      documentQuery = `membership_period_intent_id=eq.${membershipPeriodIntentId}&select=external_id,document_nr`;
+      const requests = await dbSelect(
+        "collection_requests",
+        `intent_id=eq.${membershipPeriodIntentId}&select=status`,
+      );
+      qrPayHidden = requests.some((row) => row.status === "submitted");
+    } else if (campRegistrationId) {
       const regs = await dbSelect("camp_registrations", `id=eq.${campRegistrationId}&select=parent_id`);
       const registration = regs[0];
       if (!registration) return json({ error: "no_document", message: "registration not found" }, 404);
@@ -154,13 +182,14 @@ Deno.serve(async (req: Request) => {
     const fileName = pdf.fileName || `${document.document_nr ?? "invoice"}.pdf`;
 
     log({ event: "pdf_served", bookingId, campRegistrationId, fileName });
-    return new Response(pdf.bytes, {
+    return new Response(pdf.bytes as unknown as BodyInit, {
       status: 200,
       headers: {
         ...CORS,
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${fileName}"`,
         "Cache-Control": "private, no-store",
+        "x-qr-pay-hidden": qrPayHidden ? "true" : "false",
       },
     });
   } catch (err) {

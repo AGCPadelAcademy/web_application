@@ -27,6 +27,10 @@ import {
   campConfirmationSubject,
 } from "../_shared/billing/camp-confirmation.ts";
 import { sendTransactionalEmail } from "../_shared/billing/mailer.ts";
+import {
+  applyMembershipDecision,
+  loadMembershipIntent,
+} from "../_shared/billing/membership-store.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -220,6 +224,11 @@ Deno.serve(async (req: Request) => {
       billingRepo: createPostgrestRepo(SUPABASE_URL, SERVICE_ROLE_KEY),
       config,
       onCampConfirmed: sendCampConfirmation,
+      loadMembershipIntent,
+      applyMembershipDecision: (input) => applyMembershipDecision({
+        ...input,
+        source: "accounting_reconciliation",
+      }),
     });
 
     if (result.requires_reauth) {

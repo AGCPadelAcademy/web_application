@@ -122,6 +122,40 @@ export async function fetchCampInvoicePdfBlob(registrationId) {
   return URL.createObjectURL(blob);
 }
 
+export async function fetchMembershipInvoicePdf(intentId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('You must be signed in.');
+  }
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const res = await fetch(`${supabaseUrl}/functions/v1/billing-invoice-document`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: supabaseAnonKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ membership_period_intent_id: intentId }),
+  });
+
+  if (!res.ok) {
+    let detail = `Invoice document request failed (${res.status})`;
+    try {
+      const parsed = await res.json();
+      detail = parsed?.message || parsed?.error || detail;
+    } catch { /* body is not JSON */ }
+    throw new Error(detail);
+  }
+
+  const blob = await res.blob();
+  return {
+    url: URL.createObjectURL(blob),
+    qrPayHidden: res.headers.get('x-qr-pay-hidden') === 'true',
+  };
+}
+
 // Public cutover flag (FR-017): true when the Bexio integration is connected.
 // Fail-safe: on any read error we return false so the legacy invoice path
 // keeps working (spec Edge Cases — integration must not break bookings).

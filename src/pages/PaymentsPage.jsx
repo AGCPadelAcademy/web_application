@@ -17,6 +17,25 @@ import {
   paymentCardDate,
   paymentInvoiceState,
 } from '@/lib/payments';
+import { fetchMembershipInvoicePdf } from '@/lib/billing';
+import { COLLECTION_COPY, listCollectionSubjects, requestNewMandate, setCollectionMethod } from '@/lib/membershipCollection';
+
+function latestMandate(subject) {
+  const rows = subject.direct_debit_mandates ?? [];
+  return [...rows].sort((left, right) => right.attempt_no - left.attempt_no)[0] ?? null;
+}
+
+function subjectStatusCopy(subject) {
+  const mandate = latestMandate(subject);
+  if (mandate?.status === 'proposal_sent') return COLLECTION_COPY.waiting;
+  if (mandate?.status === 'unsupported_bank') return COLLECTION_COPY.unsupported;
+  return COLLECTION_COPY.invoice;
+}
+
+function intentRequests(intent) {
+  const requests = intent.collection_requests ?? [];
+  return Array.isArray(requests) ? requests : [requests];
+}
 
 const PaymentsPage = () => {
   const { user } = useAuth();
@@ -32,6 +51,7 @@ const PaymentsPage = () => {
   const [selectedCampRegistrationId, setSelectedCampRegistrationId] = useState(null);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [campToCancel, setCampToCancel] = useState(null);
+  const [collectionSubjects, setCollectionSubjects] = useState([]);
 
   const items = mergePaymentItems(bookings, campRegistrations);
 
@@ -63,11 +83,71 @@ const PaymentsPage = () => {
         console.error('Camp payments fetch error:', campError);
         setCampRegistrations([]);
       }
+      try {
+        setCollectionSubjects(await listCollectionSubjects());
+      } catch (collectionError) {
+        console.error('Membership collection fetch error:', collectionError);
+        setCollectionSubjects([]);
+      }
     } catch (error) {
       console.error('Fetch error:', error);
       toast({ title: 'Error', description: 'Failed to load payments data.', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const chooseCollectionMethod = async (subjectId, method) => {
+    try {
+      await setCollectionMethod(subjectId, method);
+      toast({
+        title: 'Membership collection',
+        description: method === 'qr_invoice' ? COLLECTION_COPY.invoice : COLLECTION_COPY.waiting,
+      });
+      await fetchData();
+    } catch (error) {
+      const message = error.message || '';
+      toast({
+        title: 'Membership collection',
+        description: message.includes('collection_channel_not_configured')
+          ? COLLECTION_COPY.unavailable
+          : message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const chooseNewMandate = async (subjectId) => {
+    try {
+      await requestNewMandate(subjectId);
+      toast({ title: 'Membership collection', description: COLLECTION_COPY.waiting });
+      await fetchData();
+    } catch (error) {
+      const message = error.message || '';
+      toast({
+        title: 'Membership collection',
+        description: message.includes('collection_channel_not_configured')
+          ? COLLECTION_COPY.unavailable
+          : message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const openMembershipInvoice = async (intentId) => {
+    try {
+      const result = await fetchMembershipInvoicePdf(intentId);
+      if (result.qrPayHidden) {
+        toast({ title: 'Membership collection', description: COLLECTION_COPY.submitted });
+        return;
+      }
+      openPreview({ invoiceUrl: result.url });
+    } catch (error) {
+      toast({
+        title: 'Membership collection',
+        description: error.message || 'Could not open the invoice.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -305,6 +385,51 @@ const PaymentsPage = () => {
           <CreditCard className="w-8 h-8 text-green-400" />
           <h1 className="text-3xl md:text-4xl font-bold font-serif">My Payments</h1>
         </div>
+
+        {collectionSubjects.length > 0 ? (
+          <div className="mb-8 space-y-3">
+            <h2 className="text-xl font-semibold">Membership collection</h2>
+            <p className="text-sm text-gray-400">{COLLECTION_COPY.unavailable}</p>
+            {collectionSubjects.map((subject) => {
+              const mandate = latestMandate(subject);
+              return (
+                <div key={subject.id} className="rounded-xl border border-gray-800 p-4 space-y-3">
+                  <div>
+                    <p className="font-medium">{subject.display_label}</p>
+                    <p className="text-sm text-gray-400">{subjectStatusCopy(subject)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={() => chooseCollectionMethod(subject.id, 'qr_invoice')}>
+                      Pay by invoice
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => chooseCollectionMethod(subject.id, 'automatic_collection')}>
+                      Automatic collection
+                    </Button>
+                    {mandate?.status === 'rejected' || mandate?.status === 'revoked' ? (
+                      <Button type="button" variant="outline" onClick={() => chooseNewMandate(subject.id)}>
+                        Request a new mandate
+                      </Button>
+                    ) : null}
+                  </div>
+                  {(subject.membership_period_intents ?? []).map((intent) => {
+                    const hidden = intentRequests(intent).some((row) => row.status === 'submitted');
+                    return (
+                      <div key={intent.id} className="text-sm text-gray-300">
+                        <p>{intent.period_key} · CHF {intent.amount} · {intent.status}</p>
+                        {hidden ? <p className="text-gray-400">{COLLECTION_COPY.submitted}</p> : null}
+                        {!hidden && intent.status !== 'paid' && intent.status !== 'reversed' ? (
+                          <Button type="button" variant="outline" className="mt-2" onClick={() => openMembershipInvoice(intent.id)}>
+                            Pay by invoice
+                          </Button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full"></div></div>

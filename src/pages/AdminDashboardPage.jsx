@@ -7,6 +7,7 @@ import IntegrationsPanel from '@/components/admin/IntegrationsPanel';
 import ClientManagementPanel from '@/components/admin/ClientManagementPanel';
 import CampManagementPanel from '@/components/admin/CampManagementPanel';
 import MembershipManagementPanel from '@/components/admin/MembershipManagementPanel';
+import MembershipCollectionsPanel from '@/components/admin/MembershipCollectionsPanel';
 
 const AdminDashboard = () => {
   const [coachAssignmentReady, setCoachAssignmentReady] = useState(false);
@@ -42,6 +43,9 @@ const AdminDashboard = () => {
               <TabsTrigger value="camps" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Camps
               </TabsTrigger>
+              <TabsTrigger value="collections" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
+                Collections
+              </TabsTrigger>
               <TabsTrigger value="integrations" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Bexio integration
               </TabsTrigger>
@@ -60,6 +64,9 @@ const AdminDashboard = () => {
             </TabsContent>
             <TabsContent value="camps" className="mt-0">
               <CampManagementPanel />
+            </TabsContent>
+            <TabsContent value="collections" className="mt-0">
+              <MembershipCollectionsPanel />
             </TabsContent>
             <TabsContent value="integrations" className="mt-0">
               <IntegrationsPanel />

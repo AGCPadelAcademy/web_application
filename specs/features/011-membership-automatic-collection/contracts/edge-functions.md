@@ -50,9 +50,10 @@ Repeating the call while the new row is `proposal_sent` returns that row.
 Scheduler only. Hourly. Body `{}`.
 
 1. Poll `proposal_sent` and `active` mandates through the port. Ignore results with `observedAt` older than `channel_status_at`.
-2. For each `pending` or not-yet-invoiced intent, issue one F1.03 invoice if it does not already exist. Then submit one collection only when all of these are true: method is `automatic_collection`, the client is active, the latest mandate is `active`, the channel is configured, and no `collection_requests` row exists.
-3. Poll `submitted` collections. `confirmed` marks the intent paid and inserts `payment_confirmed` with source `collection_channel` when that signal is absent. `failed` or `rejected` sets `collection_failed` and does not signal payment.
-4. When the method is `qr_invoice`, the client is inactive, or the channel is not configured, issue the invoice and do not submit a collection. Do not update a `submitted` request to cancelled.
+2. Copy each F1.09 `membership_charge_intents` row that has no `membership_period_intents.charge_intent_id` yet. Copy amount and `period_key`. Set `claim_kind` from the charge row. Do not create a month row from a fee row.
+3. For each `pending` or not-yet-invoiced intent, issue one F1.03 invoice if it does not already exist. Then submit one collection only when all of these are true: method is `automatic_collection`, the client is active, the latest mandate is `active`, the channel is configured, and no `collection_requests` row exists. A cancel fee uses this same rule.
+4. Poll `submitted` collections. `confirmed` marks the intent paid, sets `membership_charge_intents.paid_at` when `charge_intent_id` is set, and inserts `payment_confirmed` with source `collection_channel` when that signal is absent. `failed` or `rejected` sets `collection_failed` and does not signal payment. Confirming the month does not mark the fee paid.
+5. When the method is `qr_invoice`, the client is inactive, or the channel is not configured, issue the invoice and do not submit a collection. Do not update a `submitted` request to cancelled.
 
 The unconfigured adapter makes the poll and submit calls no-ops. QR invoices are still issued. Issue and submit stay idempotent.
 

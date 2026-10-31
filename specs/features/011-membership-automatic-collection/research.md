@@ -1,24 +1,24 @@
 # Research: Membership Automatic Collection (F1.26)
 
 **Feature**: `specs/features/011-membership-automatic-collection/spec.md`
-**Date**: 2026-10-08
+**Date**: 2026-10-31
 **Purpose**: Resolve Technical Context unknowns without inventing an F1.09 Membership product or a live bank connection that the academy has not confirmed.
 
-Sources: F1.26 spec (including the 2026-10-07 clarifications), constitution, F1.03 billing spine (`0003_bexio_integration.sql`, `financial-service.ts`, `reconciliation-service.ts`, `0004_bexio_reconcile_cron.sql`), F1.25 camp billing extension (`0014_f125_padel_camps.sql`, `camp-mapper.ts`), F1.04 `profiles.is_active`, unused `memberships` / `credits` described in `specs/project-context/domain-model.md`, My Payments (`src/pages/PaymentsPage.jsx`). Local migrations currently run through `0019`.
+Sources: F1.26 spec (including the 2026-10-07 and 2026-10-31 clarifications), constitution, F1.03 billing spine (`0003_bexio_integration.sql`, `financial-service.ts`, `reconciliation-service.ts`, `0004_bexio_reconcile_cron.sql`), F1.25 camp billing extension (`0014_f125_padel_camps.sql`, `camp-mapper.ts`), F1.09 plan for `membership_charge_intents`, F1.04 `profiles.is_active`, My Payments (`src/pages/PaymentsPage.jsx`). Local migrations currently run through `0023`. F1.09 plans `0024`. This feature plans `0025`.
 
 ---
 
 ## R-01. Do not adopt the unused `memberships` or `credits` tables
 
-- **Decision**: F1.26 does not read or write `public.memberships` or `public.credits`. Correlation uses new operational tables keyed by `profiles.id` and a `membership_ref` uuid. That uuid is the identifier F1.09 will own. It is not a foreign key to the unused table.
-- **Rationale**: The unused table is a plan/subscription leftover (`plan_id`, `active`, `next_charge_date`) and contradicts F1.09 (one Client + one Group, fixed place, explicit lifecycle, no credit wallet). The spec forbids treating it as the product.
-- **Alternatives considered**: *Activate `memberships` and collect from `next_charge_date`* — rejected: that would implement the wrong domain. *Wait to plan until F1.09 exists* — rejected: the spec allows a test double of a chargeable period so the collection channel can be built first.
+- **Decision**: F1.26 does not change Membership lifecycle columns and does not write `public.credits`. It reads `membership_charge_intents` after F1.09’s migration and writes only `paid_at` on that table. `membership_ref` remains the F1.09 membership id. This migration does not add a second lifecycle column.
+- **Rationale**: The legacy `memberships` columns (`plan_id`, `active`, `next_charge_date`) are not the product. F1.09 owns status. This feature owns the invoice.
+- **Alternatives considered**: *Collect from `next_charge_date`* — rejected: F1.09 replaced that column with charge intents. *Ignore the charge table and seed periods forever* — rejected: FR-013 requires consuming the F1.09 intent.
 
 ## R-02. F1.26 consumes an intent inbox; it does not own the billing calendar or Membership lifecycle
 
-- **Decision**: `collection_subjects` names the client and `membership_ref` only (no Pending/Active/Paused/Cancelled/Expired column). `membership_period_intents` is the chargeable inbox: amount, currency, opaque `period_key`, and paid state for that period. Until F1.09 exists, only the service role (tests, quickstart seed) may insert subjects and intents. This feature never assigns a Group place and never changes a Membership to Active.
-- **Rationale**: FR-013 and FR-021. Calendar month versus academy term stays with F1.09. The payment-confirmed signal is a row F1.09 can read later.
-- **Alternatives considered**: *Derive the next charge inside this job* — rejected: invents the calendar the spec forbids. *Store Membership lifecycle here “temporarily”* — rejected: a second state machine.
+- **Decision**: `collection_subjects` names the client and `membership_ref` only (no Pending/Active/Paused/Cancelled/Expired column). The hourly run copies each F1.09 `membership_charge_intents` row that is not yet linked: `period_key`, `amount`, `currency`, and `kind` (`month` or `cancel_fee`). A fee key is `YYYY-MM:fee`. The amount is copied. This job does not multiply by 0.10 and does not choose the 1st. `membership_period_intents` remains the invoice inbox. Test seeds may still insert an intent with a null `charge_intent_id`. This feature never assigns a Group place and never changes a Membership to Active.
+- **Rationale**: FR-013 and FR-013a. The calendar was decided on F1.09 on 2026-10-31. The payment-confirmed signal is a row F1.09 can read later. `paid_at` on the charge intent is how the next F1.09 1st knows the month was paid.
+- **Alternatives considered**: *Derive the next charge inside this job* — rejected: invents the calendar the spec forbids. *Store Membership lifecycle here* — rejected: a second state machine. *One invoice that adds the fee onto the month* — rejected: the two claims must stay separate.
 
 ## R-03. Membership-period invoices extend the F1.03 billing spine
 
@@ -52,7 +52,7 @@ Sources: F1.26 spec (including the 2026-10-07 clarifications), constitution, F1.
 
 ## R-08. Paid and reversed are signals, not Membership transitions
 
-- **Decision**: A period is paid only from a confirmed collection or from canonical reconciliation of its invoice (fully paid, same spirit as F1.03 partial payments). That inserts one `membership_payment_signals` row of kind `payment_confirmed`. A reversal inserts `payment_reversed`, clears the paid treatment, and is visible to Admins. `consumed_at` stays null for F1.09. Stale channel or accounting timestamps older than the stored status time do not overwrite.
+- **Decision**: A period is paid only from a confirmed collection or from canonical reconciliation of its invoice (fully paid, same spirit as F1.03 partial payments). That inserts one `membership_payment_signals` row of kind `payment_confirmed` and sets `membership_charge_intents.paid_at` when `charge_intent_id` is present. A reversal inserts `payment_reversed`, clears the paid treatment, clears that `paid_at`, and is visible to Admins. `consumed_at` stays null for F1.09. Paying the month does not clear a fee intent. Stale channel or accounting timestamps older than the stored status time do not overwrite.
 - **Rationale**: FR-016, FR-020, FR-021, FR-026. This feature must not activate, pause, or cancel a Membership.
 - **Alternatives considered**: *Update a Membership status column* — rejected: F1.09 does not exist here and must not be invented.
 

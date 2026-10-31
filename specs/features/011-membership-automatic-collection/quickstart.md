@@ -29,7 +29,7 @@ deno test supabase/functions/_shared/billing/collection-channel.test.ts supabase
 SQL assertions, when a database with the migration is available:
 
 ```bash
-# tests/sql/0020_f126_membership_automatic_collection.test.sql
+# tests/sql/0025_f126_membership_automatic_collection.test.sql
 ```
 
 Confirm the filename matches the migration number actually used.
@@ -90,6 +90,13 @@ Expected: both still offer the QR invoice. Neither creates a `collection_request
 2. As Admin, open Collections.
 
 Expected: mandate status, failed collections, reversals, and duplicate receipts for every client are visible. A non-admin does not see other clients.
+
+## Scenario 8 — Month and cancel fee are separate invoices
+
+1. Seed two F1.09 charge intents for one subject, or two period intents with `charge_intent_id` set: `2026-08` kind `month` amount 200.00, and `2026-08:fee` kind `cancel_fee` amount 20.00.
+2. Run the collection job twice.
+
+Expected: two `membership_period_intents` rows, two invoices, and the fee amount stays 20.00. A second run does not add a third invoice. Marking the month paid sets `paid_at` on that charge only. The fee invoice remains.
 
 ## Out of this guide
 

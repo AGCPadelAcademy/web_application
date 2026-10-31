@@ -1,10 +1,10 @@
 # Data model: Membership Automatic Collection (F1.26)
 
 **Feature**: `specs/features/011-membership-automatic-collection/spec.md`
-**Date**: 2026-10-08
+**Date**: 2026-10-31
 **Plan**: [plan.md](plan.md) · **Research**: [research.md](research.md)
 
-Operational collection data only. No Group, fixed place, or Membership lifecycle. `public.memberships` and `public.credits` are not used.
+Operational collection data. No Group, fixed place, or Membership lifecycle writes. `paid_at` on F1.09 `membership_charge_intents` is the only column this feature updates on that table. `public.credits` is not used.
 
 ## Relationship
 
@@ -92,15 +92,17 @@ stateDiagram-v2
 |---|---|---|
 | `id` | uuid PK | |
 | `subject_id` | uuid NOT NULL | FK `collection_subjects` |
-| `period_key` | text NOT NULL | opaque; unique per subject |
-| `amount` | numeric(10,2) NOT NULL | CHF; check `amount > 0` |
+| `period_key` | text NOT NULL | copied from F1.09; `YYYY-MM` or `YYYY-MM:fee`; unique per subject |
+| `claim_kind` | text NOT NULL | `month` or `cancel_fee`; copied, never derived here |
+| `charge_intent_id` | uuid NULL | FK `membership_charge_intents(id)` when F1.09 `0024` exists; unique; null only for a test seed |
+| `amount` | numeric(10,2) NOT NULL | CHF; copied from the charge intent; check `amount > 0` |
 | `currency` | text NOT NULL | check `currency = 'CHF'` |
 | `status` | text NOT NULL | `pending`, `invoiced`, `collection_submitted`, `paid`, `collection_failed`, `reversed` |
 | `paid_at` | timestamptz NULL | |
 | `duplicate_receipt` | boolean NOT NULL | default false |
 | `created_at` / `updated_at` | timestamptz | |
 
-Unique `(subject_id, period_key)`. Service role inserts. This job does not invent `period_key`.
+Unique `(subject_id, period_key)`. Unique `charge_intent_id` where not null. The hourly run inserts from F1.09 charge intents. It does not invent `period_key` or recompute the fee. A month invoice and a fee invoice stay two rows.
 
 ```mermaid
 stateDiagram-v2
@@ -170,4 +172,4 @@ Enable RLS on every new table.
 
 ## Migration
 
-Next local number after `0019` is `0020_f126_membership_automatic_collection.sql`. Confirm remote migration history before applying. One forward migration. Do not alter `memberships` or `credits`.
+File `0025_f126_membership_automatic_collection.sql`, after F1.09 `0024`. Local head is `0023` until those migrations exist. Confirm remote history before applying. One forward migration. Do not change Membership status columns or `credits`. The only write to `membership_charge_intents` is `paid_at`.

@@ -27,7 +27,7 @@
 
 **Purpose**: Confirm the feature branch, migration number, and function folders before any behavior change
 
-- [ ] T001 Confirm branch `cursor/feature-specification-automation-933f` and the next free migration number against the remote Supabase project before creating `supabase/migrations/0020_f126_membership_automatic_collection.sql` (local history ends at `0019`; plan.md §Risks)
+- [ ] T001 Confirm branch `cursor/f126-billing-plan-tasks-8626` and that `0025` is still free after F1.09 `0024` before creating `supabase/migrations/0025_f126_membership_automatic_collection.sql` (local head is `0023`; plan.md §Risks)
 - [ ] T002 [P] Create Edge Function directories `supabase/functions/membership-set-collection-method/`, `supabase/functions/membership-request-mandate/`, and `supabase/functions/membership-collection-run/` per plan.md §Project Structure
 - [ ] T003 [P] Confirm the existing quality gate still runs with no new npm packages: `npm run lint`, `npm test`, `npm run build`, and `deno test` under `supabase/functions/` (constitution; plan.md Technical Context)
 
@@ -39,11 +39,11 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Write `supabase/migrations/0020_f126_membership_automatic_collection.sql` creating `collection_subjects`, `collection_methods`, `direct_debit_mandates`, `membership_period_intents`, `collection_requests`, and `membership_payment_signals` with columns, CHECKs, FKs to `profiles`, and the partial unique indexes in `specs/features/011-membership-automatic-collection/data-model.md` (no FK to `public.memberships` or `public.credits`)
-- [ ] T005 In `supabase/migrations/0020_f126_membership_automatic_collection.sql`, add nullable `membership_period_intent_id` to `billing_documents`, `billing_operations`, and `billing_events`; unique on the document column; replace `billing_documents_exactly_one_subject_check` with the three-way check among `booking_id`, `camp_registration_id`, and `membership_period_intent_id`; extend the document owner SELECT policy through the intent’s subject `client_id` (data-model.md §Billing spine)
-- [ ] T006 In `supabase/migrations/0020_f126_membership_automatic_collection.sql`, enable RLS on the six new tables with SELECT for `is_admin()` or the owning client and no authenticated INSERT, UPDATE, or DELETE (data-model.md §RLS)
-- [ ] T007 In `supabase/migrations/0020_f126_membership_automatic_collection.sql`, schedule `membership-collection-run` hourly via `pg_cron` / `pg_net` using Vault `bexio_scheduler_secret` and `timeout_milliseconds := 60000`, following `supabase/migrations/0004_bexio_reconcile_cron.sql`, without changing the `bexio-reconcile` schedule (research R-09)
-- [ ] T008 [P] Write static SQL assertions in `tests/sql/0020_f126_membership_automatic_collection.test.sql` for the six tables, partial unique indexes, RLS enabled, no authenticated write policies, and the three-subject billing check; do not apply the migration (quickstart.md Prerequisites)
+- [ ] T004 Write `supabase/migrations/0025_f126_membership_automatic_collection.sql` creating `collection_subjects`, `collection_methods`, `direct_debit_mandates`, `membership_period_intents`, `collection_requests`, and `membership_payment_signals` with columns, CHECKs, FKs to `profiles`, and the partial unique indexes in `specs/features/011-membership-automatic-collection/data-model.md` (no FK to `public.memberships` or `public.credits`)
+- [ ] T005 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, add nullable `membership_period_intent_id` to `billing_documents`, `billing_operations`, and `billing_events`; unique on the document column; replace `billing_documents_exactly_one_subject_check` with the three-way check among `booking_id`, `camp_registration_id`, and `membership_period_intent_id`; extend the document owner SELECT policy through the intent’s subject `client_id` (data-model.md §Billing spine)
+- [ ] T006 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, enable RLS on the six new tables with SELECT for `is_admin()` or the owning client and no authenticated INSERT, UPDATE, or DELETE (data-model.md §RLS)
+- [ ] T007 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, schedule `membership-collection-run` hourly via `pg_cron` / `pg_net` using Vault `bexio_scheduler_secret` and `timeout_milliseconds := 60000`, following `supabase/migrations/0004_bexio_reconcile_cron.sql`, without changing the `bexio-reconcile` schedule (research R-09)
+- [ ] T008 [P] Write static SQL assertions in `tests/sql/0025_f126_membership_automatic_collection.test.sql` for the six tables, partial unique indexes, RLS enabled, no authenticated write policies, and the three-subject billing check; do not apply the migration (quickstart.md Prerequisites)
 - [ ] T009 [P] Write failing Deno tests in `supabase/functions/_shared/billing/collection-channel.test.ts` for `isConfigured() === false`, no I/O, and `collection_channel_not_configured` from `proposeMandate`, `readMandate`, `submitCollection`, and `readCollection` (contracts/collection-channel.md)
 - [ ] T010 Implement `UnconfiguredCollectionChannel` in `supabase/functions/_shared/billing/collection-channel.ts` so `supabase/functions/_shared/billing/collection-channel.test.ts` passes (contracts/collection-channel.md)
 
@@ -115,8 +115,11 @@
 - [ ] T029 [US3] Implement `supabase/functions/membership-collection-run/index.ts`: scheduler secret `bexio_scheduler_secret`, issue every not-yet-invoiced intent, submit a collection only when the policy allows it, and poll `submitted` rows (contracts/edge-functions.md)
 - [ ] T030 [US3] Extend `supabase/functions/_shared/billing/reconciliation-service.ts` so a fully paid membership-period document inserts `payment_confirmed` with source `accounting_reconciliation` once, and `partially_paid` leaves the intent unpaid (contracts/membership-billing.md)
 - [ ] T031 [US3] Extend `supabase/functions/bexio-reconcile/index.ts` to load documents with `membership_period_intent_id` and pass them through the reconciliation change in `supabase/functions/_shared/billing/reconciliation-service.ts` without changing lesson or camp confirmation behavior
+- [ ] T042 [US3] In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, add `claim_kind` and nullable unique `charge_intent_id` on `membership_period_intents`, referencing `membership_charge_intents` from F1.09 `0024` (data-model.md)
+- [ ] T043 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/charge-intent-copy.test.ts` that a month intent and a `YYYY-MM:fee` intent copy their amounts unchanged, that a second copy does not insert another row, and that paying the month does not mark the fee paid
+- [ ] T044 [US3] Implement the copy at the start of `supabase/functions/membership-collection-run/index.ts`, and set `membership_charge_intents.paid_at` from `supabase/functions/_shared/billing/reconciliation-service.ts` and the collection-confirmed path when `charge_intent_id` is set (contracts/edge-functions.md)
 
-**Checkpoint**: User Stories 1–3 work — one invoice, one collection, and one payment signal for a period
+**Checkpoint**: User Stories 1–3 work — one invoice, one collection, and one payment signal per month or fee claim
 
 ---
 
@@ -165,7 +168,7 @@
 **Purpose**: Gate the slice without applying the migration or calling a bank
 
 - [ ] T040 [P] Run `npm run lint`, `npm test`, `npm run build`, and `deno test` on `supabase/functions/_shared/billing/collection-channel.test.ts`, `supabase/functions/_shared/billing/mandate-attempts.test.ts`, `supabase/functions/_shared/billing/membership-mapper.test.ts`, `supabase/functions/_shared/billing/financial-service.membership.test.ts`, `supabase/functions/_shared/billing/membership-collection-policy.test.ts`, and `supabase/functions/_shared/billing/membership-collection-policy.failure.test.ts` (quickstart.md Automated gate)
-- [ ] T041 State in the header of `supabase/migrations/0020_f126_membership_automatic_collection.sql` that the file is not applied until an explicit user request, and tick only the automated quickstart scenarios; leave Scenarios 1–3 and 7 for the user (quickstart.md)
+- [ ] T041 State in the header of `supabase/migrations/0025_f126_membership_automatic_collection.sql` that the file is not applied until an explicit user request, and tick only the automated quickstart scenarios; leave Scenarios 1–3 and 7 for the user (quickstart.md)
 
 ---
 
@@ -247,6 +250,7 @@ After Phase 2:
 ## Notes
 
 - Production wiring uses `UnconfiguredCollectionChannel` only. A real AKB or network-partner adapter is out of this task list.
-- Do not write `public.memberships` or `public.credits`.
+- Do not change Membership status columns or write `public.credits`. The only write on `membership_charge_intents` is `paid_at`.
 - Do not add a Membership Active/Paused/Cancelled column or a refund UI.
-- Apply `supabase/migrations/0020_f126_membership_automatic_collection.sql` only after an explicit user request. Confirm the number is still free before applying.
+- Apply `supabase/migrations/0025_f126_membership_automatic_collection.sql` only after an explicit user request and after F1.09 `0024`. Confirm the number is still free before applying.
+- Do not recompute the 10% fee and do not choose the 1st or the 20th cutoff in this feature.

@@ -1,12 +1,12 @@
 # Implementation Plan: Membership Automatic Collection (eBill Direct Debit) (F1.26)
 
-**Branch**: `cursor/feature-specification-automation-933f` | **Date**: 2026-10-08 | **Spec**: [spec.md](spec.md)
+**Branch**: `cursor/f126-billing-plan-tasks-8626` | **Date**: 2026-10-31 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/features/011-membership-automatic-collection/spec.md`
 
 ## Summary
 
-Add an issuer-initiated Direct Debit collection channel for adult Membership periods. The client or an Admin chooses automatic collection in My Payments. AGC stores that choice, requests one mandate proposal through a provider-neutral channel port, issues the period invoice through the existing F1.03 billing spine, and submits one collection when the mandate is active. Confirmed payment writes a signal F1.09 can read later. QR / bank transfer stays the fallback. The shipped channel adapter is unconfigured, so live bank debit waits until AKB confirms a contract. This feature does not implement Membership lifecycle, Group fixed-place, or the unused `memberships` table.
+Add an issuer-initiated Direct Debit collection channel for adult Membership periods. The client or an Admin chooses automatic collection in My Payments. AGC stores that choice, requests one mandate proposal through a provider-neutral channel port, and copies each F1.09 `membership_charge_intents` row into `membership_period_intents`. A membership month and a cancel fee are separate claims. Each gets one F1.03 invoice. The fee amount is copied from F1.09 and is not recalculated. When the mandate is active, one collection is submitted for that claim. Confirmed payment writes `paid_at` back on the charge intent and a signal F1.09 can read later. It does not activate, pause, or cancel the Membership. QR / bank transfer stays the fallback, including for the fee. The shipped channel adapter is unconfigured, so live bank debit waits until AKB confirms a contract. This feature does not choose the 1st, the 20th cutoff, the 10% rate, or the place end.
 
 ## Technical Context
 
@@ -14,7 +14,7 @@ Add an issuer-initiated Direct Debit collection channel for adult Membership per
 
 **Primary Dependencies**: Existing stack only — Supabase JS 2.30, Supabase Auth/Postgres/RLS/Edge Functions, React Router 6, existing Radix/shadcn-style components, existing F1.03 `billing_*` spine and `FinancialService → AccountingProvider → BexioAdapter`. New server-side `CollectionChannel` port with an unconfigured adapter. Zero new npm packages. No SIX SDK.
 
-**Storage**: Supabase PostgreSQL. New tables `collection_subjects`, `collection_methods`, `direct_debit_mandates`, `membership_period_intents`, `collection_requests`, `membership_payment_signals`. Additive `membership_period_intent_id` on `billing_documents` / `billing_operations` / `billing_events`. Money is `numeric(10,2)` CHF. Optional IBAN column only.
+**Storage**: Supabase PostgreSQL. New tables `collection_subjects`, `collection_methods`, `direct_debit_mandates`, `membership_period_intents`, `collection_requests`, `membership_payment_signals`. `membership_period_intents.charge_intent_id` references F1.09 `membership_charge_intents` when migration `0024` is already applied. Additive `membership_period_intent_id` on `billing_documents` / `billing_operations` / `billing_events`. Money is `numeric(10,2)` CHF. Optional IBAN column only.
 
 **Testing**: Vitest 4 for the My Payments client and forbidden-copy guard; Deno tests for the channel port, mandate idempotency, collection idempotency, stale status, stop, and deactivation; SQL/RLS tests in `tests/sql/` for the new tables and partial unique indexes. Manual scenarios in [quickstart.md](quickstart.md).
 
@@ -38,14 +38,14 @@ Add an issuer-initiated Direct Debit collection channel for adult Membership per
 | II. Spec-driven | Clarified spec precedes this plan. Tasks and implementation remain later gates. Work stays on the existing `cursor/feature-specification-automation-933f` branch | PASS |
 | III. Incremental / backward compatible | New operational tables and additive billing columns. Lesson bookings, camp registrations, and the unused membership tables stay untouched | PASS |
 | IV. Security-first | RLS select-only for clients; mutations in JWT Edge Functions; scheduler uses the existing Vault secret; no bank credentials; IBAN optional and not logged | PASS |
-| V. Migration discipline | One forward migration after remote numbering confirmation. Money is `numeric`. Status values are CHECK constraints. No unrelated schema debt | PASS |
+| V. Migration discipline | One forward migration `0025` after F1.09 `0024` and after remote numbering confirmation. Local head is `0023` until those files land. Money is `numeric`. Status values are CHECK constraints. No unrelated schema debt | PASS |
 | VI. Documentation | Research, data model, contracts, and quickstart in this feature folder. Mermaid for the entity and state diagrams | PASS |
 | VII. Simplicity / YAGNI | Reuse F1.03 invoicing and reconciliation. One unconfigured channel adapter instead of an unconfirmed AKB client. No cancel-collection API | PASS |
 | Fixed stack | React, Supabase, Deno Edge Functions. No custom API server and no new payment vendor in this slice | PASS |
 | Payments | Manual bank transfer remains the fallback. Direct Debit is an additional rail into the same paid meaning. No Stripe | PASS |
 | Swiss PII | Client isolation. IBAN only if a future channel requires it. No full account numbers in logs | PASS |
 
-**Pre-design gate: PASS.** No unresolved clarifications. The concrete bank adapter is intentionally deferred until AKB confirms a contract (research R-04).
+**Pre-design gate: PASS.** The 2026-10-31 spec session closed the calendar. This plan consumes F1.09 charge intents and does not reopen the 1st, the 20th, or the 10%. The concrete bank adapter stays deferred until AKB confirms a contract (research R-04).
 
 ### Post-design re-check
 
@@ -68,7 +68,7 @@ specs/features/011-membership-automatic-collection/
 │   └── edge-functions.md
 ├── checklists/
 │   └── requirements.md
-└── tasks.md                         # created later by /speckit-tasks
+└── tasks.md                         # updated in this planning pass
 ```
 
 ### Source Code (repository root)
@@ -76,7 +76,7 @@ specs/features/011-membership-automatic-collection/
 ```text
 supabase/
 ├── migrations/
-│   └── 0020_f126_membership_automatic_collection.sql   # tentative; confirm remote history first
+│   └── 0025_f126_membership_automatic_collection.sql   # after F1.09 0024; confirm remote head first
 └── functions/
     ├── _shared/
     │   └── billing/
@@ -103,7 +103,7 @@ src/
         └── MembershipCollectionsPanel.jsx             # NEW: status, reversals, duplicate receipts
 
 tests/sql/
-└── 0020_f126_membership_automatic_collection.test.sql
+└── 0025_f126_membership_automatic_collection.test.sql
 ```
 
 **Structure Decision**: Stay inside the existing SPA, `src/lib` service modules, migrations, and Edge Functions. Clients manage the collection method on My Payments. Admins get one tab on the existing dashboard. The bank port lives next to the F1.03 billing modules and is not callable from the browser.
@@ -113,7 +113,7 @@ tests/sql/
 [research.md](research.md) resolves:
 
 - Correlation tables instead of the unused `memberships` / `credits` tables
-- A chargeable-period inbox without a Membership lifecycle
+- A chargeable-period inbox filled from F1.09 charge intents, without a second calendar
 - Additive F1.03 billing columns and `agc:membership-period:{id}` references
 - An unconfigured `CollectionChannel` until AKB confirms a contract
 - One in-flight mandate attempt, with an explicit new attempt after rejection or revocation
@@ -137,7 +137,7 @@ No `NEEDS CLARIFICATION` remains.
 
 ### 1. Migration
 
-Create one migration only after checking remote numbering. Local history ends at `0019`, so the tentative file is `0020_f126_membership_automatic_collection.sql`.
+Create one migration only after checking remote numbering. Local history ends at `0023`. F1.09 reserves `0024_f109_adult_memberships.sql`. This feature’s file is `0025_f126_membership_automatic_collection.sql` and it references `membership_charge_intents`, so `0024` must be applied first. Renumber both if the remote head has moved.
 
 1. Create the six tables, checks, and partial unique indexes in data-model.md.
 2. Add `membership_period_intent_id` to the three billing tables and replace the exactly-one-subject check with the three-way form. Extend owner SELECT on `billing_documents`.
@@ -151,7 +151,9 @@ Do not modify `memberships`, `credits`, `bookings`, or camp tables.
 - Implement the port and `UnconfiguredCollectionChannel` as in the collection-channel contract.
 - Add `issueInvoiceForMembershipPeriod` beside the camp issuer, including `api_reference` recovery.
 - Extend reconciliation for membership documents: full payment signals once; partial payment does not; a second settlement sets `duplicate_receipt`; a reversal signals `payment_reversed`.
-- The hourly run polls status and submits collections only for active mandates, active clients, and the automatic method. It also issues the QR invoice when the method is `qr_invoice`, with no collection row.
+- Before issuing, the hourly run copies each F1.09 charge intent that has no `membership_period_intents` row yet. It copies `amount`, `currency`, and `period_key`, and stores `claim_kind` (`month` or `cancel_fee`). It does not invent a period and does not recompute 10%.
+- The hourly run polls status and submits collections only for active mandates, active clients, and the automatic method. The fee uses that same path. It also issues the QR invoice when the method is `qr_invoice`, with no collection row.
+- When a period intent becomes paid, the run or reconciliation sets `membership_charge_intents.paid_at` for its `charge_intent_id`. Paying the month does not delete or cancel the fee invoice.
 
 ### 3. My Payments
 
@@ -175,7 +177,7 @@ No constitution violations. No waiver table.
 
 ## Risks
 
-- F1.09 is not implemented. End-to-end collection against a real Group fixed-place cannot be demonstrated. The quickstart seed is the test double.
+- F1.09 is specified and planned, and is not implemented yet. Until `membership_charge_intents` exists, the quickstart seed remains the test double. Implement F1.09 before this feature.
 - A live eBill debit cannot be verified until a contracted adapter replaces the unconfigured one.
 - An emailed Swiss QR slip can still be paid after the app hides the pay action. Duplicate settlement is recorded for Admins and is not refunded in this feature.
-- Remote migration numbers may already be ahead of local `0019`. Confirm before adding `0020`.
+- Remote migration numbers may already be ahead of local `0023`. Confirm before adding `0025`. If F1.26 is applied while every charge stays unpaid, the next F1.09 1st creates the fee and stops further months. That is the F1.09 rule, not a second F1.26 policy.

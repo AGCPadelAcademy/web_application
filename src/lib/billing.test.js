@@ -14,7 +14,7 @@ const { mockSupabase } = vi.hoisted(() => ({
 
 vi.mock('@/lib/customSupabaseClient', () => ({ supabase: mockSupabase }));
 
-import { fetchCampInvoicePdfBlob, fetchInvoicePdfBlob } from '@/lib/billing';
+import { fetchCampInvoicePdfBlob, fetchInvoicePdfBlob, fetchMembershipInvoicePdf } from '@/lib/billing';
 
 describe('fetchInvoicePdfBlob', () => {
   beforeEach(() => {
@@ -77,5 +77,23 @@ describe('fetchCampInvoicePdfBlob', () => {
       }),
     );
     expect(url).toBe('blob:camp-pdf');
+  });
+
+  it('posts a membership period and honors qr_pay_hidden', async () => {
+    const blob = new Blob(['%PDF'], { type: 'application/pdf' });
+    fetch.mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(blob),
+      headers: { get: (name) => (name === 'x-qr-pay-hidden' ? 'true' : null) },
+    });
+    const result = await fetchMembershipInvoicePdf('intent-1');
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/billing-invoice-document'),
+      expect.objectContaining({
+        body: JSON.stringify({ membership_period_intent_id: 'intent-1' }),
+      }),
+    );
+    expect(result.qrPayHidden).toBe(true);
+    expect(result.url).toBe('blob:camp-pdf');
   });
 });

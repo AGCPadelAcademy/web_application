@@ -65,7 +65,7 @@ const ContactPage = () => {
         <title>AGC Padel Academy - Contact</title>
         <meta name="description" content="Get in touch with AGC Padel Academy. Find our address, phone, email or send us a message through our form." />
       </Helmet>
-      <div className="px-6 py-12 md:py-24 bg-black">
+      <div className="px-6 py-12 md:py-24 bg-background">
         <div className="max-w-6xl mx-auto">
           <motion.div initial={{
           opacity: 0,

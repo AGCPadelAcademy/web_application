@@ -17,6 +17,7 @@ import {
   paymentCardDate,
   paymentInvoiceState,
 } from '@/lib/payments';
+import MembershipCollectionSection from '@/components/payments/MembershipCollectionSection.jsx';
 
 const PaymentsPage = () => {
   const { user } = useAuth();
@@ -305,6 +306,8 @@ const PaymentsPage = () => {
           <CreditCard className="w-8 h-8 text-green-400" />
           <h1 className="text-3xl md:text-4xl font-bold font-serif">My Payments</h1>
         </div>
+
+        <MembershipCollectionSection />
 
         {loading ? (
           <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full"></div></div>

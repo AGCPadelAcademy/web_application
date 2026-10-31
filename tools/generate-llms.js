@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { TOURNAMENTS_ENABLED } from '../src/lib/featureFlags.js';
 
 const CLEAN_CONTENT_REGEX = {
   comments: /\/\*[\s\S]*?\*\/|\/\/.*$/gm,
@@ -100,7 +101,7 @@ function extractHelmetData(content, filePath, routes) {
   const descMatch = helmetContent.match(EXTRACTION_REGEX.description);
   
   const title = cleanText(titleMatch?.[1]);
-  const description = cleanText(descMatch?.[1]);
+  const description = cleanText(descMatch?.[1] || descriptionFromExpression(helmetContent));
   
   const fileName = path.basename(filePath, path.extname(filePath));
   const url = routes.length && routes.has(fileName) 
@@ -112,6 +113,18 @@ function extractHelmetData(content, filePath, routes) {
     title: title || 'Untitled Page',
     description: description || 'No description available'
   };
+}
+
+function descriptionFromExpression(helmetContent) {
+  const meta = helmetContent.match(/<meta\s+name=["']description["'][\s\S]*?\/>/i);
+  if (!meta) return null;
+  const contentPart = meta[0].split(/content=/)[1] || '';
+  const strings = [...contentPart.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1]);
+  if (strings.length === 0) return null;
+  if (strings.length >= 2 && meta[0].includes('TOURNAMENTS_ENABLED')) {
+    return strings[TOURNAMENTS_ENABLED ? 0 : 1];
+  }
+  return strings[0];
 }
 
 function generateFallbackUrl(fileName) {
@@ -157,7 +170,9 @@ function main() {
     const routes = extractRoutes(appJsxPath);
     const reactFiles = findReactFiles(pagesDir);
 
+    const hiddenPages = TOURNAMENTS_ENABLED ? new Set() : new Set(['TournamentsPage.jsx']);
     pages = reactFiles
+      .filter(filePath => !hiddenPages.has(path.basename(filePath)))
       .map(filePath => processPageFile(filePath, routes))
       .filter(Boolean);
   }

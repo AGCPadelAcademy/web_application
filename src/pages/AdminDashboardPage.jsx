@@ -6,14 +6,20 @@ import { isCoachAssignmentAvailable } from '@/lib/coachAssignments';
 import IntegrationsPanel from '@/components/admin/IntegrationsPanel';
 import ClientManagementPanel from '@/components/admin/ClientManagementPanel';
 import CampManagementPanel from '@/components/admin/CampManagementPanel';
+import MembershipCollectionsPanel from '@/components/admin/MembershipCollectionsPanel';
+import { isCollectionDataAvailable } from '@/lib/membershipCollection';
 
 const AdminDashboard = () => {
   const [coachAssignmentReady, setCoachAssignmentReady] = useState(false);
+  const [collectionsReady, setCollectionsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     isCoachAssignmentAvailable().then((ready) => {
       if (!cancelled) setCoachAssignmentReady(ready);
+    });
+    isCollectionDataAvailable().then((ready) => {
+      if (!cancelled) setCollectionsReady(ready);
     });
     return () => {
       cancelled = true;
@@ -38,6 +44,11 @@ const AdminDashboard = () => {
               <TabsTrigger value="camps" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Camps
               </TabsTrigger>
+              {collectionsReady && (
+                <TabsTrigger value="collections" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
+                  Collections
+                </TabsTrigger>
+              )}
               <TabsTrigger value="integrations" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-black">
                 Bexio integration
               </TabsTrigger>
@@ -54,6 +65,11 @@ const AdminDashboard = () => {
             <TabsContent value="camps" className="mt-0">
               <CampManagementPanel />
             </TabsContent>
+            {collectionsReady && (
+              <TabsContent value="collections" className="mt-0">
+                <MembershipCollectionsPanel />
+              </TabsContent>
+            )}
             <TabsContent value="integrations" className="mt-0">
               <IntegrationsPanel />
             </TabsContent>

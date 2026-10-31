@@ -22,7 +22,7 @@ const TournamentsPage = () => {
         <title>AGC Padel Academy - Tournaments</title>
         <meta name="description" content="Information about upcoming AGC Padel Academy tournaments and photo gallery." />
       </Helmet>
-      <div className="px-6 py-12 md:py-24 bg-black min-h-screen">
+      <div className="px-6 py-12 md:py-24 bg-background min-h-screen">
         <div className="max-w-5xl mx-auto">
           
           {/* Info Box */}

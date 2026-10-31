@@ -10,6 +10,94 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { useProfile } from '@/hooks/useProfile';
 import { profileToFormData } from '@/lib/profileService';
 import CountrySelect from '@/components/profile/CountrySelect';
+import { cancelMyMembership, fetchMyMemberships, MEMBERSHIP_STATUS_LABELS } from '@/lib/memberships';
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function MyMembershipSection({ userId }) {
+  const { toast } = useToast();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState('');
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    fetchMyMemberships()
+      .then((memberships) => {
+        if (!cancelled) setRows(memberships);
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          toast({ title: 'Could not load memberships', description: loadError.message, variant: 'destructive' });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [toast, userId]);
+
+  const onCancel = async (membershipId) => {
+    if (!window.confirm('Cancel this membership? The end date follows the 20th cutoff.')) return;
+    setCancellingId(membershipId);
+    try {
+      await cancelMyMembership(membershipId);
+      const memberships = await fetchMyMemberships();
+      setRows(memberships);
+      toast({ title: 'Membership cancelled' });
+    } catch (cancelError) {
+      toast({ title: 'Cancel failed', description: cancelError.message, variant: 'destructive' });
+    } finally {
+      setCancellingId('');
+    }
+  };
+
+  return (
+    <Card className="bg-gray-900 border-gray-800 text-white mt-8">
+      <CardHeader>
+        <CardTitle>My membership</CardTitle>
+        <CardDescription className="text-gray-400">Your adult group membership and monthly price.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? <p className="text-gray-400">Loading memberships…</p> : null}
+        {!loading && rows.length === 0 ? <p className="text-gray-400">You have no membership.</p> : null}
+        {rows.map((membership) => {
+          const group = membership.groups;
+          const canCancel = ['pending_payment', 'active', 'paused'].includes(membership.status);
+          return (
+            <div key={membership.id} className="rounded-lg border border-gray-800 p-4">
+              <p className="font-medium">{group?.name || 'Group'}</p>
+              <p className="text-sm text-gray-400">
+                {WEEKDAYS[group?.weekday] || ''} {group?.start_time}–{group?.end_time}
+              </p>
+              <p className="text-sm text-gray-300">
+                {MEMBERSHIP_STATUS_LABELS[membership.status] || membership.status}
+                {' · CHF '}
+                {membership.monthly_price_amount}
+                {membership.cancellation_effective_on ? ` · through ${membership.cancellation_effective_on}` : ''}
+              </p>
+              {canCancel ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3"
+                  disabled={cancellingId === membership.id}
+                  onClick={() => onCancel(membership.id)}
+                >
+                  Cancel membership
+                </Button>
+              ) : null}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
 
 const EMPTY_FORM = {
   first_name: '',
@@ -275,6 +363,7 @@ const ProfileManagementPage = () => {
             </Button>
           </CardFooter>
         </Card>
+        {user?.id ? <MyMembershipSection userId={user.id} /> : null}
       </div>
     </div>
   );

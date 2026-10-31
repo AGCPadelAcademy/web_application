@@ -27,8 +27,8 @@
 
 **Purpose**: Confirm the branch and the migration number before any behavior change
 
-- [ ] T001 Confirm the implementation branch and that `0024` is still free against the remote Supabase project before creating `supabase/migrations/0024_f109_adult_memberships.sql` (local head is `0023`; plan.md migration note)
-- [ ] T002 [P] Confirm the quality gate still runs with no new npm packages: `npm run lint`, `npm test`, and `npm run build` (plan.md Technical Context)
+- [X] T001 Confirm the implementation branch and that `0024` is still free against the remote Supabase project before creating `supabase/migrations/0024_f109_adult_memberships.sql` (local head is `0023`; plan.md migration note)
+- [X] T002 [P] Confirm the quality gate still runs with no new npm packages: `npm run lint`, `npm test`, and `npm run build` (plan.md Technical Context)
 
 ---
 
@@ -38,12 +38,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Write `supabase/migrations/0024_f109_adult_memberships.sql` creating `groups`, altering `memberships` with `group_id`, `status`, `monthly_price_amount`, `cancellation_effective_on`, and `updated_at`, and adding `memberships_one_live_per_client_group`, without dropping legacy columns (data-model.md)
-- [ ] T004 In `supabase/migrations/0024_f109_adult_memberships.sql`, add RLS `groups_admin_all`, `groups_member_read`, `memberships_admin_all`, `memberships_owner_read`, and `memberships_owner_cancel`, and create `membership_state_events` with admin-read only (data-model.md)
-- [ ] T005 In `supabase/migrations/0024_f109_adult_memberships.sql`, add `guard_membership_status_transition()` and `record_membership_state_event()` for T1–T9, the 20th cutoff in `Europe/Zurich`, owner cancel, and the GUC `agc.membership_charge_job` (contracts/membership-lifecycle.md)
-- [ ] T006 In `supabase/migrations/0024_f109_adult_memberships.sql`, create `membership_charge_intents` and `create_membership_charges(p_on date)` per research R-14, and schedule it with `pg_cron` at 00:05 `Europe/Zurich` on day 1
-- [ ] T007 In `supabase/migrations/0024_f109_adult_memberships.sql`, create security-invoker view `membership_fixed_places` using the Zurich date (contracts/fixed-place-participation.md)
-- [ ] T008 [P] Write `tests/sql/0024_f109_adult_memberships.test.sql` asserting the tables, the partial unique index, RLS, the 20th effective date, charge idempotency, the 10% fee, and the fixed-place view (quickstart.md). Do not apply the migration from this task
+- [X] T003 Write `supabase/migrations/0024_f109_adult_memberships.sql` creating `groups`, altering `memberships` with `group_id`, `status`, `monthly_price_amount`, `cancellation_effective_on`, and `updated_at`, and adding `memberships_one_live_per_client_group`, without dropping legacy columns (data-model.md)
+- [X] T004 In `supabase/migrations/0024_f109_adult_memberships.sql`, add RLS `groups_admin_all`, `groups_member_read`, `memberships_admin_all`, `memberships_owner_read`, and `memberships_owner_cancel`, and create `membership_state_events` with admin-read only (data-model.md)
+- [X] T005 In `supabase/migrations/0024_f109_adult_memberships.sql`, add `guard_membership_status_transition()` and `record_membership_state_event()` for T1–T9, the 20th cutoff in `Europe/Zurich`, owner cancel, and the GUC `agc.membership_charge_job` (contracts/membership-lifecycle.md)
+- [X] T006 In `supabase/migrations/0024_f109_adult_memberships.sql`, create `membership_charge_intents` and `create_membership_charges(p_on date)` per research R-14, and schedule it with `pg_cron` at 00:05 `Europe/Zurich` on day 1
+- [X] T007 In `supabase/migrations/0024_f109_adult_memberships.sql`, create security-invoker view `membership_fixed_places` using the Zurich date (contracts/fixed-place-participation.md)
+- [X] T008 [P] Write `tests/sql/0024_f109_adult_memberships.test.sql` asserting the tables, the partial unique index, RLS, the 20th effective date, charge idempotency, the 10% fee, and the fixed-place view (quickstart.md). Do not apply the migration from this task
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -57,12 +57,12 @@
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] Write failing Vitest tests in `src/lib/memberships.test.js` for `createMembership({ clientId, groupId, monthlyPriceAmount })` payload shape and `mapMembershipError()` on duplicate, inactive Group, and RLS denial
+- [X] T009 [P] [US1] Write failing Vitest tests in `src/lib/memberships.test.js` for `createMembership({ clientId, groupId, monthlyPriceAmount })` payload shape and `mapMembershipError()` on duplicate, inactive Group, and RLS denial
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Implement `listMemberships`, `createMembership`, and `mapMembershipError` in `src/lib/memberships.js` (plan.md frontend service)
-- [ ] T011 [US1] Add `src/components/admin/MembershipManagementPanel.jsx` with the create form (Client, Group, monthly price) and register a Memberships tab in `src/pages/AdminDashboardPage.jsx`
+- [X] T010 [US1] Implement `listMemberships`, `createMembership`, and `mapMembershipError` in `src/lib/memberships.js` (plan.md frontend service)
+- [X] T011 [US1] Add `src/components/admin/MembershipManagementPanel.jsx` with the create form (Client, Group, monthly price) and register a Memberships tab in `src/pages/AdminDashboardPage.jsx`
 
 **Checkpoint**: User Story 1 works — one live Membership per Client and Group, price stored, audit row on create
 
@@ -76,11 +76,11 @@
 
 ### Tests for User Story 2
 
-- [ ] T012 [P] [US2] Extend `src/lib/memberships.test.js` so `activateMembership` sends only the status update and maps an invalid-transition error
+- [X] T012 [P] [US2] Extend `src/lib/memberships.test.js` so `activateMembership` sends only the status update and maps an invalid-transition error
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Implement `activateMembership` in `src/lib/memberships.js` and the Activate action on `src/components/admin/MembershipManagementPanel.jsx`
+- [X] T013 [US2] Implement `activateMembership` in `src/lib/memberships.js` and the Activate action on `src/components/admin/MembershipManagementPanel.jsx`
 
 **Checkpoint**: Activation is an Admin write and is audited
 
@@ -94,11 +94,11 @@
 
 ### Tests for User Story 6
 
-- [ ] T014 [P] [US6] Extend `src/lib/memberships.test.js` for `pauseMembership`, `resumeMembership`, and `expireMembership` payloads
+- [X] T014 [P] [US6] Extend `src/lib/memberships.test.js` for `pauseMembership`, `resumeMembership`, and `expireMembership` payloads
 
 ### Implementation for User Story 6
 
-- [ ] T015 [US6] Implement `pauseMembership`, `resumeMembership`, and `expireMembership` in `src/lib/memberships.js` and the matching actions on `src/components/admin/MembershipManagementPanel.jsx`
+- [X] T015 [US6] Implement `pauseMembership`, `resumeMembership`, and `expireMembership` in `src/lib/memberships.js` and the matching actions on `src/components/admin/MembershipManagementPanel.jsx`
 
 **Checkpoint**: Only the listed transitions succeed
 
@@ -112,13 +112,13 @@
 
 ### Tests for User Story 5
 
-- [ ] T016 [P] [US5] Extend `src/lib/memberships.test.js` for `cancelMembership` and `cancelMyMembership`
+- [X] T016 [P] [US5] Extend `src/lib/memberships.test.js` for `cancelMembership` and `cancelMyMembership`
 
 ### Implementation for User Story 5
 
-- [ ] T017 [US5] Implement `cancelMembership` and `cancelMyMembership` in `src/lib/memberships.js`
-- [ ] T018 [US5] Add the Admin cancel action on `src/components/admin/MembershipManagementPanel.jsx`, showing `cancellation_effective_on`
-- [ ] T019 [US5] Add the My Membership section to `src/pages/ProfileManagementPage.jsx` with Group, schedule, monthly price, status, effective date, and cancel for the owner (`fetchMyMemberships` in `src/lib/memberships.js`)
+- [X] T017 [US5] Implement `cancelMembership` and `cancelMyMembership` in `src/lib/memberships.js`
+- [X] T018 [US5] Add the Admin cancel action on `src/components/admin/MembershipManagementPanel.jsx`, showing `cancellation_effective_on`
+- [X] T019 [US5] Add the My Membership section to `src/pages/ProfileManagementPage.jsx` with Group, schedule, monthly price, status, effective date, and cancel for the owner (`fetchMyMemberships` in `src/lib/memberships.js`)
 
 **Checkpoint**: Owner cancel and the 20th date are enforced in the database
 
@@ -132,7 +132,7 @@
 
 ### Implementation for User Story 7
 
-- [ ] T020 [US7] Keep `fetchMyMemberships` in `src/lib/memberships.js` on the owner SELECT policy only, and do not add a coach or cross-client query in `src/pages/ProfileManagementPage.jsx`
+- [X] T020 [US7] Keep `fetchMyMemberships` in `src/lib/memberships.js` on the owner SELECT policy only, and do not add a coach or cross-client query in `src/pages/ProfileManagementPage.jsx`
 
 **Checkpoint**: Owner read matches FR-014. The SQL assertions in T008 cover the denial
 
@@ -146,7 +146,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Leave Session generation and Booking out of this feature. Confirm `membership_fixed_places` is the only participation predicate added, in `supabase/migrations/0024_f109_adult_memberships.sql`
+- [X] T021 [US3] Leave Session generation and Booking out of this feature. Confirm `membership_fixed_places` is the only participation predicate added, in `supabase/migrations/0024_f109_adult_memberships.sql`
 
 **Checkpoint**: The view exists. F1.10 and F1.11 are not implemented here
 
@@ -160,7 +160,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T022 [US4] Do not add Session-cancel writes in `src/lib/memberships.js` or `supabase/migrations/0024_f109_adult_memberships.sql`. Cancellation remains the explicit T3/T7/T8 path only
+- [X] T022 [US4] Do not add Session-cancel writes in `src/lib/memberships.js` or `supabase/migrations/0024_f109_adult_memberships.sql`. Cancellation remains the explicit T3/T7/T8 path only
 
 **Checkpoint**: Membership state changes only through the lifecycle trigger
 
@@ -174,8 +174,8 @@
 
 ### Implementation for User Story 8
 
-- [ ] T023 [US8] Keep charge creation inside `create_membership_charges` in `supabase/migrations/0024_f109_adult_memberships.sql`. Do not add a Bexio call, an email, or a client insert of `membership_charge_intents`
-- [ ] T024 [US8] Show the monthly price on `src/components/admin/MembershipManagementPanel.jsx` and `src/pages/ProfileManagementPage.jsx`. Do not show a fee editor; the fee is computed by the database
+- [X] T023 [US8] Keep charge creation inside `create_membership_charges` in `supabase/migrations/0024_f109_adult_memberships.sql`. Do not add a Bexio call, an email, or a client insert of `membership_charge_intents`
+- [X] T024 [US8] Show the monthly price on `src/components/admin/MembershipManagementPanel.jsx` and `src/pages/ProfileManagementPage.jsx`. Do not show a fee editor; the fee is computed by the database
 
 **Checkpoint**: The 1st job matches FR-021 and FR-022. Invoicing stays in F1.26
 
@@ -185,8 +185,8 @@
 
 **Purpose**: Run the automated gate. Leave live-app checks to the user
 
-- [ ] T025 Run `npm run lint`, `npm test`, and `npm run build` (quickstart.md Automated quality gate)
-- [ ] T026 State in the header of `supabase/migrations/0024_f109_adult_memberships.sql` that the file is not applied until an explicit user request. Leave quickstart Scenarios 1–8 for the user in the live app
+- [X] T025 Run `npm run lint`, `npm test`, and `npm run build` (quickstart.md Automated quality gate)
+- [X] T026 State in the header of `supabase/migrations/0024_f109_adult_memberships.sql` that the file is not applied until an explicit user request. Leave quickstart Scenarios 1–8 for the user in the live app
 
 ---
 

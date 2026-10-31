@@ -32,6 +32,6 @@
 ## Notes
 
 - Validated 2026-09-10. Gap analysis names F1.03/F1.09/F1.25, the unused `memberships` table, and live QR payment because brownfield rules require discovery against the current system. User stories, functional requirements, and success criteria stay in business language (Swiss eBill Direct Debit is the named payment scheme, not an API design).
-- No `[NEEDS CLARIFICATION]` markers. Dual opt-in actors (client + Admin), payment-confirmed signal without implementing F1.09 state transitions, channel-agnostic issuer, F1.09-owned billing calendar, and any-supporting-bank coverage with QR fallback are documented in Assumptions.
-- Issue #54 open decisions that belong to planning or F1.09 (exact AKB vs partner channel; whether F1.09 auto-activates on the signal; calendar month vs term) are recorded as assumptions / open questions, not specification blockers.
+- No `[NEEDS CLARIFICATION]` markers. Dual opt-in actors (client + Admin), payment-confirmed signal without implementing F1.09 state transitions, channel-agnostic issuer, and any-supporting-bank coverage with QR fallback are documented in Assumptions.
+- **2026-10-31**: The billing calendar is no longer open. F1.09 owns the 1st and the 10% cancel fee. This spec only invoices those intents (FR-013, FR-013a). Issuer channel and whether F1.09 auto-activates on the payment signal remain planning or F1.09 decisions, not specification blockers.
 - Spec folder is `specs/features/011-membership-automatic-collection` (sequential Spec Kit numbering), not the issue’s `specs/phase-1/F1.26-membership-automatic-collection/` path — same convention as F1.25 → `010-padel-camps`.

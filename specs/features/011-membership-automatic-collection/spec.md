@@ -23,6 +23,13 @@
 - Q: After a mandate is rejected or revoked, who can start a new authorization proposal? → A: The client or an Admin can explicitly request one new authorization proposal. It is a new attempt. The rejected or revoked mandate is never treated as active.
 - Q: When a client is deactivated after a mandate is already active, may AGC still collect later Membership periods? → A: No new Direct Debit collections. A collection already submitted may finish. History stays readable. A new opt-in is refused.
 
+### Session 2026-10-31
+
+The product owner set the billing calendar on F1.09. This feature consumes it.
+
+- Q: Which calendar does collection use? → A: F1.09 creates one chargeable calendar month on the 1st. F1.26 issues one invoice for that period. This feature does not choose calendar month versus academy term.
+- Q: What does F1.26 do with the non-payment fee? → A: When F1.09 creates a cancel-fee intent of 10% of that month’s membership price, F1.26 issues one invoice for that fee through the same path. F1.26 does not set the percentage, the 1st, the 20th cutoff, or whether the place ends.
+
 ---
 
 ## Gap analysis (current → target)
@@ -33,7 +40,7 @@ Inspected: GitHub issue #54, F1.09 issue #14, constitution, project context, dom
 |---|---|---|
 | Client opts into automatic Membership collection from AGC | Payment is per-invoice Swiss QR / bank transfer. F1.03 007 Session 2026-08-25 noted future Membership “QR each month or domiciliation” and left it out of 007. F1.09 defers automatic activation from confirmed payment as Phase 2. | **Add** an in-app collection-method choice on a Membership. Declining auto-pay keeps QR / invoice payment. The product MUST NOT claim that AGC can switch on the bank’s Automatic transaction / standing approval. |
 | Issuer-initiated Direct Debit mandate | No mandate, no collection rail. AGC does not connect to SIX. Bexio has no customer Direct Debit API (007). | **Add** a Direct Debit **authorization proposal** through the contracted issuer channel (network partner or bank eBill Web — channel chosen in planning). Persist a provider-neutral mandate mapping. One bank-side mandate approval is required by the Swiss eBill Direct Debit scheme; it is not per-invoice bank setup and is not Automatic transaction. |
-| Recurring collection of a Membership period | Lesson invoices use `booking_id`. Camp invoices use `camp_registration_id` (F1.25). 007 FR-013 reserved memberships as a future financial source. Unused `memberships` table has `next_charge_date` but 0 rows and no collection. | **Consume** a chargeable Membership-period intent owned with F1.09 / pricing. Issue the accounting invoice through F1.03 (idempotent, correlated to the period — not as if it were a lesson `booking_id`). Submit one Direct Debit collection against that claim. Confirmed payment emits a **payment-confirmed** signal for F1.09. |
+| Recurring collection of a Membership period | Lesson invoices use `booking_id`. Camp invoices use `camp_registration_id` (F1.25). 007 FR-013 reserved memberships as a future financial source. Unused `memberships` table has `next_charge_date` but 0 rows and no collection. | **Consume** the calendar-month intent F1.09 creates on the 1st, and the 10% cancel-fee intent F1.09 creates on the next 1st when that month is unpaid. Issue each through F1.03 (idempotent, correlated to that intent — not as if it were a lesson `booking_id`). Submit one Direct Debit collection against a membership-month claim when the mandate is active. Confirmed payment emits a **payment-confirmed** signal for F1.09. |
 | Paid = confirmed collection / reconciliation | Lesson and Camp paid state comes from accounting reconciliation, not a screenshot. | **Same authority.** Opt-in ≠ paid. Mandate active ≠ paid. Invoice issued ≠ paid. Only confirmed collection/reconciliation marks the period paid. |
 | Fallback when auto-pay is unavailable | QR / bank transfer is the only live path. | **Keep** QR / invoice as fallback when the client did not opt in, the payer bank does not support Direct Debit, the mandate is missing/rejected/revoked, or the issuer channel is not configured. Show an honest status. |
 | Membership lifecycle / Group fixed-place | Unused `memberships` table (`plan_id`, `active` boolean) does **not** match F1.09. F1.09: Membership = one Client + one Group, fixed place, states Pending Payment / Active / Paused / Cancelled / Expired, **manual Admin activation**. Domain-model §2.9 still describes a plan/subscription leftover. | **Do not** implement F1.09. Do not treat the unused table as the Membership product. Do not invent a credit wallet. This feature owns collection method, mandate, collection, and the payment-confirmed signal only. |
@@ -101,6 +108,8 @@ On each Membership billing period (period rules belong to F1.09 / pricing; this 
 3. **Given** confirmed collection and/or canonical accounting reconciliation for that invoice, **When** AGC records it, **Then** the period is marked paid and a payment-confirmed signal is available for F1.09 to activate or renew — without this feature assigning a Group place.
 4. **Given** a stale partner or accounting response, **When** it arrives after a newer known AGC financial state, **Then** it MUST NOT overwrite the newer state.
 5. **Given** the collection channel is temporarily unavailable, **When** the period is processed, **Then** operational Membership records are not rolled back solely because of that outage; the failure is retryable and visible to Admins.
+6. **Given** F1.09 has created one chargeable month for 1 August, **When** this feature invoices it, **Then** exactly one invoice exists for that month, including after a retry. This feature does not decide that the charge falls on the 1st.
+7. **Given** F1.09 has created one cancel-fee intent of 10% of the August membership price, **When** this feature invoices it, **Then** exactly one fee invoice exists. This feature does not change the percentage, cancel the Membership, or open a September membership month.
 
 ---
 
@@ -186,7 +195,8 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 
 #### Recurring collection and invoice
 
-- **FR-013**: This feature MUST consume the Membership billing period / chargeable intent owned with F1.09 and pricing. It MUST NOT invent a second billing calendar (calendar month vs academy term is not decided here).
+- **FR-013**: This feature MUST consume the chargeable intent F1.09 creates. F1.09 owns the calendar: one membership month on the 1st, and one cancel fee of 10% of that month’s price on the next 1st when the month is still unpaid. This feature MUST NOT invent a second calendar, a second cutoff, or a second fee percentage.
+- **FR-013a**: A membership-month intent and a cancel-fee intent are separate claims. Each MUST produce at most one invoice, including after retries. Invoicing the fee MUST NOT create a membership month, and invoicing the month MUST NOT create the fee. The fee amount is the amount on F1.09’s intent. Paying the original month after the fee invoice exists MUST NOT cancel the fee invoice.
 - **FR-014**: For each chargeable period with an active mandate, the system MUST create a chargeable financial operation, issue the invoice through the existing F1.03 provider-neutral financial/accounting boundary, and submit one Direct Debit collection request against that claim. Membership, Booking, Cancellation, and Recovery services MUST NOT call the accounting provider, SIX, or the issuer channel directly; they express intent; this feature and F1.03 execute it.
 - **FR-015**: Membership-period invoices MUST reuse F1.03 invoice, correlation, PDF, email, and reconciliation mechanisms. The invoice MUST be correlated to the Membership period, not treated as a lesson `booking_id`. Bexio remains the accounting source of truth for the invoice document and recorded payments. Bexio MUST NOT become the source of truth for Membership lifecycle or Group fixed-place.
 - **FR-016**: Invoice issuance MUST NOT mark the period paid.
@@ -220,7 +230,8 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 
 - **Collection method choice**: per Membership (and client), whether automatic collection or QR / invoice is selected; operational AGC data, not an accounting-system field.
 - **Direct Debit mandate**: provider-neutral mapping of AGC client/Membership to an external mandate/Biller reference, with status (not requested / proposal sent / active / rejected / revoked / failed / unsupported bank), timestamps, and optional failure reason. Does not imply paid.
-- **Chargeable Membership period**: the billable interval produced by F1.09 / pricing. This feature does not own the calendar; it consumes the intent and records paid vs not paid for that period.
+- **Chargeable Membership period**: the calendar month produced by F1.09 on the 1st. This feature does not own the calendar; it consumes the intent and records paid vs not paid for that period.
+- **Cancel fee**: the separate F1.09 intent of 10% of an unpaid month’s membership price. This feature invoices it once and does not decide the percentage or the Membership state.
 - **Period invoice**: F1.03 financial document for that period (same invoice/PDF/reconciliation mechanisms as lessons and Camps, correlated to the period rather than a lesson booking).
 - **Collection request**: one Direct Debit collection against a period claim, idempotent, auditable.
 - **Payment-confirmed signal**: notice to F1.09 that a period is paid via canonical reconciliation/collection. Not a Membership state machine.
@@ -236,6 +247,7 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 - **SC-002**: 100% of opt-ins produce at most one in-flight authorization proposal per Membership/client across retries. An explicit new request after rejection or revocation creates one new attempt and never reuses the rejected or revoked mandate as active.
 - **SC-003**: 0% of “proposal sent” or “mandate active” events, by themselves, mark a Membership period paid or the Membership Active.
 - **SC-004**: 100% of billing periods with an active mandate produce at most one invoice and at most one collection request, including after retries.
+- **SC-012**: 100% of F1.09 membership-month intents produce at most one invoice, and 100% of F1.09 cancel-fee intents produce at most one separate invoice. Zero fee invoices change the Membership state or the 10% amount.
 - **SC-005**: After confirmed collection/reconciliation, the period is marked paid and F1.09 can observe the payment-confirmed signal within one synchronization interval (target ≤ 1 hour), with 0 double-paid periods over any rolling 30-day window. A period that receives both a confirmed collection and a bank transfer is still one paid period, and the extra receipt is visible to Admins.
 - **SC-006**: 100% of failed/rejected collections leave the Membership not activated or extended by that attempt.
 - **SC-007**: 100% of unsupported-bank, missing-mandate, revoked-mandate, not-opted-in, and unconfigured-channel cases offer QR / invoice payment with an honest status in AGC.
@@ -258,7 +270,7 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 >
 > **Assumption:** V1 offers Direct Debit for any payer institution the contracted channel reports as supporting eBill Direct Debit. If the contracted channel is AKB-only, that is a channel constraint, not a second product rule. Unsupported banks always fall back to QR.
 >
-> **Assumption:** Billing period (calendar month vs academy term) is owned with F1.09 / pricing. This feature does not invent a second calendar.
+> **Assumption:** The billing calendar is decided. F1.09 creates one calendar-month charge on the 1st, and a 10% cancel-fee intent on the next 1st when that month is unpaid. This feature invoices those intents and does not invent a second calendar.
 >
 > **Assumption:** Manual issuer prerequisites (Biller ID, contract, ability to send proposals and collections) sit outside this issue’s application work. Spec/plan may proceed with QR fallback; live-bank collection cannot be verified until that channel exists.
 >
@@ -280,7 +292,7 @@ F1.03 invoicing/reconciliation, F1.02 authorization, F1.04 client identity, and 
 - Generic credit wallets (forbidden by F1.09 / F1.13).
 - AGC-built accounting, bank-reconciliation UI, or SIX connectivity.
 - Changing lesson QR billing (F1.03 V1).
-- Inventing a second Membership cancellation policy when auto-pay stops.
+- Inventing a second Membership cancellation policy when auto-pay stops, or deciding the 20th cutoff, the 10% fee, or the end of the place. Those stay with F1.09.
 
 ---
 

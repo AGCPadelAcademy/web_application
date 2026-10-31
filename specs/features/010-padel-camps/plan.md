@@ -261,3 +261,26 @@ No schema change and no new Edge Function. FR-012 unchanged.
 - **Public `/camps` flyer**: size the listing control to the image (no oversized empty `h-64` frame). Keep keep-aspect and a non-zero mobile height via the image itself (`h-auto`).
 - **Flyer preview**: `FlyerLightbox` is image-only (blurred overlay, close **X** on the image, click-outside/Escape). Do not reuse invoice-preview dialog chrome.
 
+## Evolution 2026-09-24, round 7 (Phase 20): age range is informational
+
+No new Edge Function. Do not drop `children.date_of_birth`, `camp_registrations.child_date_of_birth`, or `camps.min_age` / `max_age`. Apply migration `0020` only when the user asks.
+
+- **Schema** (`0020`): `CREATE OR REPLACE public.register_camp_child` from the `0017` six-argument body **without** the `min_age` / `max_age` / missing-DOB `age_out_of_range` block. Member price, capacity, window, extras, and the child snapshot (including date of birth when present) stay. Repeat service-role-only `REVOKE` / `GRANT`.
+- **Client / Edge mapping**: `mapCampError` and `mapSubmitError` no longer treat `age_out_of_range` as a registration refusal. Other 409 codes stay.
+- **Unchanged display**: public “Ages …” lines, admin min/max fields, and child date of birth collection remain.
+
+## Evolution 2026-09-24, round 8 (Phase 21): Junior dynamic capacity
+
+No new Edge Function. Do not change stored `camps.max_capacity` (Junior stays 10). Live project already has `0021_f125_camp_registration_billing_on_delete`, so this migration is `0022`.
+
+- **Ceiling**: `camp_registration_ceiling` — Junior (`camp_type`) uses `max_capacity` until active registrations reach `max_capacity - 1`, then `max_capacity + 6` (16 when the stored limit is 10). Mini, Competition, and any other type stay on `max_capacity`.
+- **Register / waitlist**: `register_camp_child` raises `camp_full` at that ceiling. `guard_camp_waitlist_join` treats the camp as full at the same ceiling.
+- **Public list**: `camp_places_remaining` returns 1 for a Junior camp from 9 through 15 active registrations, and 0 at 16. `is_full` follows the ceiling.
+
+## Evolution 2026-09-24, round 9 (Phase 22): Junior places countdown
+
+No new Edge Function. Do not change stored `camps.max_capacity`. Migration `0023` replaces the two helper functions from `0022`.
+
+- **Trigger**: Junior ceiling opens at `max_capacity - 3` (7 active when the stored limit is 10), not at one place remaining. Ceiling stays `max_capacity + 6` (16).
+- **Display**: 3 places from 7 through 13 active, 2 at 14, 1 at 15, full at 16. Waitlist still opens at 16. Mini and Competition stay a hard `max_capacity`.
+

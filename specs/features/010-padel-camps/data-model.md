@@ -206,7 +206,7 @@ No name/contact/DOB/allergy columns exist by design, so PII cannot be recorded. 
 
 | New column | Type | Constraints | Notes |
 |---|---|---|---|
-| `camp_registration_id` | uuid | NULL, UNIQUE, FK → `camp_registrations(id)` ON DELETE RESTRICT | idempotency anchor for camp invoices |
+| `camp_registration_id` | uuid | NULL, UNIQUE, FK → `camp_registrations(id)` ON DELETE CASCADE | idempotency anchor for camp invoices. **(Amended 2026-09-24)** CASCADE because the exactly-one-subject CHECK forbids SET NULL. Deleting the registration removes its `billing_documents` row. It does not cancel the invoice in Bexio. |
 
 New CHECK: exactly one of `booking_id` / `camp_registration_id` is set.
 
@@ -216,7 +216,7 @@ RLS owner clause extended: owner = `bookings.user_id` **or** the registration’
 
 | New column | Type | Constraints | Notes |
 |---|---|---|---|
-| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` | subject for camp retries |
+| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` ON DELETE SET NULL | subject for camp retries. **(Amended 2026-09-24)** `billing_document_id` is ON DELETE SET NULL so a cascaded document delete does not block the registration delete. |
 
 **Decision (2026-09-08, analysis I1):** the existing `kind` CHECK from migration `0003` is **altered** to add `camp_invoice_issue` and `camp_invoice_cancel`. Deterministic idempotency keys: `camp-registration:{id}:invoice:v1` (issue) and `camp-registration:{id}:invoice_cancel:v1` (cancel). Lesson kinds are unchanged.
 
@@ -224,7 +224,7 @@ RLS owner clause extended: owner = `bookings.user_id` **or** the registration’
 
 | New column | Type | Constraints | Notes |
 |---|---|---|---|
-| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` | audit subject |
+| `camp_registration_id` | uuid | NULL, FK → `camp_registrations(id)` ON DELETE SET NULL | audit subject |
 
 New event types: `camp.registration_submitted`, `camp.invoice.issued`, `camp.payment.reconciled`, `camp.confirmation.sent`, `camp.waitlist.joined`, `camp.waitlist.converted`.
 
@@ -262,11 +262,11 @@ stateDiagram-v2
 
 ## Transactional capacity function
 
-`public.register_camp_child(p_camp_id uuid, p_child_id uuid, p_parent_id uuid, p_extra_ids uuid[], p_terms_version text)` (SECURITY DEFINER, service-role only):
+`public.register_camp_child(p_camp_id uuid, p_child_id uuid, p_parent_id uuid, p_extra_ids uuid[], p_terms_version text, p_member_price_claimed boolean)` (SECURITY DEFINER, service-role only; six-argument form since `0017`):
 
 1. Lock the Camp row `FOR UPDATE`.
-2. Revalidate: Camp exists, `is_published`, window open, deadline not passed, child belongs to `p_parent_id` and is not archived, age within range when configured.
-3. Count active registrations (`pending_payment`,`confirmed`). If `count >= max_capacity` → raise `camp_full`.
+2. Revalidate: Camp exists, `is_published`, window open, deadline not passed, child belongs to `p_parent_id` and is not archived. **(Amended 2026-09-24 C7)** `min_age` / `max_age` and a missing date of birth do not refuse the insert. The function still snapshots `child_date_of_birth` when present. Signature is the six-argument form from `0017` (`p_member_price_claimed boolean`).
+3. Count active registrations (`pending_payment`,`confirmed`). If `count >= camp_registration_ceiling(...)` → raise `camp_full`. **(Amended 2026-09-24 C9)** Junior (`camp_type`) ceiling is `max_capacity` until 3 places remain, then `max_capacity + 6`. `camp_places_remaining` shows 3 through 13 active, 2 at 14, 1 at 15, and 0 at 16. Other types stay on `max_capacity`.
 4. Insert the registration with snapshots and computed totals; insert selected extras (validated active and belonging to the Camp).
 5. Return the registration id.
 
@@ -291,7 +291,7 @@ One additive migration `supabase/migrations/0014_f125_padel_camps.sql` (confirm 
 | FR-001/FR-002 configurable Camps | `camps` columns + admin RLS |
 | FR-006/FR-006a parent-owned children | `children.parent_id` RLS |
 | FR-006d no child hard delete | no `DELETE` policy; `archived_at` only |
-| FR-009 age eligibility | transactional function age check at `start_date` |
+| FR-009 age range informational | `camps.min_age` / `max_age` and `children.date_of_birth` stay stored and displayed; `register_camp_child` does not raise `age_out_of_range` (`0020`) |
 | FR-010/FR-011 window/full/idempotent submit | transactional function + partial UNIQUE index |
 | FR-017/FR-018 decimal totals + snapshots | `numeric(10,2)` snapshots on registration/extras |
 | FR-019/FR-020 capacity | derived count + `FOR UPDATE` lock in one transaction |

@@ -32,7 +32,7 @@ Do not pre-create empty folders. Add a folder when a spec is started.
 | `008-roles-and-permissions` | F1.02 — live Coach + student isolation tightenings (delta vs `006`) |
 | `009-client-management` | F1.04 — client profiles, admin directory, deactivation (delta vs `005`/`006`) |
 | `010-padel-camps` | F1.25 — admin-managed Camps, parent Children page, child registration, extras, capacity, F1.03 invoice, confirmation email |
-| `011-adult-memberships` | F1.09 — adult Membership as a Client+Group fixed-place commitment (manual Admin activation; not a credit wallet) |
+| `011-membership-automatic-collection` | F1.26 — in-app Membership auto-pay via eBill Direct Debit mandate + F1.03 period invoice + payment-confirmed signal (QR fallback) |
 
 ---
 

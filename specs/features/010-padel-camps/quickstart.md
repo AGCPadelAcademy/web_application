@@ -169,9 +169,31 @@ This guide proves the feature end-to-end after implementation (from `tasks.md`).
 | 15.4 | Visitor opens `/camps` at ~375px | Flyer control is sized to the flyer (no oversized empty frame). Flyer stays visible and tappable |
 | 15.5 | Visitor or admin opens the flyer preview (phone and desktop) | Preview is the flyer only on a blurred background — no invoice-style dialog title. **X** is on the top-right of the image. Click outside or Escape returns to the previous state |
 
+## 16. Age range is informational (convergence 7, 2026-09-24)
+
+Requires migration `0020_f125_camp_age_informational` applied. Do not drop date-of-birth or min/max age columns.
+
+| Step | Action | Expected |
+|---|---|---|
+| 16.1 | Visitor opens `/camps` and a Camp detail page that has min/max age | “Ages …” line is still shown. Admin Camp form still has min/max age |
+| 16.2 | Parent opens a saved child | Date of birth is still stored and visible |
+| 16.3 | Parent submits one registration for a saved child younger or older than that Camp’s displayed age range (or with no date of birth) | One registration is created. It is not refused for age. Date of birth is snapshotted when present |
+| 16.4 | Parent submits after the deadline, or against an unpublished or full Camp | Still refused (`camp_closed`, `camp_not_published`, or `camp_full`) |
+
+## 17. Junior dynamic capacity (convergence 8, 2026-09-24)
+
+Requires migration `0023_f125_junior_places_countdown` applied. Do not change the stored Junior capacity from 10 to 16.
+
+| Step | Action | Expected |
+|---|---|---|
+| 17.1 | Admin opens Junior week 1 and week 2 | Capacity field is still 10 |
+| 17.2 | Junior camp reaches 7 active registrations (3 places left of 10) | The ceiling is 16. The public card shows 3 places left, and it still shows 3 through 13 registrations |
+| 17.3 | Junior camp has 14, then 15, then 16 active registrations | The card shows 2, then 1, then full (`Complet / Ausgebucht`). The 16th registration is the last. Another is refused (`camp_full`). Waitlist, if enabled, can open |
+| 17.4 | Mini or Competition camp reaches its configured capacity | No extra places. The next registration is refused |
+
 ## Acceptance mapping
 
-Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
+Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Scenario 17 covers C9: Junior week 1 and week 2 open at 3 places remaining, show 3 through 13 registrations, then 2, 1, and the waitlist at 16. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).
 
 ## Validation log (2026-09-08)
 

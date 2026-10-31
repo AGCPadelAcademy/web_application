@@ -40,6 +40,7 @@ import {
   extrasTotal,
   filterCampsByType,
   formatCampExtraChoice,
+  mapCampError,
   sortPublicCamps,
   funnelEventPayload,
   FUNNEL_EVENTS,
@@ -326,5 +327,13 @@ describe('formatCampExtraChoice', () => {
       description: 'Offered by El Toro Restaurant',
     });
     expect(formatCampExtraChoice({ name: 'Lunch', price_amount: 99, description: '  ' }).description).toBe('');
+  });
+});
+
+describe('mapCampError age range (C7)', () => {
+  it('does not treat age_out_of_range as a registration refusal message', () => {
+    expect(mapCampError('age_out_of_range')).not.toMatch(/outside the camp age range/i);
+    expect(mapCampError('camp_full')).toBe('This camp is full.');
+    expect(mapCampError('duplicate_registration')).toBe('This child is already registered for this camp.');
   });
 });

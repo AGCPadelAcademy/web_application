@@ -140,7 +140,7 @@ WHERE table_schema = 'public' AND table_name = 'camp_funnel_events'
 -- * deadline passed → camp_closed
 -- * unpublished → camp_not_published
 -- * archived child → child_archived
--- * age out of range at start_date → age_out_of_range
+-- * age outside min_age/max_age, or missing date of birth, does NOT refuse (0020; age range is informational)
 -- * extras not belonging to the Camp / inactive → extras_invalid
 -- * missing emergency contact → emergency_contact_required
 -- * duplicate active (parent, child, camp) → duplicate_registration

@@ -21,27 +21,31 @@ error) and leaves the stored state unchanged.
 |---|---|---|---|
 | T1 | (none) → `pending_payment` | Admin | Creation event audited (`from_status` NULL). Requires active Client + active Group + no live duplicate (FR-004) |
 | T2 | `pending_payment` → `active` | Admin | Manual activation (FR-006). Payment confirmation MUST NOT trigger this in V1 |
-| T3 | `pending_payment` → `cancelled` | Admin | `cancellation_effective_on` set (see below) |
+| T3 | `pending_payment` → `cancelled` | Owning client or Admin | `cancellation_effective_on` set (see below) |
 | T4 | `pending_payment` → `expired` | Admin | Abandoned before activation |
 | T5 | `active` → `paused` | Admin | Fixed place stops while Paused (FR-011) |
 | T6 | `paused` → `active` | Admin | Fixed place restored (FR-011) |
-| T7 | `active` → `cancelled` | Admin | `cancellation_effective_on` set (see below) |
-| T8 | `paused` → `cancelled` | Admin | `cancellation_effective_on` set (see below) |
+| T7 | `active` → `cancelled` | Owning client or Admin | `cancellation_effective_on` set (see below) |
+| T8 | `paused` → `cancelled` | Owning client or Admin | `cancellation_effective_on` set (see below) |
 | T9 | `cancelled` → `expired` | Admin | Close-out after the effective date has passed |
 
 Terminal for participation: `cancelled` (after its effective date) and `expired`.
 No transition re-enters `pending_payment`; no transition leaves `expired`.
 
-## Cancellation effective date (FR-012, Q2 Option B)
+## Cancellation effective date (FR-012)
 
-- On T3/T7/T8 the trigger sets
-  `cancellation_effective_on = (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date`
-  — the last day of the calendar month containing the cancellation.
-- The Client keeps the fixed place **through** `cancellation_effective_on` (inclusive);
-  participation stops for Sessions after that date.
-- The live Terms notice rule (by the 1st of the previous month) is **not** enforced
+Academy dates use `(now() AT TIME ZONE 'Europe/Zurich')::date`.
+
+- On T3/T7/T8, day 1–20 inclusive sets `cancellation_effective_on` to the last day of
+  the current Zurich month. Day 21 onward sets it to the last day of the next Zurich
+  month.
+- The client keeps the fixed place **through** `cancellation_effective_on` (inclusive).
+- A cancellation after the 20th still produces one next-month charge on the following
+  1st. A cancellation on or before the 20th does not. Pending Payment never starts a
+  month (FR-021).
+- The published Terms notice (by the 1st of the previous month) is replaced
   (spec Discrepancy #5).
-- V1 has no Admin override of the effective date (research R-06 assumption).
+- V1 has no override of the effective date (research R-06).
 
 ## Audit contract (FR-005)
 
@@ -55,14 +59,28 @@ Every T1–T9 writes exactly one `membership_state_events` row:
 
 ## Authorization contract (FR-003 / FR-014 / FR-015)
 
-- All writes (create + T2–T9): Admin only, enforced by RLS (`is_admin()`) **and** the
-  transition trigger. Direct PostgREST calls by students/coaches/anon fail.
+- Create, T2, T4, T5, T6, and T9: Admin only, enforced by RLS (`is_admin()`) and the
+  transition trigger.
+- T3, T7, and T8: owning client (`memberships_owner_cancel`) or Admin. The client
+  cannot change `user_id`, `group_id`, or `monthly_price_amount`.
 - Reads: Admin all rows; Client own rows only.
 - Deletes: none, for any role. History is never hard-deleted.
+- Direct PostgREST calls by other students, coaches, and anon fail.
 
-## F1.26 handover signal (future — not built here)
+## Charge intents (FR-021 / FR-022)
 
-F1.26 (automatic collection) will drive T2 from a confirmed-payment signal. The contract
-it consumes: **set `status = 'active'` on a `pending_payment` Membership** — the trigger
-validates the transition and writes the audit row with the service actor. No other
-automation hook exists or is needed.
+`create_membership_charges(p_on date)` runs at 00:05 `Europe/Zurich` on day 1. It
+inserts `membership_charge_intents` and does not call Bexio. See research R-14.
+
+When an Active Membership’s previous month is still unpaid, the same function moves
+that Membership to `cancelled` with `cancellation_effective_on` on the last day of the
+unpaid month. The audit actor is NULL. This path is allowed only while
+`agc.membership_charge_job` is `on`. A Paused Membership is not moved; it still gets
+the fee and no new month.
+
+## F1.26 handover
+
+F1.26 copies each uninvoiced charge intent into its own period inbox and issues one
+invoice per intent. It writes `membership_charge_intents.paid_at` when that claim is
+paid. It does not run T2. Invoice issue does not activate the Membership. Paying the
+month after the fee exists does not delete the fee intent.

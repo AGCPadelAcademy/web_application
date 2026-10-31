@@ -13,7 +13,8 @@ A Membership confers a fixed place in its Group **iff**:
 
 ```text
 status = 'active'
-OR (status = 'cancelled' AND cancellation_effective_on >= CURRENT_DATE)
+OR (status = 'cancelled'
+    AND cancellation_effective_on >= (now() AT TIME ZONE 'Europe/Zurich')::date)
 ```
 
 Published as the security-invoker view:
@@ -24,9 +25,9 @@ membership_fixed_places(membership_id, user_id, group_id)
 
 - Inherits `memberships` RLS: Clients see only their own rows; Admins see all.
 - Paused, Pending Payment, and Expired Memberships never appear.
-- A Cancelled Membership appears until the end of its already-paid month
-  (`cancellation_effective_on` inclusive), then disappears — no consumer should
-  re-implement this window.
+- A Cancelled Membership appears through `cancellation_effective_on` inclusive, then
+  disappears. That date is the 20th-cutoff result or, after a non-payment fee, the
+  last day of the unpaid month. No consumer should re-implement this window.
 
 **Consumer obligation (F1.10)**: when generating Sessions for a Group, treat every
 `membership_fixed_places.user_id` for that Group as a fixed participant. Consumers MUST

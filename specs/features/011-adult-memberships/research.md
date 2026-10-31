@@ -1,6 +1,6 @@
 # Phase 0 Research: Adult Memberships (F1.09)
 
-**Feature**: `011-adult-memberships` | **Date**: 2026-10-05 | **Spec**: [spec.md](spec.md)
+**Feature**: `011-adult-memberships` | **Date**: 2026-10-31 | **Spec**: [spec.md](spec.md)
 
 All findings verified against the current implementation (`src/`, `supabase/`) and the
 brownfield baseline (`specs/baseline-system/`, `specs/project-context/`). No
@@ -113,28 +113,23 @@ do not block a later new Membership.
 **Alternatives considered**: application-level check (race-prone, bypassable), full
 unique index (would forbid legitimate re-membership after Cancelled/Expired).
 
-## R-06 — Cancellation effective date (FR-012, Option B)
+## R-06 — Cancellation effective date (FR-012, 20th cutoff)
 
-**Decision**: On the transition to `cancelled`, the database sets
-`cancellation_effective_on` to the **last day of the calendar month containing the
-cancellation** (`(date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date`),
-computed inside the transition trigger. No Admin override in V1.
+**Decision**: On the transition to `cancelled` by the owning client or an Admin, the
+database sets `cancellation_effective_on` from the academy date
+`(now() AT TIME ZONE 'Europe/Zurich')::date`. Day 1–20 inclusive: last day of that
+month. Day 21 onward: last day of the next month. No override in V1. The same trigger
+does not itself insert the next month’s charge; `create_membership_charges` does that
+on the following 1st only when the effective date still covers that next month.
 
-**Rationale**: "End of the already-paid month" (Q2, Option B) needs a deterministic rule.
-Memberships are monthly and payment tracking is manual/out-of-band (no payment-period
-data exists in the system), so the calendar month of cancellation is the only
-implementable reading of "already-paid month". Computing it in the trigger keeps the
-rule authoritative and identical for all clients; the value is stored so F1.10/F1.11 can
-compare Session dates against it without re-deriving policy.
+**Rationale**: The 2026-10-31 session replaced both the live Terms notice and the
+2026-10-05 “end of the cancellation month” reading. One stored date lets
+`membership_fixed_places` and the charge job share the rule. The 20th stays on the
+on-time side.
 
-> **Assumption (flagged for plan review):** "already-paid month" = the calendar month in
-> which the Admin cancels. If the academy later bills non-calendar periods, this rule
-> moves to a paid-through date tracked per Membership.
-
-**Alternatives considered**: Admin-chosen effective date (adds UI + validation for a
-case the Terms already cover by notice; YAGNI for V1), immediate effect (rejected by Q2),
-enforcing the live Terms 1st-of-previous-month notice (rejected by Q2; recorded as
-Discrepancy #5).
+**Alternatives considered**: Admin-chosen effective date (a second policy), keeping the
+Terms 1st-of-previous-month notice (explicitly replaced; Discrepancy #5), using
+`CURRENT_DATE` in UTC (moves the cutoff for evening users in Switzerland).
 
 ## R-07 — `expired` semantics (undefined in spec/issue)
 
@@ -161,8 +156,10 @@ no DELETE policy for any role (history is never hard-deleted — spec Non-goals)
 legacy public self-read policy is rewritten to the `(SELECT auth.uid())` form while we
 touch the table (advisor finding, in-scope). `groups`: Admin ALL; Client SELECT only
 Groups they hold a Membership in (EXISTS subquery) — schedule rows carry no PII but
-least-privilege is cheap here. `membership_state_events`: Admin SELECT only. The
-transition trigger additionally rejects non-admin status changes as defense in depth.
+least-privilege is cheap here. `membership_state_events`: Admin SELECT only. The transition trigger allows an Admin
+for every listed transition, the owning client only for cancel (T3, T7, T8), and
+`create_membership_charges` only while `agc.membership_charge_job` is `on`. Every
+other status change is rejected.
 
 **Rationale**: FR-003/FR-014/FR-015. Reuses the F1.02/F1.04 `is_admin()` SECURITY
 INVOKER function and the `(SELECT auth.uid())` advisor-compliant form. Coaches receive
@@ -173,8 +170,9 @@ no Membership policies (spec: no coach admin surface).
 **Decision**: Admin surface = new **Memberships tab** in `AdminDashboardPage.jsx` with a
 `src/components/admin/MembershipManagementPanel.jsx` (list, create form selecting Client
 from the existing client directory + Group from `groups`, per-row lifecycle actions with
-confirmation dialogs). Client surface = read-only **My Membership** section on
-`ProfileManagementPage.jsx`. New service module `src/lib/memberships.js` with Vitest
+confirmation dialogs). Client surface = **My Membership** section on `ProfileManagementPage.jsx`, including
+cancel for the owning client. Create, activate, pause, resume, and expire stay on the
+admin panel. New service module `src/lib/memberships.js` with Vitest
 coverage, following `clientManagement.js` conventions (bounded selects, error mapping).
 
 **Rationale**: Both placements reuse existing protected-route + role infrastructure
@@ -190,7 +188,7 @@ F1.04 home for client self-view).
 
 **Decision**: Publish the participation predicate as a security-invoker view
 `membership_fixed_places(membership_id, user_id, group_id)` over `memberships` where
-`status = 'active'` OR (`status = 'cancelled'` AND `cancellation_effective_on >= CURRENT_DATE`).
+`status = 'active'` OR (`status = 'cancelled'` AND `cancellation_effective_on >= (now() AT TIME ZONE 'Europe/Zurich')::date`).
 The view inherits `memberships` RLS (Clients see only their own rows; Admins see all).
 The full consumer contract — recognition on generated Sessions, no duplicate Booking,
 cancellation preservation — is documented in
@@ -211,7 +209,7 @@ duplicating the predicate into each future consumer (divergence risk).
 **Decision**: Three layers, matching repo conventions:
 1. **Vitest 4** unit tests for `src/lib/memberships.js` with a mocked Supabase client
    (payload shape, error mapping, client-side guards) — `environment: 'node'`.
-2. **SQL assertions** in `tests/sql/0020_f109_adult_memberships.test.sql` covering RLS
+2. **SQL assertions** in `tests/sql/0024_f109_adult_memberships.test.sql` covering RLS
    policies, transition-trigger acceptance/refusal, audit-row writes, the partial unique
    index, and the effective-date computation — same style as `0011`/`0014` test files.
 3. **Manual acceptance** by the user per [quickstart.md](quickstart.md) (repo rule:
@@ -220,17 +218,82 @@ duplicating the predicate into each future consumer (divergence risk).
 **Rationale**: Constitution testing section; no Edge Functions are added, so no Deno
 tests are required for this feature.
 
-## R-12 — No Edge Functions, no notifications, no billing coupling
+## R-12 — No invoice Edge Functions and no emails
 
-**Decision**: F1.09 V1 adds **zero** Edge Functions and sends **zero** emails. Manual
-activation (FR-006) is a direct Admin write; invoice/bank payment stays out-of-band
-(F1.03); issue #14 defines no notification requirement; automatic payment-triggered
-activation is F1.26.
+**Decision**: F1.09 adds **zero** Edge Functions and sends **zero** emails. It does
+write `membership_charge_intents` and runs `create_membership_charges` from `pg_cron`.
+It does not call Bexio. Manual activation stays an Admin write. Invoice issue does not
+activate the Membership.
 
-**Rationale**: FR-016 (no second accounting system; invoice issue ≠ activation), spec
-Non-goals, YAGNI. The lifecycle contract
-([contracts/membership-lifecycle.md](contracts/membership-lifecycle.md)) documents the
-signal F1.26 will later consume.
+**Rationale**: FR-016 and FR-021. The charge row is the calendar. Sending the invoice
+is F1.26.
+
+## R-13 — Monthly price is set at create
+
+**Decision**: `memberships.monthly_price_amount numeric(10,2)` is required and greater
+than zero. The Admin sets it in the create form. The month intent copies that amount.
+The fee is 10% of the unpaid month intent’s `amount`, rounded with
+`round(amount * 0.10, 2)`. A later price edit does not rewrite an existing intent.
+
+**Rationale**: The confirmed example is 10% of that month’s charge (CHF 200 → CHF 20),
+not a separate price list.
+
+**Alternatives considered**: a shared price catalogue (not in the spec), recomputing
+the fee from the current column (would change a fee after a price edit).
+
+## R-14 — Charge intents and the 1st job
+
+**Decision**: Table `membership_charge_intents` with `kind` `month` or `cancel_fee`,
+`period_key` `YYYY-MM` or `YYYY-MM:fee`, `amount`, `currency` `CHF`,
+`source_period_key` for the fee, and nullable `paid_at`. Unique
+`(membership_id, period_key)`. Only the service role sets `paid_at`, and only F1.26
+does so when that claim is paid. F1.09 never sets it.
+
+`create_membership_charges(p_on date)` is `SECURITY DEFINER`, executable by the
+service role, and does nothing unless `p_on` is day 1. It is idempotent. For each
+Membership, using the previous calendar month:
+
+- An unpaid `month` intent produces exactly one `cancel_fee` intent. It does not
+  produce a new `month` intent.
+- If that Membership is still `active`, the function sets `agc.membership_charge_job`
+  and moves it to `cancelled` with `cancellation_effective_on` equal to the last day
+  of the unpaid month. A `paused` Membership stays paused and still gets the fee and
+  no new month.
+- An `active` Membership with no unpaid previous month gets one `month` intent for
+  `p_on`’s month, at `monthly_price_amount`.
+- A Membership cancelled after the 20th still gets that next `month` intent once,
+  because its effective date covers that month. An on-time cancellation does not.
+- `pending_payment` never gets a month intent.
+
+If F1.26 is not deployed, `paid_at` stays null, so the next 1st creates the fee and
+stops further months. That is the specified non-payment outcome, not a second policy.
+
+**Rationale**: FR-021 and FR-022. Keeping the rows here stops F1.26 from inventing the
+calendar. Ending an Active unpaid Membership on the fee day is what makes
+`membership_fixed_places` stop after the unpaid month; leaving it Active would keep
+the place.
+
+**Alternatives considered**: storing the rows only in F1.26 (that feature must not
+choose the 1st or the 10%), leaving status Active after the fee (the place would
+continue).
+
+## R-15 — Owner cancel is one column
+
+**Decision**: RLS policy `memberships_owner_cancel` allows the owning client to UPDATE
+their row only when the new `status` is `cancelled` and `user_id`, `group_id`, and
+`monthly_price_amount` are unchanged. The trigger computes the effective date. The
+client cannot create, activate, pause, resume, or expire.
+
+**Rationale**: FR-003, FR-010, and FR-014.
+
+## R-16 — Academy timezone
+
+**Decision**: The 1st, the 20th, and `membership_fixed_places` use
+`Europe/Zurich`. The cron job is `5 0 1 * *` in that zone when the host accepts a
+cron timezone; the function still checks that the passed date is day 1.
+
+**Rationale**: No timezone constant exists in `src/`. The academy bills in
+Switzerland. This is an assumption for plan review.
 
 ---
 
@@ -243,10 +306,11 @@ signal F1.26 will later consume.
 | State machine | DB trigger + RLS, no Edge Function (R-03) |
 | Audit | Trigger-written `membership_state_events` (R-04) |
 | Duplicate live place | Partial unique index (R-05) |
-| Cancellation effective date | End of cancellation calendar month, trigger-computed (R-06) |
+| Cancellation effective date | 20th cutoff in `Europe/Zurich`, trigger-computed (R-06) |
 | Expired | Admin-only close-out from Pending Payment or Cancelled (R-07) |
-| Authorization | `is_admin()` RLS + owner SELECT; no DELETE (R-08) |
-| UI | Admin dashboard tab + profile-page card (R-09) |
+| Authorization | `is_admin()` plus owner cancel; no DELETE (R-08, R-15) |
+| UI | Admin dashboard tab + profile card with cancel (R-09) |
 | Fixed-place contract | `membership_fixed_places` view + contract doc (R-10) |
-| Tests | Vitest + `tests/sql/`; manual acceptance by user (R-11) |
-| Edge Functions / email / billing | None (R-12) |
+| Tests | Vitest + `tests/sql/0024`; manual acceptance by user (R-11) |
+| Invoices and email | None; charge intents are written here (R-12, R-13, R-14) |
+| Calendar zone | `Europe/Zurich` (R-16) |

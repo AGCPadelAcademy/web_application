@@ -1,10 +1,10 @@
 # Data Model: Adult Memberships (F1.09)
 
-**Feature**: `011-adult-memberships` | **Date**: 2026-10-05 | **Spec**: [spec.md](spec.md) | **Research**: [research.md](research.md)
+**Feature**: `011-adult-memberships` | **Date**: 2026-10-31 | **Spec**: [spec.md](spec.md) | **Research**: [research.md](research.md)
 
-Additive evolution of the existing unused `memberships` table plus two new tables and
-one contract view. Forward-only migration `0020_f109_adult_memberships.sql` (confirm
-remote numbering before applying; local head is `0019`). No column is dropped or
+Additive evolution of the existing unused `memberships` table plus three new tables and
+one contract view. Forward-only migration `0024_f109_adult_memberships.sql` (confirm
+remote numbering before applying; local head is `0023`). No column is dropped or
 retyped (constitution III/V).
 
 ---
@@ -16,6 +16,7 @@ erDiagram
     profiles ||--o{ memberships : "user_id"
     groups ||--o{ memberships : "group_id"
     memberships ||--o{ membership_state_events : "membership_id"
+    memberships ||--o{ membership_charge_intents : "membership_id"
     profiles ||--o{ membership_state_events : "actor_id"
 
     groups {
@@ -34,6 +35,7 @@ erDiagram
         uuid user_id FK
         uuid group_id FK "NEW"
         text status "NEW"
+        numeric monthly_price_amount "NEW"
         date cancellation_effective_on "NEW"
         timestamptz updated_at "NEW"
         text plan_id "legacy, superseded"
@@ -47,6 +49,17 @@ erDiagram
         text from_status "NULL on create"
         text to_status
         uuid actor_id FK
+        timestamptz created_at
+    }
+    membership_charge_intents {
+        uuid id PK
+        uuid membership_id FK
+        text kind
+        text period_key
+        numeric amount
+        text currency
+        text source_period_key
+        timestamptz paid_at
         timestamptz created_at
     }
 ```
@@ -96,11 +109,12 @@ Group. Not a credit wallet (FR-002); the legacy credit-token semantics in
 | `user_id` | `uuid` | NOT NULL, FK → `profiles.id` (existing) | the Client (F1.04 profile) |
 | `group_id` | `uuid` | **NEW** NOT NULL, FK → `groups.id` (ON DELETE RESTRICT) | the recurring Group |
 | `status` | `text` | **NEW** NOT NULL, default `'pending_payment'`, CHECK in (`pending_payment`,`active`,`paused`,`cancelled`,`expired`) | lifecycle state |
+| `monthly_price_amount` | `numeric(10,2)` | **NEW** NOT NULL, CHECK `> 0` | CHF set by Admin at create (R-13) |
 | `cancellation_effective_on` | `date` | **NEW** nullable | set by the transition trigger on cancel (R-06); NULL otherwise |
 | `updated_at` | `timestamptz` | **NEW** NOT NULL, default `now()` | maintained by trigger |
 | `plan_id` | `text` | legacy — **superseded**, unused | kept per constitution; do not read/write |
 | `start_date` | `timestamptz` | legacy NOT NULL (existing default) | retained; creation sets `now()` |
-| `next_charge_date` | `timestamptz` | legacy nullable | retained, unused (no auto-billing in V1) |
+| `next_charge_date` | `timestamptz` | legacy nullable | retained; the 1st job uses `membership_charge_intents` instead |
 | `active` | `boolean` | legacy NOT NULL default `true` | **superseded by `status`**; left untouched (R-02) |
 
 **Indexes / constraints (NEW)**
@@ -125,9 +139,10 @@ Group. Not a credit wallet (FR-002); the legacy credit-token semantics in
 |---|---|---|---|
 | `memberships_admin_all` | authenticated | ALL | `public.is_admin()` (WITH CHECK same) |
 | `memberships_owner_read` | authenticated | SELECT | `(SELECT auth.uid()) = user_id` |
+| `memberships_owner_cancel` | authenticated | UPDATE | `(SELECT auth.uid()) = user_id` AND new `status = 'cancelled'` AND `user_id`, `group_id`, and `monthly_price_amount` unchanged |
 
 No DELETE policy for any role (history is preserved — spec Non-goals). No client
-INSERT/UPDATE. Status changes additionally pass the transition trigger (R-03).
+INSERT. Status changes additionally pass the transition trigger (R-03, R-15).
 
 ## `membership_state_events` (NEW — audit)
 
@@ -146,6 +161,33 @@ trigger; no role can INSERT/UPDATE/DELETE directly.
 **RLS**: `membership_state_events_admin_read` — authenticated SELECT where
 `public.is_admin()`. No other policies.
 
+## `membership_charge_intents` (NEW — calendar rows, not invoices)
+
+One row per chargeable claim (R-13, R-14). F1.26 copies these into its invoice inbox.
+F1.09 does not call Bexio.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| `id` | `uuid` | PK, `default gen_random_uuid()` | |
+| `membership_id` | `uuid` | NOT NULL, FK → `memberships.id` ON DELETE RESTRICT | |
+| `kind` | `text` | NOT NULL, CHECK in (`month`,`cancel_fee`) | |
+| `period_key` | `text` | NOT NULL | `YYYY-MM` for a month; `YYYY-MM:fee` for the fee on that unpaid month |
+| `amount` | `numeric(10,2)` | NOT NULL, CHECK `> 0` | month copies `monthly_price_amount`; fee is `round(month.amount * 0.10, 2)` |
+| `currency` | `text` | NOT NULL, CHECK `= 'CHF'` | |
+| `source_period_key` | `text` | nullable | set on a fee to the unpaid `YYYY-MM` |
+| `paid_at` | `timestamptz` | nullable | written only by F1.26’s service role when that claim is paid |
+| `created_at` | `timestamptz` | NOT NULL, default `now()` | |
+
+Unique `(membership_id, period_key)`.
+
+**RLS**: `membership_charge_intents_admin_read` and
+`membership_charge_intents_owner_read` (through the membership’s `user_id`). No
+authenticated INSERT, UPDATE, or DELETE. The charge function is `SECURITY DEFINER`
+and executable by the service role.
+
+`create_membership_charges(p_on date)` inserts these rows. Full rules are in
+research R-14 and [contracts/membership-lifecycle.md](contracts/membership-lifecycle.md).
+
 ## `membership_fixed_places` (NEW — contract view, security invoker)
 
 The single participation predicate consumed by F1.08/F1.10/F1.11 (R-10):
@@ -154,13 +196,14 @@ The single participation predicate consumed by F1.08/F1.10/F1.11 (R-10):
 SELECT id AS membership_id, user_id, group_id
 FROM public.memberships
 WHERE status = 'active'
-   OR (status = 'cancelled' AND cancellation_effective_on >= CURRENT_DATE);
+   OR (status = 'cancelled'
+       AND cancellation_effective_on >= (now() AT TIME ZONE 'Europe/Zurich')::date);
 ```
 
 - Security-invoker: inherits `memberships` RLS (owner sees own rows, Admin sees all).
 - Granted SELECT to `authenticated`; not to `anon`.
-- Encodes FR-007 + FR-012: Active participates; Cancelled participates only until the
-  end of the already-paid month; Pending Payment / Paused / Expired never participate.
+- Encodes FR-007 + FR-012: Active participates; Cancelled participates through
+  `cancellation_effective_on`; Pending Payment / Paused / Expired never participate.
 
 ---
 
@@ -170,12 +213,12 @@ WHERE status = 'active'
 stateDiagram-v2
     [*] --> pending_payment : Admin create (US1)
     pending_payment --> active : Admin activate (US2 / FR-006)
-    pending_payment --> cancelled : Admin cancel (US5)
+    pending_payment --> cancelled : Client or Admin cancel (US5)
     pending_payment --> expired : Admin expire — abandoned, never paid (R-07)
     active --> paused : Admin pause (FR-011)
     paused --> active : Admin resume (FR-011)
-    active --> cancelled : Admin cancel — effective end of paid month (FR-012)
-    paused --> cancelled : Admin cancel — effective end of paid month (FR-012)
+    active --> cancelled : Client or Admin cancel — 20th cutoff (FR-012)
+    paused --> cancelled : Client or Admin cancel — 20th cutoff (FR-012)
     cancelled --> expired : Admin close-out after effective date (R-07)
     cancelled --> [*]
     expired --> [*]
@@ -188,8 +231,8 @@ stateDiagram-v2
 | `pending_payment → expired` | ✅ | Admin close-out of abandoned pending Membership |
 | `active → paused` | ✅ | Admin pause; fixed place stops while Paused (FR-011) |
 | `paused → active` | ✅ | Admin resume; fixed place restored (FR-011) |
-| `active → cancelled` | ✅ | Trigger sets `cancellation_effective_on` = last day of current calendar month (R-06) |
-| `paused → cancelled` | ✅ | Same effective-date rule |
+| `active → cancelled` | ✅ | Owning client or Admin. Trigger sets `cancellation_effective_on` from the 20th cutoff in `Europe/Zurich` (R-06) |
+| `paused → cancelled` | ✅ | Same actors and effective-date rule |
 | `cancelled → expired` | ✅ | Admin close-out after the effective date has passed |
 | anything → `pending_payment` | ❌ | Never reopens; a new Membership is created instead |
 | `cancelled`/`expired` → `active`/`paused` | ❌ | Terminal for participation (spec Edge Cases; US6.4) |
@@ -197,7 +240,8 @@ stateDiagram-v2
 | same → same | ❌ | No-op transitions rejected |
 
 Enforcement: `guard_membership_status_transition()` (BEFORE UPDATE OF status) rejects
-any pair not listed, rejects non-admin callers (defense in depth behind RLS), sets
+any pair not listed, rejects callers who are neither Admin nor the owning client on a
+cancel, sets
 `cancellation_effective_on` on entry to `cancelled`, clears it if a transition ever
 leaves `cancelled` back to a live state (none in V1 — kept as a guard), and maintains
 `updated_at`. `record_membership_state_event()` (AFTER INSERT, AFTER UPDATE OF status)
@@ -206,21 +250,24 @@ writes the audit row. Both functions follow the migration `0011` style:
 
 ---
 
-## Migration plan (`0020_f109_adult_memberships.sql`)
+## Migration plan (`0024_f109_adult_memberships.sql`)
 
-1. Confirm remote migration head (local head `0019`); renumber if remote advanced.
+1. Confirm remote migration head (local head `0023`); renumber if remote advanced.
 2. Create `groups` (constraints, indexes, RLS, grants).
-3. Alter `memberships`: add `group_id`, `status`, `cancellation_effective_on`,
-   `updated_at`; add CHECK + partial unique index + FK/FK indexes; comment legacy
-   columns as superseded.
+3. Alter `memberships`: add `group_id`, `status`, `monthly_price_amount`,
+   `cancellation_effective_on`, `updated_at`; add CHECK + partial unique index +
+   FK/FK indexes; comment legacy columns as superseded.
 4. Replace the legacy `memberships` self-read policy with `memberships_owner_read`
-   (`(SELECT auth.uid())` form) and add `memberships_admin_all`.
+   (`(SELECT auth.uid())` form), add `memberships_admin_all`, and add
+   `memberships_owner_cancel`.
 5. Create `membership_state_events` (RLS, grants, no write policies).
 6. Create `guard_membership_status_transition()` + `record_membership_state_event()`
-   triggers on `memberships`.
-7. Create `membership_fixed_places` view (security invoker) and grant SELECT to
+   triggers on `memberships`. The guard allows owner cancel and the charge-job GUC.
+7. Create `membership_charge_intents` and `create_membership_charges(p_on date)`.
+   Schedule it with `pg_cron` at 00:05 `Europe/Zurich` on day 1.
+8. Create `membership_fixed_places` view (security invoker) and grant SELECT to
    `authenticated`.
-8. Seed nothing. Group anchor rows are inserted by an Admin via the Supabase dashboard
+9. Seed nothing. Group anchor rows are inserted by an Admin via the Supabase dashboard
    until F1.08 (research R-01).
 
 **Rollback strategy**: forward-only; compensation migration would drop the new objects
@@ -233,6 +280,7 @@ and columns. Not written unless requested (constitution V).
 - Booking duplicate-prevention → F1.11 (contract in
   [contracts/fixed-place-participation.md](contracts/fixed-place-participation.md)).
 - Session cancellation / Recovery → F1.12 / F1.13 (must not touch Membership state).
-- Automatic payment-triggered activation → F1.26 (contract in
-  [contracts/membership-lifecycle.md](contracts/membership-lifecycle.md)).
+- Invoicing the charge intents and writing `paid_at` → F1.26 (contract in
+  [contracts/membership-lifecycle.md](contracts/membership-lifecycle.md)). F1.26 does
+  not activate the Membership.
 - `credits` table → stays unused (FR-002).

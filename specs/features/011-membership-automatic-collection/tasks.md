@@ -27,9 +27,9 @@
 
 **Purpose**: Confirm the feature branch, migration number, and function folders before any behavior change
 
-- [ ] T001 Confirm branch `cursor/f126-billing-plan-tasks-8626` and that `0025` is still free after F1.09 `0024` before creating `supabase/migrations/0025_f126_membership_automatic_collection.sql` (local head is `0023`; plan.md §Risks)
-- [ ] T002 [P] Create Edge Function directories `supabase/functions/membership-set-collection-method/`, `supabase/functions/membership-request-mandate/`, and `supabase/functions/membership-collection-run/` per plan.md §Project Structure
-- [ ] T003 [P] Confirm the existing quality gate still runs with no new npm packages: `npm run lint`, `npm test`, `npm run build`, and `deno test` under `supabase/functions/` (constitution; plan.md Technical Context)
+- [X] T001 Confirm implementation branch `cursor/f126-membership-collection-impl-8626` (the plan branch `cursor/f126-billing-plan-tasks-8626` is already merged) and that `0025` follows F1.09 `0024` in `supabase/migrations/0025_f126_membership_automatic_collection.sql`
+- [X] T002 [P] Create Edge Function directories `supabase/functions/membership-set-collection-method/`, `supabase/functions/membership-request-mandate/`, and `supabase/functions/membership-collection-run/` per plan.md §Project Structure
+- [X] T003 [P] Confirm the existing quality gate still runs with no new npm packages: `npm run lint`, `npm test`, `npm run build`, and `deno test` under `supabase/functions/` (constitution; plan.md Technical Context)
 
 ---
 
@@ -39,13 +39,13 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Write `supabase/migrations/0025_f126_membership_automatic_collection.sql` creating `collection_subjects`, `collection_methods`, `direct_debit_mandates`, `membership_period_intents`, `collection_requests`, and `membership_payment_signals` with columns, CHECKs, FKs to `profiles`, and the partial unique indexes in `specs/features/011-membership-automatic-collection/data-model.md` (no FK to `public.memberships` or `public.credits`)
-- [ ] T005 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, add nullable `membership_period_intent_id` to `billing_documents`, `billing_operations`, and `billing_events`; unique on the document column; replace `billing_documents_exactly_one_subject_check` with the three-way check among `booking_id`, `camp_registration_id`, and `membership_period_intent_id`; extend the document owner SELECT policy through the intent’s subject `client_id` (data-model.md §Billing spine)
-- [ ] T006 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, enable RLS on the six new tables with SELECT for `is_admin()` or the owning client and no authenticated INSERT, UPDATE, or DELETE (data-model.md §RLS)
-- [ ] T007 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, schedule `membership-collection-run` hourly via `pg_cron` / `pg_net` using Vault `bexio_scheduler_secret` and `timeout_milliseconds := 60000`, following `supabase/migrations/0004_bexio_reconcile_cron.sql`, without changing the `bexio-reconcile` schedule (research R-09)
-- [ ] T008 [P] Write static SQL assertions in `tests/sql/0025_f126_membership_automatic_collection.test.sql` for the six tables, partial unique indexes, RLS enabled, no authenticated write policies, and the three-subject billing check; do not apply the migration (quickstart.md Prerequisites)
-- [ ] T009 [P] Write failing Deno tests in `supabase/functions/_shared/billing/collection-channel.test.ts` for `isConfigured() === false`, no I/O, and `collection_channel_not_configured` from `proposeMandate`, `readMandate`, `submitCollection`, and `readCollection` (contracts/collection-channel.md)
-- [ ] T010 Implement `UnconfiguredCollectionChannel` in `supabase/functions/_shared/billing/collection-channel.ts` so `supabase/functions/_shared/billing/collection-channel.test.ts` passes (contracts/collection-channel.md)
+- [X] T004 Write `supabase/migrations/0025_f126_membership_automatic_collection.sql` creating `collection_subjects`, `collection_methods`, `direct_debit_mandates`, `membership_period_intents`, `collection_requests`, and `membership_payment_signals` with columns, CHECKs, FKs to `profiles`, and the partial unique indexes in `specs/features/011-membership-automatic-collection/data-model.md` (no FK to `public.memberships` or `public.credits`)
+- [X] T005 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, add nullable `membership_period_intent_id` to `billing_documents`, `billing_operations`, and `billing_events`; unique on the document column; replace `billing_documents_exactly_one_subject_check` with the three-way check among `booking_id`, `camp_registration_id`, and `membership_period_intent_id`; extend the document owner SELECT policy through the intent’s subject `client_id` (data-model.md §Billing spine)
+- [X] T006 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, enable RLS on the six new tables with SELECT for `is_admin()` or the owning client and no authenticated INSERT, UPDATE, or DELETE (data-model.md §RLS)
+- [X] T007 In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, schedule `membership-collection-run` hourly via `pg_cron` / `pg_net` using Vault `bexio_scheduler_secret` and `timeout_milliseconds := 60000`, following `supabase/migrations/0004_bexio_reconcile_cron.sql`, without changing the `bexio-reconcile` schedule (research R-09)
+- [X] T008 [P] Write static SQL assertions in `tests/sql/0025_f126_membership_automatic_collection.test.sql` for the six tables, partial unique indexes, RLS enabled, no authenticated write policies, and the three-subject billing check; do not apply the migration (quickstart.md Prerequisites)
+- [X] T009 [P] Write failing Deno tests in `supabase/functions/_shared/billing/collection-channel.test.ts` for `isConfigured() === false`, no I/O, and `collection_channel_not_configured` from `proposeMandate`, `readMandate`, `submitCollection`, and `readCollection` (contracts/collection-channel.md)
+- [X] T010 Implement `UnconfiguredCollectionChannel` in `supabase/functions/_shared/billing/collection-channel.ts` so `supabase/functions/_shared/billing/collection-channel.test.ts` passes (contracts/collection-channel.md)
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -59,15 +59,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Write failing Deno tests in `supabase/functions/membership-set-collection-method/index.test.ts` for 403 non-owner, 409 `client_inactive`, 409 `collection_channel_not_configured` leaving method `qr_invoice`, successful `qr_invoice` with `stopped_at`, and no period status change (contracts/edge-functions.md)
-- [ ] T012 [P] [US1] Write failing Vitest tests in `src/lib/membershipCollection.test.js` for the `membership-set-collection-method` JSON body and for rejection of the phrases “Automatic transaction”, “standing approval”, and “standing order”
+- [X] T011 [P] [US1] Write failing Deno tests in `supabase/functions/membership-set-collection-method/index.test.ts` for 403 non-owner, 409 `client_inactive`, 409 `collection_channel_not_configured` leaving method `qr_invoice`, successful `qr_invoice` with `stopped_at`, and no period status change (contracts/edge-functions.md)
+- [X] T012 [P] [US1] Write failing Vitest tests in `src/lib/membershipCollection.test.js` for the `membership-set-collection-method` JSON body and for rejection of the phrases “Automatic transaction”, “standing approval”, and “standing order”
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement `supabase/functions/membership-set-collection-method/index.ts`: JWT via `auth.getUser`, owner or `canAdminister` from `supabase/functions/_shared/profile-access.ts`, service-role writes, and the response table in contracts/edge-functions.md (no mandate insert while the channel is unconfigured)
-- [ ] T014 [US1] Implement `setCollectionMethod` in `src/lib/membershipCollection.js` using the explicit session JWT invoke pattern from `src/lib/billing.js`
-- [ ] T015 [US1] Add the signed-in client’s collection-method control to `src/pages/PaymentsPage.jsx`, reading `collection_subjects` and `collection_methods` under RLS and showing the unconfigured-channel copy from contracts/edge-functions.md
-- [ ] T016 [US1] Add `src/components/admin/MembershipCollectionsPanel.jsx` and register a Collections tab in `src/pages/AdminDashboardPage.jsx` so an Admin can set the method for a client through `src/lib/membershipCollection.js`
+- [X] T013 [US1] Implement `supabase/functions/membership-set-collection-method/index.ts`: JWT via `auth.getUser`, owner or `canAdminister` from `supabase/functions/_shared/profile-access.ts`, service-role writes, and the response table in contracts/edge-functions.md (no mandate insert while the channel is unconfigured)
+- [X] T014 [US1] Implement `setCollectionMethod` in `src/lib/membershipCollection.js` using the explicit session JWT invoke pattern from `src/lib/billing.js`
+- [X] T015 [US1] Add the signed-in client’s collection-method control to `src/pages/PaymentsPage.jsx`, reading `collection_subjects` and `collection_methods` under RLS and showing the unconfigured-channel copy from contracts/edge-functions.md
+- [X] T016 [US1] Add `src/components/admin/MembershipCollectionsPanel.jsx` and register a Collections tab in `src/pages/AdminDashboardPage.jsx` so an Admin can set the method for a client through `src/lib/membershipCollection.js`
 
 **Checkpoint**: User Story 1 is functional — the choice is stored, opt-in is refused while the channel is unconfigured, and QR payment remains
 
@@ -81,15 +81,15 @@
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] Write failing Deno tests in `supabase/functions/_shared/billing/mandate-attempts.test.ts` for one in-flight `proposal_sent`, retry correlation, explicit next attempt only from `rejected` or `revoked`, terminal `unsupported_bank`, and `failed` retrying the same attempt (data-model.md state machine)
+- [X] T017 [P] [US2] Write failing Deno tests in `supabase/functions/_shared/billing/mandate-attempts.test.ts` for one in-flight `proposal_sent`, retry correlation, explicit next attempt only from `rejected` or `revoked`, terminal `unsupported_bank`, and `failed` retrying the same attempt (data-model.md state machine)
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Implement the attempt rules in `supabase/functions/_shared/billing/mandate-attempts.ts` so `supabase/functions/_shared/billing/mandate-attempts.test.ts` passes
-- [ ] T019 [US2] Implement `supabase/functions/membership-request-mandate/index.ts` per contracts/edge-functions.md, using `supabase/functions/_shared/billing/mandate-attempts.ts` and `supabase/functions/_shared/billing/collection-channel.ts`
-- [ ] T020 [US2] Extend `supabase/functions/membership-set-collection-method/index.ts` so a configured channel creates the first `proposal_sent` attempt and a repeat while `proposal_sent` does not insert another row; production wiring still uses `UnconfiguredCollectionChannel`
-- [ ] T021 [US2] Add `requestNewMandate` to `src/lib/membershipCollection.js` and cover its request body in `src/lib/membershipCollection.test.js`
-- [ ] T022 [US2] Show the latest mandate status on `src/pages/PaymentsPage.jsx` using the English copy table in contracts/edge-functions.md, without treating `proposal_sent` or `active` as paid
+- [X] T018 [US2] Implement the attempt rules in `supabase/functions/_shared/billing/mandate-attempts.ts` so `supabase/functions/_shared/billing/mandate-attempts.test.ts` passes
+- [X] T019 [US2] Implement `supabase/functions/membership-request-mandate/index.ts` per contracts/edge-functions.md, using `supabase/functions/_shared/billing/mandate-attempts.ts` and `supabase/functions/_shared/billing/collection-channel.ts`
+- [X] T020 [US2] Extend `supabase/functions/membership-set-collection-method/index.ts` so a configured channel creates the first `proposal_sent` attempt and a repeat while `proposal_sent` does not insert another row; production wiring still uses `UnconfiguredCollectionChannel`
+- [X] T021 [US2] Add `requestNewMandate` to `src/lib/membershipCollection.js` and cover its request body in `src/lib/membershipCollection.test.js`
+- [X] T022 [US2] Show the latest mandate status on `src/pages/PaymentsPage.jsx` using the English copy table in contracts/edge-functions.md, without treating `proposal_sent` or `active` as paid
 
 **Checkpoint**: User Stories 1 and 2 work — one proposal attempt is tracked and a new attempt requires an explicit request
 
@@ -103,21 +103,21 @@
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/membership-mapper.test.ts` for `apiReference` `agc:membership-period:{id}`, one CHF line, and the existing tax helper (contracts/membership-billing.md)
-- [ ] T024 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/financial-service.membership.test.ts` that a second `issueInvoiceForMembershipPeriod` call does not create a second document and that issue does not set the intent `paid`
-- [ ] T025 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/membership-collection-policy.test.ts` for one collection per intent, one `payment_confirmed` signal, and ignoring a channel timestamp older than `channel_status_at`
+- [X] T023 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/membership-mapper.test.ts` for `apiReference` `agc:membership-period:{id}`, one CHF line, and the existing tax helper (contracts/membership-billing.md)
+- [X] T024 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/financial-service.membership.test.ts` that a second `issueInvoiceForMembershipPeriod` call does not create a second document and that issue does not set the intent `paid`
+- [X] T025 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/membership-collection-policy.test.ts` for one collection per intent, one `payment_confirmed` signal, and ignoring a channel timestamp older than `channel_status_at`
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Implement `membershipPeriodToInvoiceInput` in `supabase/functions/_shared/billing/membership-mapper.ts` so `supabase/functions/_shared/billing/membership-mapper.test.ts` passes
-- [ ] T027 [US3] Add `issueInvoiceForMembershipPeriod` to `supabase/functions/_shared/billing/financial-service.ts`, reusing the camp issuer’s document, operation, and `api_reference` recovery layers (contracts/membership-billing.md)
-- [ ] T028 [US3] Implement the pure submit/signal decisions in `supabase/functions/_shared/billing/membership-collection-policy.ts` so `supabase/functions/_shared/billing/membership-collection-policy.test.ts` passes
-- [ ] T029 [US3] Implement `supabase/functions/membership-collection-run/index.ts`: scheduler secret `bexio_scheduler_secret`, issue every not-yet-invoiced intent, submit a collection only when the policy allows it, and poll `submitted` rows (contracts/edge-functions.md)
-- [ ] T030 [US3] Extend `supabase/functions/_shared/billing/reconciliation-service.ts` so a fully paid membership-period document inserts `payment_confirmed` with source `accounting_reconciliation` once, and `partially_paid` leaves the intent unpaid (contracts/membership-billing.md)
-- [ ] T031 [US3] Extend `supabase/functions/bexio-reconcile/index.ts` to load documents with `membership_period_intent_id` and pass them through the reconciliation change in `supabase/functions/_shared/billing/reconciliation-service.ts` without changing lesson or camp confirmation behavior
-- [ ] T042 [US3] In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, add `claim_kind` and nullable unique `charge_intent_id` on `membership_period_intents`, referencing `membership_charge_intents` from F1.09 `0024` (data-model.md)
-- [ ] T043 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/charge-intent-copy.test.ts` that a month intent and a `YYYY-MM:fee` intent copy their amounts unchanged, that a second copy does not insert another row, and that paying the month does not mark the fee paid
-- [ ] T044 [US3] Implement the copy at the start of `supabase/functions/membership-collection-run/index.ts`, and set `membership_charge_intents.paid_at` from `supabase/functions/_shared/billing/reconciliation-service.ts` and the collection-confirmed path when `charge_intent_id` is set (contracts/edge-functions.md)
+- [X] T026 [US3] Implement `membershipPeriodToInvoiceInput` in `supabase/functions/_shared/billing/membership-mapper.ts` so `supabase/functions/_shared/billing/membership-mapper.test.ts` passes
+- [X] T027 [US3] Add `issueInvoiceForMembershipPeriod` to `supabase/functions/_shared/billing/financial-service.ts`, reusing the camp issuer’s document, operation, and `api_reference` recovery layers (contracts/membership-billing.md)
+- [X] T028 [US3] Implement the pure submit/signal decisions in `supabase/functions/_shared/billing/membership-collection-policy.ts` so `supabase/functions/_shared/billing/membership-collection-policy.test.ts` passes
+- [X] T029 [US3] Implement `supabase/functions/membership-collection-run/index.ts`: scheduler secret `bexio_scheduler_secret`, issue every not-yet-invoiced intent, submit a collection only when the policy allows it, and poll `submitted` rows (contracts/edge-functions.md)
+- [X] T030 [US3] Extend `supabase/functions/_shared/billing/reconciliation-service.ts` so a fully paid membership-period document inserts `payment_confirmed` with source `accounting_reconciliation` once, and `partially_paid` leaves the intent unpaid (contracts/membership-billing.md)
+- [X] T031 [US3] Extend `supabase/functions/bexio-reconcile/index.ts` to load documents with `membership_period_intent_id` and pass them through the reconciliation change in `supabase/functions/_shared/billing/reconciliation-service.ts` without changing lesson or camp confirmation behavior
+- [X] T042 [US3] In `supabase/migrations/0025_f126_membership_automatic_collection.sql`, add `claim_kind` and nullable unique `charge_intent_id` on `membership_period_intents`, referencing `membership_charge_intents` from F1.09 `0024` (data-model.md)
+- [X] T043 [P] [US3] Write failing Deno tests in `supabase/functions/_shared/billing/charge-intent-copy.test.ts` that a month intent and a `YYYY-MM:fee` intent copy their amounts unchanged, that a second copy does not insert another row, and that paying the month does not mark the fee paid
+- [X] T044 [US3] Implement the copy at the start of `supabase/functions/membership-collection-run/index.ts`, and set `membership_charge_intents.paid_at` from `supabase/functions/_shared/billing/reconciliation-service.ts` and the collection-confirmed path when `charge_intent_id` is set (contracts/edge-functions.md)
 
 **Checkpoint**: User Stories 1–3 work — one invoice, one collection, and one payment signal per month or fee claim
 
@@ -131,13 +131,13 @@
 
 ### Tests for User Story 4
 
-- [ ] T032 [P] [US4] Extend `src/lib/billing.test.js` so a membership document posts `membership_period_intent_id` and honors `qr_pay_hidden`, and so the existing lesson and camp document calls stay unchanged
+- [X] T032 [P] [US4] Extend `src/lib/billing.test.js` so a membership document posts `membership_period_intent_id` and honors `qr_pay_hidden`, and so the existing lesson and camp document calls stay unchanged
 
 ### Implementation for User Story 4
 
-- [ ] T033 [US4] Add the membership-period document helper to `src/lib/billing.js`, posting `{ "membership_period_intent_id": "..." }` to `billing-invoice-document`
-- [ ] T034 [US4] Extend `supabase/functions/billing-invoice-document/index.ts` to accept exactly one of booking id, camp registration id, or `membership_period_intent_id`, enforce owner-or-admin, and return `"qr_pay_hidden": true` when a `collection_requests` row for that intent is `submitted` (contracts/edge-functions.md)
-- [ ] T035 [US4] In `src/pages/PaymentsPage.jsx`, hide the Membership period pay action when `qr_pay_hidden` is true and show the fallback copy from contracts/edge-functions.md; leave the lesson and camp blocks in that file unchanged
+- [X] T033 [US4] Add the membership-period document helper to `src/lib/billing.js`, posting `{ "membership_period_intent_id": "..." }` to `billing-invoice-document`
+- [X] T034 [US4] Extend `supabase/functions/billing-invoice-document/index.ts` to accept exactly one of booking id, camp registration id, or `membership_period_intent_id`, enforce owner-or-admin, and return `"qr_pay_hidden": true` when a `collection_requests` row for that intent is `submitted` (contracts/edge-functions.md)
+- [X] T035 [US4] In `src/pages/PaymentsPage.jsx`, hide the Membership period pay action when `qr_pay_hidden` is true and show the fallback copy from contracts/edge-functions.md; leave the lesson and camp blocks in that file unchanged
 
 **Checkpoint**: QR fallback and the hidden in-flight pay action work without changing lesson or camp payments
 
@@ -151,13 +151,13 @@
 
 ### Tests for User Story 5
 
-- [ ] T036 [P] [US5] Write failing Deno tests in `supabase/functions/_shared/billing/membership-collection-policy.failure.test.ts` for failed collection not paid, in-flight request kept after stop and after `profiles.is_active = false`, no new submission in those cases, reversal clearing paid, and a second settlement setting `duplicate_receipt` without a second `payment_confirmed`
+- [X] T036 [P] [US5] Write failing Deno tests in `supabase/functions/_shared/billing/membership-collection-policy.failure.test.ts` for failed collection not paid, in-flight request kept after stop and after `profiles.is_active = false`, no new submission in those cases, reversal clearing paid, and a second settlement setting `duplicate_receipt` without a second `payment_confirmed`
 
 ### Implementation for User Story 5
 
-- [ ] T037 [US5] Extend `supabase/functions/_shared/billing/membership-collection-policy.ts` and `supabase/functions/membership-collection-run/index.ts` so stop and deactivation skip new submissions and do not cancel a `submitted` collection (research R-06)
-- [ ] T038 [US5] Extend `supabase/functions/_shared/billing/reconciliation-service.ts` so a reversal sets the intent `reversed` and inserts one `payment_reversed` signal, and a second settlement sets `duplicate_receipt` without a second `payment_confirmed` (contracts/membership-billing.md)
-- [ ] T039 [US5] Extend `src/components/admin/MembershipCollectionsPanel.jsx` with read-only lists of failed or rejected collections, reversals, and duplicate receipts for every client; keep non-admin reads on own rows only via RLS
+- [X] T037 [US5] Extend `supabase/functions/_shared/billing/membership-collection-policy.ts` and `supabase/functions/membership-collection-run/index.ts` so stop and deactivation skip new submissions and do not cancel a `submitted` collection (research R-06)
+- [X] T038 [US5] Extend `supabase/functions/_shared/billing/reconciliation-service.ts` so a reversal sets the intent `reversed` and inserts one `payment_reversed` signal, and a second settlement sets `duplicate_receipt` without a second `payment_confirmed` (contracts/membership-billing.md)
+- [X] T039 [US5] Extend `src/components/admin/MembershipCollectionsPanel.jsx` with read-only lists of failed or rejected collections, reversals, and duplicate receipts for every client; keep non-admin reads on own rows only via RLS
 
 **Checkpoint**: Failure, reversal, stop, and deactivation match the 2026-10-07 clarifications
 
@@ -167,8 +167,8 @@
 
 **Purpose**: Gate the slice without applying the migration or calling a bank
 
-- [ ] T040 [P] Run `npm run lint`, `npm test`, `npm run build`, and `deno test` on `supabase/functions/_shared/billing/collection-channel.test.ts`, `supabase/functions/_shared/billing/mandate-attempts.test.ts`, `supabase/functions/_shared/billing/membership-mapper.test.ts`, `supabase/functions/_shared/billing/financial-service.membership.test.ts`, `supabase/functions/_shared/billing/membership-collection-policy.test.ts`, and `supabase/functions/_shared/billing/membership-collection-policy.failure.test.ts` (quickstart.md Automated gate)
-- [ ] T041 State in the header of `supabase/migrations/0025_f126_membership_automatic_collection.sql` that the file is not applied until an explicit user request, and tick only the automated quickstart scenarios; leave Scenarios 1–3 and 7 for the user (quickstart.md)
+- [X] T040 [P] Run `npm run lint`, `npm test`, `npm run build`, and `deno test` on `supabase/functions/_shared/billing/collection-channel.test.ts`, `supabase/functions/_shared/billing/mandate-attempts.test.ts`, `supabase/functions/_shared/billing/membership-mapper.test.ts`, `supabase/functions/_shared/billing/financial-service.membership.test.ts`, `supabase/functions/_shared/billing/membership-collection-policy.test.ts`, and `supabase/functions/_shared/billing/membership-collection-policy.failure.test.ts` (quickstart.md Automated gate)
+- [X] T041 State in the header of `supabase/migrations/0025_f126_membership_automatic_collection.sql` that the file is not applied until an explicit user request, and tick only the automated quickstart scenarios; leave Scenarios 1–3 and 7 for the user (quickstart.md)
 
 ---
 

@@ -31,6 +31,10 @@ import {
   type CampRegistrationExtraRow,
   type CampRegistrationRow,
 } from './camp-mapper.ts';
+import {
+  membershipPeriodToInvoiceInput,
+  type MembershipPeriodIntentRow,
+} from './membership-mapper.ts';
 
 export class BookingNotBillableError extends Error {
   override readonly name = 'BookingNotBillableError';
@@ -55,6 +59,7 @@ export interface BillingDocumentRow {
   id?: string;
   booking_id?: string | null;
   camp_registration_id?: string | null;
+  membership_period_intent_id?: string | null;
   provider: string;
   external_id: string;
   document_nr: string | null;
@@ -69,6 +74,7 @@ export interface BillingOperationRow {
   idempotency_key: string;
   booking_id?: string | null;
   camp_registration_id?: string | null;
+  membership_period_intent_id?: string | null;
   billing_document_id?: string | null;
   status: string;
   attempts: number;
@@ -606,6 +612,111 @@ export async function cancelInvoiceForCampRegistration(
 
 // --- PostgREST repository (service role; Edge Functions are the only writers) ---
 
+export interface MembershipInvoiceRepo {
+  findDocumentByIntent(intentId: string): Promise<BillingDocumentRow | null>;
+  findOperation(idempotencyKey: string): Promise<BillingOperationRow | null>;
+  getIntent(intentId: string): Promise<MembershipPeriodIntentRow | null>;
+  getProfile(userId: string): Promise<AgcProfileRow | null>;
+  findContactByUser(userId: string): Promise<{ external_id: string; email_snapshot: string } | null>;
+  upsertContact(row: {
+    user_id: string;
+    provider: string;
+    external_id: string;
+    email_snapshot: string;
+  }): Promise<void>;
+  upsertMembershipDocument(row: BillingDocumentRow & { membership_period_intent_id: string }): Promise<BillingDocumentRow>;
+  upsertOperation(row: BillingOperationRow): Promise<void>;
+  insertEvent(event: {
+    event_type: string;
+    membership_period_intent_id?: string | null;
+    billing_document_id?: string | null;
+    details?: Record<string, unknown>;
+  }): Promise<void>;
+  markIntentInvoiced(intentId: string): Promise<void>;
+}
+
+export async function issueInvoiceForMembershipPeriod(
+  deps: {
+    provider: AccountingProvider;
+    repo: MembershipInvoiceRepo;
+    config: BexioConfig;
+    now?: () => Date;
+  },
+  intentId: string,
+): Promise<IssueInvoiceResult> {
+  const { provider, repo, config } = deps;
+  const now = deps.now?.() ?? new Date();
+  const idempotencyKey = `membership-period:${intentId}:invoice:v1`;
+  const existingDoc = await repo.findDocumentByIntent(intentId);
+  if (existingDoc) return { document: existingDoc, reused: true };
+
+  const existingOp = await repo.findOperation(idempotencyKey);
+  if (existingOp?.status === 'succeeded') {
+    const doc = await repo.findDocumentByIntent(intentId);
+    if (doc) return { document: doc, reused: true };
+  }
+
+  const intent = await repo.getIntent(intentId);
+  if (!intent) throw new Error(`membership period ${intentId} was not found`);
+  const profile = await repo.getProfile(intent.client_id);
+  if (!profile?.email) throw new Error(`membership period ${intentId} has no billable profile`);
+
+  let contactRef: ExternalContactRef | null = null;
+  const storedContact = await repo.findContactByUser(intent.client_id);
+  const contactInput = billingContactInput(profile, config);
+  if (storedContact) {
+    contactRef = { externalId: storedContact.external_id };
+  } else {
+    contactRef = await provider.findContactByEmail(profile.email);
+    if (!contactRef) contactRef = await provider.createContact(contactInput);
+    await repo.upsertContact({
+      user_id: intent.client_id,
+      provider: provider.name,
+      external_id: contactRef.externalId,
+      email_snapshot: profile.email,
+    });
+  }
+
+  const apiReference = `agc:membership-period:${intentId}`;
+  let invoice = await provider.findInvoiceByApiReference(apiReference);
+  if (!invoice) {
+    const input = membershipPeriodToInvoiceInput(intent, contactRef, config, now);
+    const draft = await provider.createInvoice(input);
+    invoice = await provider.issueInvoice({ externalId: draft.externalId });
+  }
+
+  const document = await repo.upsertMembershipDocument({
+    membership_period_intent_id: intentId,
+    booking_id: null,
+    camp_registration_id: null,
+    provider: provider.name,
+    external_id: invoice.externalId,
+    document_nr: invoice.documentNr,
+    api_reference: apiReference,
+    status: invoice.status === 'unknown' ? 'issued' : invoice.status,
+    total: invoice.total,
+    currency: 'CHF',
+  });
+  await repo.markIntentInvoiced(intentId);
+  await repo.upsertOperation({
+    kind: 'membership_invoice_issue',
+    idempotency_key: idempotencyKey,
+    membership_period_intent_id: intentId,
+    billing_document_id: document.id ?? null,
+    status: 'succeeded',
+    attempts: (existingOp?.attempts ?? 0) + 1,
+    next_retry_at: null,
+    last_error: null,
+  });
+  await repo.insertEvent({
+    event_type: 'membership.invoice.issued',
+    membership_period_intent_id: intentId,
+    billing_document_id: document.id ?? null,
+    details: { provider: provider.name, total: invoice.total },
+  });
+  return { document, reused: false };
+}
+
 export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string): BillingRepo {
   const headers = {
     apikey: serviceRoleKey,
@@ -719,6 +830,123 @@ export function createPostgrestRepo(supabaseUrl: string, serviceRoleKey: string)
         const body = await res.text().catch(() => '');
         throw new Error(`db cancel camp registration failed: ${res.status} ${body}`);
       }
+    },
+  };
+}
+
+export function createMembershipInvoiceRepo(supabaseUrl: string, serviceRoleKey: string): MembershipInvoiceRepo {
+  const headers = {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  async function selectOne<T>(table: string, query: string): Promise<T | null> {
+    const res = await fetch(`${supabaseUrl}/rest/v1/${table}?${query}`, { headers });
+    if (!res.ok) throw new Error(`db select ${table} failed: ${res.status}`);
+    const rows = (await res.json()) as T[];
+    return rows[0] ?? null;
+  }
+
+  async function upsert(table: string, onConflict: string, row: Record<string, unknown>): Promise<void> {
+    const res = await fetch(`${supabaseUrl}/rest/v1/${table}?on_conflict=${onConflict}`, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) throw new Error(`db upsert ${table} failed: ${res.status}`);
+  }
+
+  return {
+    findDocumentByIntent: (intentId) =>
+      selectOne(
+        'billing_documents',
+        `membership_period_intent_id=eq.${intentId}&select=id,membership_period_intent_id,provider,external_id,document_nr,api_reference,status,total,currency`,
+      ),
+    findOperation: (key) =>
+      selectOne(
+        'billing_operations',
+        `idempotency_key=eq.${encodeURIComponent(key)}&select=kind,idempotency_key,membership_period_intent_id,billing_document_id,status,attempts,next_retry_at,last_error`,
+      ),
+    getIntent: async (intentId) => {
+      const row = await selectOne<{
+        id: string;
+        subject_id: string;
+        period_key: string;
+        claim_kind: 'month' | 'cancel_fee';
+        charge_intent_id: string | null;
+        amount: number | string;
+        currency: 'CHF';
+        status: string;
+        collection_subjects: {
+          client_id: string;
+          membership_ref: string;
+          display_label: string;
+        } | Array<{
+          client_id: string;
+          membership_ref: string;
+          display_label: string;
+        }> | null;
+      }>(
+        'membership_period_intents',
+        `id=eq.${intentId}&select=id,subject_id,period_key,claim_kind,charge_intent_id,amount,currency,status,collection_subjects(client_id,membership_ref,display_label)`,
+      );
+      const subject = Array.isArray(row?.collection_subjects)
+        ? row?.collection_subjects[0]
+        : row?.collection_subjects;
+      if (!row || !subject) return null;
+      const label = row.claim_kind === 'cancel_fee'
+        ? `${subject.display_label} cancel fee`
+        : subject.display_label;
+      return {
+        id: row.id,
+        subject_id: row.subject_id,
+        client_id: subject.client_id,
+        membership_ref: subject.membership_ref,
+        period_key: row.period_key,
+        claim_kind: row.claim_kind,
+        charge_intent_id: row.charge_intent_id,
+        display_label: label,
+        amount: Number(row.amount),
+        currency: 'CHF',
+        status: row.status,
+      };
+    },
+    getProfile: (userId) =>
+      selectOne(
+        'profiles',
+        `id=eq.${userId}&select=id,full_name,first_name,last_name,email,phone,address,postal_code,city,country,country_code`,
+      ),
+    findContactByUser: (userId) =>
+      selectOne('billing_contacts', `user_id=eq.${userId}&select=external_id,email_snapshot`),
+    upsertContact: (row) => upsert('billing_contacts', 'user_id', { ...row }),
+    upsertMembershipDocument: async (row) => {
+      await upsert('billing_documents', 'membership_period_intent_id', { ...row });
+      const saved = await selectOne<BillingDocumentRow>(
+        'billing_documents',
+        `membership_period_intent_id=eq.${row.membership_period_intent_id}&select=id,membership_period_intent_id,provider,external_id,document_nr,api_reference,status,total,currency`,
+      );
+      return saved ?? row;
+    },
+    upsertOperation: (row) => upsert('billing_operations', 'idempotency_key', { ...row }),
+    insertEvent: async (event) => {
+      const res = await fetch(`${supabaseUrl}/rest/v1/billing_events`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ details: {}, ...event }),
+      });
+      if (!res.ok) throw new Error(`db insert billing_events failed: ${res.status}`);
+    },
+    markIntentInvoiced: async (intentId) => {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/membership_period_intents?id=eq.${intentId}&status=eq.pending`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'invoiced', updated_at: new Date().toISOString() }),
+        },
+      );
+      if (!res.ok) throw new Error(`db mark membership intent invoiced failed: ${res.status}`);
     },
   };
 }

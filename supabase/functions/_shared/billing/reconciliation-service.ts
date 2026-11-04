@@ -10,6 +10,7 @@ import {
   ProviderAuthError,
   ProviderUnavailableError,
   type AccountingProvider,
+  type ExternalInvoiceStatus,
 } from './accounting-provider.ts';
 import {
   BookingNotBillableError,
@@ -26,6 +27,11 @@ import {
 } from './financial-service.ts';
 import { isOverpaid } from './bexio/bexio-adapter.ts';
 import type { BexioConfig } from './bexio/bexio-mappers.ts';
+import {
+  settleMembershipRail,
+  type MembershipMoneyDecision,
+  type PaymentRail,
+} from './membership-collection-policy.ts';
 
 export interface ReconcileBookingRow {
   id: string;
@@ -65,6 +71,24 @@ export interface ReconcileDeps {
   config: BexioConfig;
   now?: () => Date;
   onCampConfirmed?: (registrationId: string) => Promise<void>;
+  onMembershipPaid?: (intentId: string, now: Date) => Promise<void>;
+  loadMembershipIntent?: (intentId: string) => Promise<{
+    status: string;
+    chargeIntentId: string | null;
+    subjectId: string;
+    clientId: string;
+    hasConfirmedSignal: boolean;
+    hasReversedSignal: boolean;
+    confirmedSource: PaymentRail | null;
+  } | null>;
+  applyMembershipDecision?: (input: {
+    intentId: string;
+    chargeIntentId: string | null;
+    subjectId: string;
+    clientId: string;
+    decision: MembershipMoneyDecision;
+    now: Date;
+  }) => Promise<void>;
 }
 
 export interface ReconcileResult {
@@ -100,6 +124,17 @@ async function emitCampOnce(
   return true;
 }
 
+function membershipInvoiceStatus(
+  status: ExternalInvoiceStatus,
+): 'paid' | 'partially_paid' | 'issued' | 'cancelled' | null {
+  if (status === 'unknown') return null;
+  if (status === 'draft') return 'issued';
+  if (status === 'paid' || status === 'partially_paid' || status === 'issued' || status === 'cancelled') {
+    return status;
+  }
+  return null;
+}
+
 async function reconcileDocument(
   deps: ReconcileDeps,
   doc: BillingDocumentRow,
@@ -114,6 +149,40 @@ async function reconcileDocument(
     total: invoice.total,
     last_synced_at: now.toISOString(),
   };
+
+  if (doc.membership_period_intent_id) {
+    await deps.repo.updateDocument(
+      doc.id!,
+      invoice.status === 'unknown' ? { last_synced_at: now.toISOString() } : syncedPatch,
+    );
+    const mapped = membershipInvoiceStatus(invoice.status);
+    if (mapped && deps.loadMembershipIntent && deps.applyMembershipDecision) {
+      const intent = await deps.loadMembershipIntent(doc.membership_period_intent_id);
+      if (intent) {
+        const decision = settleMembershipRail({
+          invoiceStatus: mapped,
+          intentStatus: intent.status,
+          hasConfirmedSignal: intent.hasConfirmedSignal,
+          hasReversedSignal: intent.hasReversedSignal,
+          confirmedSource: intent.confirmedSource,
+          rail: 'accounting_reconciliation',
+        });
+        await deps.applyMembershipDecision({
+          intentId: doc.membership_period_intent_id,
+          chargeIntentId: intent.chargeIntentId,
+          subjectId: intent.subjectId,
+          clientId: intent.clientId,
+          decision,
+          now,
+        });
+        if (decision.setPaidAt) counts.confirmed += 1;
+      }
+    } else if (invoice.status === 'paid' && deps.onMembershipPaid) {
+      await deps.onMembershipPaid(doc.membership_period_intent_id, now);
+      counts.confirmed += 1;
+    }
+    return;
+  }
 
   if (invoice.status === 'paid') {
     await deps.repo.updateDocument(doc.id!, syncedPatch);
@@ -428,12 +497,12 @@ export function createPostgrestReconcileRepo(
     listOpenDocuments: () =>
       select<BillingDocumentRow>(
         'billing_documents',
-        'status=in.(issued,partially_paid)&select=id,booking_id,camp_registration_id,provider,external_id,document_nr,api_reference,status,total,currency',
+        'or=(status.in.(issued,partially_paid),and(membership_period_intent_id.not.is.null,status.eq.paid))&select=id,booking_id,camp_registration_id,membership_period_intent_id,provider,external_id,document_nr,api_reference,status,total,currency',
       ),
     getDocument: async (id) => {
       const rows = await select<BillingDocumentRow>(
         'billing_documents',
-        `id=eq.${id}&select=id,booking_id,camp_registration_id,provider,external_id,document_nr,api_reference,status,total,currency`,
+        `id=eq.${id}&select=id,booking_id,camp_registration_id,membership_period_intent_id,provider,external_id,document_nr,api_reference,status,total,currency`,
       );
       return rows[0] ?? null;
     },

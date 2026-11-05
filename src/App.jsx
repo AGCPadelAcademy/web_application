@@ -1,9 +1,11 @@
-import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import FrontendSwitcher from '@/components/layout/FrontendSwitcher';
 
 import HomePage from '@/pages/HomePage';
+import NewFrontendPage from '@/pages/NewFrontendPage';
 import LessonsPage from '@/pages/LessonsPage';
 import TripsPage from '@/pages/TripsPage';
 import TournamentsPage from '@/pages/TournamentsPage';
@@ -25,16 +27,22 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AuthProvider } from '@/contexts/SupabaseAuthContext';
 import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
-const AppLayout = () => (
-  <div className="min-h-screen bg-background text-white flex flex-col w-full">
-    <Header />
-    <main className="flex-grow flex flex-col w-full">
-      <Outlet />
-    </main>
-    <Footer />
-    <Toaster />
-  </div>
-);
+const AppLayout = () => {
+  const { pathname } = useLocation();
+  const isNewFrontend = pathname === '/new';
+
+  return (
+    <div className="min-h-screen bg-background text-white flex flex-col w-full">
+      <FrontendSwitcher />
+      {!isNewFrontend && <Header />}
+      <main className="flex-grow flex flex-col w-full">
+        <Outlet />
+      </main>
+      {!isNewFrontend && <Footer />}
+      <Toaster />
+    </div>
+  );
+};
 
 function App() {
   return (
@@ -44,6 +52,7 @@ function App() {
           <Route path="/" element={<AppLayout />}>
 
             <Route index element={<HomePage />} />
+            <Route path="new" element={<NewFrontendPage />} />
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="trips" element={<TripsPage />} />
             <Route path="camps" element={<CampsPage />} />

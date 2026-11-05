@@ -5,7 +5,14 @@ import Footer from '@/components/layout/Footer';
 import FrontendSwitcher from '@/components/layout/FrontendSwitcher';
 
 import HomePage from '@/pages/HomePage';
-import NewFrontendPage from '@/pages/NewFrontendPage';
+import NewLayout from '@/pages/new-frontend/NewLayout';
+import NewHomePage from '@/pages/new-frontend/NewHomePage';
+import NewLessonsPage from '@/pages/new-frontend/NewLessonsPage';
+import NewCampsPage from '@/pages/new-frontend/NewCampsPage';
+import NewTripsPage from '@/pages/new-frontend/NewTripsPage';
+import NewContactPage from '@/pages/new-frontend/NewContactPage';
+import NewTermsPage from '@/pages/new-frontend/NewTermsPage';
+import NewLoginPage from '@/pages/new-frontend/NewLoginPage';
 import LessonsPage from '@/pages/LessonsPage';
 import TripsPage from '@/pages/TripsPage';
 import TournamentsPage from '@/pages/TournamentsPage';
@@ -29,7 +36,7 @@ import { TOURNAMENTS_ENABLED } from '@/lib/featureFlags';
 
 const AppLayout = () => {
   const { pathname } = useLocation();
-  const isNewFrontend = pathname === '/new';
+  const isNewFrontend = pathname === '/new' || pathname.startsWith('/new/');
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col w-full">
@@ -52,7 +59,15 @@ function App() {
           <Route path="/" element={<AppLayout />}>
 
             <Route index element={<HomePage />} />
-            <Route path="new" element={<NewFrontendPage />} />
+            <Route path="new" element={<NewLayout />}>
+              <Route index element={<NewHomePage />} />
+              <Route path="lessons" element={<NewLessonsPage />} />
+              <Route path="camps" element={<NewCampsPage />} />
+              <Route path="trips" element={<NewTripsPage />} />
+              <Route path="contact" element={<NewContactPage />} />
+              <Route path="terms" element={<NewTermsPage />} />
+              <Route path="login" element={<NewLoginPage />} />
+            </Route>
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="trips" element={<TripsPage />} />
             <Route path="camps" element={<CampsPage />} />

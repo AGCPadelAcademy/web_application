@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 const FrontendSwitcher = () => {
   const { pathname } = useLocation();
-  const isNew = pathname === '/new';
+  const isNew = pathname === '/new' || pathname.startsWith('/new/');
 
   return (
     <nav

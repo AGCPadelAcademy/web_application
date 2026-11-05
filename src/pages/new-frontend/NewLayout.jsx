@@ -29,12 +29,12 @@ const LANGUAGES = [
 ];
 
 const NewLayout = () => {
-  const [theme, setTheme] = useState('light');
+  const [themeIcon, setThemeIcon] = useState('sun');
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={`nf ${theme === 'dark' ? 'nf-dark' : ''} flex flex-col flex-grow`}>
+    <div className="nf flex flex-col flex-grow">
       <Helmet>
         <title>AGC Padel Academy — New</title>
         <meta name="description" content="AGC Padel Academy new frontend concept." />
@@ -90,11 +90,15 @@ const NewLayout = () => {
             variant="ghost"
             size="icon"
             className="nf-icon-btn group h-10 w-10 hover:bg-white/10"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            aria-label={themeIcon === 'sun' ? 'Sun' : 'Moon'}
+            onClick={() => setThemeIcon((current) => (current === 'sun' ? 'moon' : 'sun'))}
           >
             <span className="inline-flex origin-center transition-transform duration-200 group-hover:scale-110 group-active:scale-95">
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {themeIcon === 'sun' ? (
+                <Sun key="sun" className="h-4 w-4 animate-in fade-in duration-200" />
+              ) : (
+                <Moon key="moon" className="h-4 w-4 animate-in fade-in duration-200" />
+              )}
             </span>
           </Button>
           <Link to="/new/login" className="nf-cta">Login</Link>

@@ -21,9 +21,10 @@
   top: 1.75rem;
   z-index: 40;
   margin: 12px 3% 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 16px;
+  column-gap: 16px;
   background: rgba(15, 26, 22, 0.84);
   border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(18px);
@@ -32,10 +33,22 @@
   color: #fff;
 }
 
-.nf-brand { font-weight: 800; font-size: 22px; letter-spacing: -1.4px; line-height: 1; }
+.nf-brand {
+  justify-self: start;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -1.4px;
+  line-height: 1;
+}
 .nf-brand small { display: block; font-size: 9px; letter-spacing: 2px; font-weight: 600; }
 
-.nf-links { display: flex; gap: 18px; margin: auto; font-size: 13px; font-weight: 700; }
+.nf-links {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 13px;
+  font-weight: 700;
+}
 .nf-links a { color: #fff; position: relative; }
 .nf-links a::after {
   content: '';
@@ -52,7 +65,7 @@
 .nf-links a:hover::after,
 .nf-links a.is-active::after { transform: scaleX(1); }
 
-.nf-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.nf-tools { display: flex; align-items: center; justify-self: end; gap: 8px; }
 .nf-icon-btn {
   width: 40px;
   height: 40px;

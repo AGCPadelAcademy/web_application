@@ -32,15 +32,25 @@ const NewHomePage = () => {
   };
 
   return (
-    <iframe
-      ref={frameRef}
-      title="AGC Padel Academy new homepage"
-      src="/prototypes/agc-v28.html?embed=1"
-      onLoad={onLoad}
-      className="nf-home-frame w-full border-0 bg-[#c2cea5] block"
-      scrolling="no"
-      style={{ minHeight: '70vh' }}
-    />
+    <>
+      <iframe
+        ref={frameRef}
+        title="AGC Padel Academy new homepage"
+        src="/prototypes/agc-v28.html?embed=1"
+        onLoad={onLoad}
+        className="nf-home-frame w-full border-0 bg-[#c2cea5] block"
+        scrolling="no"
+        style={{ minHeight: '70vh' }}
+      />
+      <button
+        type="button"
+        className="nf-backtop"
+        aria-label="Back to top"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      >
+        ↑
+      </button>
+    </>
   );
 };
 

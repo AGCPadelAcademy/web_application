@@ -26,7 +26,7 @@
   scrollbar-width: none;
 }
 
-.nf-backtop {
+.nf-whatsapp {
   position: fixed;
   right: 24px;
   bottom: 25px;
@@ -37,16 +37,41 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
+  padding: 0;
   background: #78845c;
   color: #fff;
-  font-size: 27px;
-  line-height: 1;
   box-shadow: 0 8px 30px #0002;
   cursor: pointer;
 }
-.nf-backtop:hover {
+.nf-whatsapp svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+.nf-whatsapp:hover,
+.nf-whatsapp:focus-visible {
   transform: translateY(-6px);
   background: #253529;
+}
+.nf-whatsapp-note {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #253529;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+.nf-whatsapp:hover .nf-whatsapp-note,
+.nf-whatsapp:focus-visible .nf-whatsapp-note {
+  opacity: 1;
 }
 
 .nf-mast {

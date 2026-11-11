@@ -21,6 +21,11 @@
   background: #c2cea5;
 }
 
+.nf-home-frame {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
 .nf-mast {
   background: transparent;
   text-align: center;

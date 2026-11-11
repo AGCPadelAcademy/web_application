@@ -6,17 +6,29 @@ const NewHomePage = () => {
   const onLoad = () => {
     const frame = frameRef.current;
     const doc = frame?.contentDocument;
-    if (!doc) return;
-    const style = doc.createElement('style');
-    style.textContent = `
-      .nav, .footer, .demo, .agc-reading-track { display: none !important; }
-      html, body { padding-top: 0 !important; background: #c2cea5 !important; }
-      #home.agc-v23-hero,
-      #home.agc-v23-hero .agc-v23-heading { background: #c2cea5 !important; }
-      #home.agc-v23-hero .agc-v23-heading { padding-top: 18px !important; }
-    `;
-    doc.head.appendChild(style);
-    frame.style.height = `${Math.max(doc.documentElement.scrollHeight, 2400)}px`;
+    const view = doc?.defaultView;
+    if (!doc || !view || !doc.body) return;
+
+    const fit = () => {
+      const height = Math.max(
+        ...Array.from(doc.body.children, (el) => {
+          if (view.getComputedStyle(el).display === 'none') return 0;
+          return el.offsetTop + el.offsetHeight;
+        }),
+      );
+      if (height > 0) frame.style.height = `${height}px`;
+    };
+
+    fit();
+    view.requestAnimationFrame(() => {
+      fit();
+      view.requestAnimationFrame(fit);
+    });
+    if (view.ResizeObserver) {
+      const observer = new view.ResizeObserver(fit);
+      const main = doc.querySelector('main');
+      if (main) observer.observe(main);
+    }
   };
 
   return (
@@ -25,7 +37,8 @@ const NewHomePage = () => {
       title="AGC Padel Academy new homepage"
       src="/prototypes/agc-v28.html?embed=1"
       onLoad={onLoad}
-      className="w-full border-0 bg-[#c2cea5] block"
+      className="nf-home-frame w-full border-0 bg-[#c2cea5] block"
+      scrolling="no"
       style={{ minHeight: '70vh' }}
     />
   );

@@ -14,9 +14,10 @@ import './new-shell.css';
 
 const NAV = [
   { to: '/new', label: 'Home', end: true },
-  { to: '/new/lessons', label: 'Lessons' },
-  { to: '/new/camps', label: 'Camps' },
+  { to: '/new/kids', label: 'Kids' },
+  { to: '/new/adults', label: 'Adults' },
   { to: '/new/trips', label: 'Trips' },
+  { to: '/new/tournaments', label: 'Tournaments' },
   { to: '/new/contact', label: 'Contact' },
 ];
 
@@ -130,9 +131,10 @@ const NewLayout = () => {
           </div>
           <div>
             <p><Link to="/new">Home</Link></p>
-            <p><Link to="/new/lessons">Lessons</Link></p>
-            <p><Link to="/new/camps">Camps</Link></p>
+            <p><Link to="/new/kids">Kids Academy</Link></p>
+            <p><Link to="/new/adults">Adult Training</Link></p>
             <p><Link to="/new/trips">Trips</Link></p>
+            <p><Link to="/new/tournaments">Tournaments</Link></p>
           </div>
           <div>
             <p><Link to="/new/contact">Contact</Link></p>

@@ -7,9 +7,10 @@ import FrontendSwitcher from '@/components/layout/FrontendSwitcher';
 import HomePage from '@/pages/HomePage';
 import NewLayout from '@/pages/new-frontend/NewLayout';
 import NewHomePage from '@/pages/new-frontend/NewHomePage';
-import NewLessonsPage from '@/pages/new-frontend/NewLessonsPage';
-import NewCampsPage from '@/pages/new-frontend/NewCampsPage';
+import NewKidsPage from '@/pages/new-frontend/NewKidsPage';
+import NewAdultsPage from '@/pages/new-frontend/NewAdultsPage';
 import NewTripsPage from '@/pages/new-frontend/NewTripsPage';
+import NewTournamentsPage from '@/pages/new-frontend/NewTournamentsPage';
 import NewContactPage from '@/pages/new-frontend/NewContactPage';
 import NewTermsPage from '@/pages/new-frontend/NewTermsPage';
 import NewLoginPage from '@/pages/new-frontend/NewLoginPage';
@@ -61,10 +62,13 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="new" element={<NewLayout />}>
               <Route index element={<NewHomePage />} />
-              <Route path="lessons" element={<NewLessonsPage />} />
-              <Route path="camps" element={<NewCampsPage />} />
+              <Route path="kids" element={<NewKidsPage />} />
+              <Route path="adults" element={<NewAdultsPage />} />
               <Route path="trips" element={<NewTripsPage />} />
+              <Route path="tournaments" element={<NewTournamentsPage />} />
               <Route path="contact" element={<NewContactPage />} />
+              <Route path="lessons" element={<Navigate to="/new/adults" replace />} />
+              <Route path="camps" element={<Navigate to="/new/kids" replace />} />
               <Route path="terms" element={<NewTermsPage />} />
               <Route path="login" element={<NewLoginPage />} />
             </Route>

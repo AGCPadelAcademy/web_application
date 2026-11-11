@@ -45,9 +45,10 @@
 .nf-links {
   display: flex;
   justify-content: center;
-  gap: 18px;
-  font-size: 13px;
+  gap: 13px;
+  font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 .nf-links a { color: #fff; position: relative; }
 .nf-links a::after {
@@ -122,6 +123,44 @@
 .nf-price { font-size: 32px; font-weight: 800; color: var(--nf-olive); margin: 8px 0 12px; }
 .nf-card p { color: var(--nf-muted); line-height: 1.55; margin: 0; }
 
+.nf-shot {
+  overflow: hidden;
+  padding: 0;
+}
+.nf-shot img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+}
+.nf-shot .nf-shot-body { padding: 22px 26px 26px; }
+.nf-mosaic {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 12px;
+  margin-top: 40px;
+}
+.nf-mosaic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 28px;
+}
+.nf-ages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 36px;
+}
+.nf-ages article {
+  background: var(--nf-card);
+  border: 1px solid var(--nf-line);
+  border-radius: 22px;
+  padding: 20px;
+}
+.nf-ages b { display: block; font-size: 28px; letter-spacing: -0.04em; margin-top: 8px; }
+
 .nf-pill {
   display: inline-flex;
   align-items: center;
@@ -164,12 +203,9 @@
 
 .nf-mobile { display: none; }
 
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .nf-links { display: none; }
   .nf-hamb { display: grid; }
-  .nf-grid-3,
-  .nf-grid-2 { grid-template-columns: 1fr; }
-  .nf-foot-grid { grid-template-columns: 1fr 1fr; }
   .nf-mobile {
     display: flex;
     flex-direction: column;
@@ -182,9 +218,20 @@
   }
 }
 
+@media (max-width: 900px) {
+  .nf-grid-3,
+  .nf-grid-2 { grid-template-columns: 1fr; }
+  .nf-mosaic,
+  .nf-ages { grid-template-columns: 1fr 1fr; }
+  .nf-foot-grid { grid-template-columns: 1fr 1fr; }
+}
+
 @media (max-width: 580px) {
   .nf-nav { margin: 8px 3% 0; padding: 8px 12px; }
   .nf-cta { display: none; }
   .nf-foot-grid { grid-template-columns: 1fr; }
   .nf-page { padding: 64px 5% 72px; }
+  .nf-mosaic,
+  .nf-ages { grid-template-columns: 1fr; }
+  .nf-shot img { height: 180px; }
 }

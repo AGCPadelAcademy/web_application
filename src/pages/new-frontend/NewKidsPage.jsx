@@ -100,6 +100,9 @@ const NewKidsPage = () => {
         <div className="nf-camp-list">
           {visible.map((camp) => (
             <article key={camp.name} className="nf-card nf-camp">
+              <div className="nf-camp-photo">
+                <img alt={`${camp.name} camp`} src={camp.img} />
+              </div>
               <div className="nf-camp-copy">
                 <p className="nf-kicker">{camp.type}</p>
                 <h3>{camp.name}</h3>
@@ -116,9 +119,6 @@ const NewKidsPage = () => {
                     {camp.status === 'open' ? 'View camp' : 'Join the list'}
                   </Link>
                 )}
-              </div>
-              <div className="nf-camp-photo">
-                <img alt={`${camp.name} camp`} src={camp.img} />
               </div>
             </article>
           ))}

@@ -20,8 +20,7 @@ const NewKidsPage = () => (
     <title>AGC Padel Academy — Kids Academy</title>
   </Helmet>
   <NewMasthead
-    kicker="Villmergen, Switzerland  /  Kids Academy"
-    title="KIDS ACADEMY"
+    title="Kids Academy"
     lead="Kids camps work like the academy weeks: pick a date, request a place, we group by age. This page is visual only."
   />
   <section className="nf-page">

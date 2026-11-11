@@ -9,8 +9,7 @@ const NewLoginPage = () => {
   return (
     <>
     <NewMasthead
-      kicker="Villmergen, Switzerland  /  Login"
-      title="LOGIN"
+      title="Login"
       lead="Looks like the academy login. It does not authenticate. Use the main Login page for a real session."
     />
     <section className="nf-page">

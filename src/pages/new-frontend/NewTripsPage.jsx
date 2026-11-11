@@ -8,8 +8,7 @@ const NewTripsPage = () => (
     <title>AGC Padel Academy — Trips</title>
   </Helmet>
   <NewMasthead
-    kicker="Villmergen, Switzerland  /  Trips"
-    title="TRIPS"
+    title="Trips"
     lead="A week of morning padel, Delta light, hotel, and transfers. Visual only. No booking from this page."
   />
   <section className="nf-page">

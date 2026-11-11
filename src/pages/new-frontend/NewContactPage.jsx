@@ -14,8 +14,7 @@ const NewContactPage = () => {
       <title>AGC Padel Academy — Contact</title>
     </Helmet>
     <NewMasthead
-      kicker="Villmergen, Switzerland  /  Contact"
-      title="CONTACT"
+      title="Contact"
       lead="A visual form. It does not send mail. Use the main Contact page when a real message has to go through."
     />
     <section className="nf-page">

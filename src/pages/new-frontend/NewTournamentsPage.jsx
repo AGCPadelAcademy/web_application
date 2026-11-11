@@ -15,8 +15,7 @@ const NewTournamentsPage = () => (
     <title>AGC Padel Academy — Tournaments</title>
   </Helmet>
   <NewMasthead
-    kicker="Villmergen, Switzerland  /  Tournaments"
-    title="TOURNAMENTS"
+    title="Tournaments"
     lead="One-day opens, golden-point tiebreak, one set, at least four matches. Next date is still to be confirmed."
   />
   <section className="nf-page">

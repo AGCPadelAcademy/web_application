@@ -21,8 +21,7 @@ const NewAdultsPage = () => (
     <title>AGC Padel Academy — Adult Training</title>
   </Helmet>
   <NewMasthead
-    kicker="Villmergen, Switzerland  /  Adult Training"
-    title="ADULT TRAINING"
+    title="Adult Training"
     lead="Group memberships and private sessions. Cards are visual only. Booking stays on the main site."
   />
   <section className="nf-page">

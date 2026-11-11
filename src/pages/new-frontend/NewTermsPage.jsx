@@ -3,8 +3,7 @@ import NewMasthead from './NewMasthead';
 const NewTermsPage = () => (
   <>
   <NewMasthead
-    kicker="Villmergen, Switzerland  /  Terms"
-    title="TERMS"
+    title="Terms"
     lead="Headings from the live Terms page, laid out in the new shell. This is a reading layout, not a legal rewrite."
   />
   <section className="nf-page">

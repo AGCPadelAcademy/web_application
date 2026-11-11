@@ -27,7 +27,7 @@ const NewAdultsPage = () => (
     <div className="nf-mosaic" style={{ minHeight: 320 }}>
       <img alt="Adult coaching at AGC" src={PHOTO} />
       <article className="nf-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <p className="nf-kicker">01 Group · 02 Private · 03 Intensive</p>
+        <p className="nf-kicker">Adult training</p>
         <h3>From first rally to match play.</h3>
         <p>Professional coaching built around your week. 48-hour cancellation on the live product.</p>
         <Link to="/new/contact" className="nf-pill">Find your training</Link>

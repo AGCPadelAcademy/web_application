@@ -243,6 +243,51 @@
   gap: 12px;
   margin-top: 40px;
 }
+.nf-trip-photos {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 12px;
+}
+.nf-trip-photos img {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  border-radius: 22px;
+}
+.nf-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+.nf-fact {
+  background: var(--nf-card);
+  border: 1px solid var(--nf-line);
+  border-radius: 22px;
+  padding: 18px;
+}
+.nf-fact b { display: block; font-size: 18px; letter-spacing: -0.03em; margin: 0 0 4px; }
+.nf-fact span { color: var(--nf-muted); font-size: 14px; line-height: 1.4; }
+.nf-days {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.nf-day { display: flex; gap: 12px; align-items: flex-start; }
+.nf-day em {
+  flex: none;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #142819;
+  background: var(--nf-neon);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
 .nf-mosaic img {
   width: 100%;
   height: 100%;
@@ -392,7 +437,11 @@
   .nf-grid-3,
   .nf-grid-2 { grid-template-columns: 1fr; }
   .nf-mosaic,
-  .nf-ages { grid-template-columns: 1fr 1fr; }
+  .nf-ages,
+  .nf-facts,
+  .nf-trip-photos { grid-template-columns: 1fr 1fr; }
+  .nf-trip-photos img:first-child { grid-column: 1 / -1; height: 180px; }
+  .nf-days { grid-template-columns: 1fr; }
   .nf-camp-list { grid-template-columns: 1fr 1fr; }
   .nf-foot-grid { grid-template-columns: 1fr 1fr; }
 }

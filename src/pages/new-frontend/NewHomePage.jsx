@@ -23,7 +23,7 @@ const NewHomePage = () => {
     <iframe
       ref={frameRef}
       title="AGC Padel Academy new homepage"
-      src="/prototypes/agc-v28.html"
+      src="/prototypes/agc-v28.html?embed=1"
       onLoad={onLoad}
       className="w-full border-0 bg-[#c2cea5] block"
       style={{ minHeight: '70vh' }}

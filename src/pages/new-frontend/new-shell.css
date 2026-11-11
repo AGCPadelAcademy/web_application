@@ -205,6 +205,13 @@
 }
 .nf-lead { max-width: 540px; font-size: 17px; line-height: 1.6; color: var(--nf-muted); }
 
+.nf-block + .nf-block { margin-top: 72px; }
+.nf-block h2 {
+  font-size: clamp(36px, 4vw, 56px);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  margin: 8px 0 10px;
+}
 .nf-grid { display: grid; gap: 16px; margin-top: 40px; }
 .nf-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .nf-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

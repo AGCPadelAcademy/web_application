@@ -16,6 +16,14 @@
 
 .nf a { color: inherit; text-decoration: none; }
 
+.nf.nf-home {
+  background: #c2cea5;
+}
+
+.nf-home .nf-nav {
+  margin-top: 10px;
+}
+
 .nf-nav {
   position: sticky;
   top: 1.75rem;

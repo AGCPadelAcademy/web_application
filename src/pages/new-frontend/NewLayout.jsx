@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Moon, Sun, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,12 +30,14 @@ const LANGUAGES = [
 ];
 
 const NewLayout = () => {
+  const { pathname } = useLocation();
+  const isHome = pathname === '/new';
   const [themeIcon, setThemeIcon] = useState('sun');
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="nf flex flex-col flex-grow">
+    <div className={`nf ${isHome ? 'nf-home' : ''} flex flex-col flex-grow`}>
       <Helmet>
         <title>AGC Padel Academy — New</title>
         <meta name="description" content="AGC Padel Academy new frontend concept." />

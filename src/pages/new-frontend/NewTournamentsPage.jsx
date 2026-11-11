@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import NewMasthead from './NewMasthead';
 
 const PHOTOS = [
   { src: 'https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/foto-grup-torneo-agc-MZ4y0.jpg', alt: 'Tournament group with trophies' },
@@ -13,11 +14,12 @@ const NewTournamentsPage = () => (
   <Helmet>
     <title>AGC Padel Academy — Tournaments</title>
   </Helmet>
+  <NewMasthead
+    kicker="Villmergen, Switzerland  /  Tournaments"
+    title="TOURNAMENTS"
+    lead="One-day opens, golden-point tiebreak, one set, at least four matches. Next date is still to be confirmed."
+  />
   <section className="nf-page">
-    <p className="nf-kicker">Tournaments</p>
-    <h1 className="nf-title">Play the day. Keep the photo.</h1>
-    <p className="nf-lead">One-day opens, golden-point tiebreak, one set, at least four matches. Next date is still to be confirmed. This page does not take entries.</p>
-
     <article className="nf-card" style={{ marginTop: 40, maxWidth: 640 }}>
       <p className="nf-kicker">Upcoming</p>
       <h3>Date to be confirmed</h3>

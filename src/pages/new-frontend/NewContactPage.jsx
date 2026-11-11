@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import NewMasthead from './NewMasthead';
 
 const PHOTO = 'https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/albert-ensenyan-pilota-agc-Mii0Q.jpg';
 
@@ -12,11 +13,12 @@ const NewContactPage = () => {
     <Helmet>
       <title>AGC Padel Academy — Contact</title>
     </Helmet>
+    <NewMasthead
+      kicker="Villmergen, Switzerland  /  Contact"
+      title="CONTACT"
+      lead="A visual form. It does not send mail. Use the main Contact page when a real message has to go through."
+    />
     <section className="nf-page">
-      <p className="nf-kicker">Contact</p>
-      <h1 className="nf-title">Write to the academy.</h1>
-      <p className="nf-lead">A visual form. It does not send mail. Use the main Contact page when a real message has to go through.</p>
-
       <div className="nf-grid nf-grid-2">
         <form className="nf-card nf-form" onSubmit={onSubmit}>
           <label htmlFor="nf-name">Name</label>

@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import NewMasthead from './NewMasthead';
 
 const PHOTO = 'https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/albert-ensenyan-pilota-agc-Mii0Q.jpg';
 
@@ -19,11 +20,12 @@ const NewAdultsPage = () => (
   <Helmet>
     <title>AGC Padel Academy — Adult Training</title>
   </Helmet>
+  <NewMasthead
+    kicker="Villmergen, Switzerland  /  Adult Training"
+    title="ADULT TRAINING"
+    lead="Group memberships and private sessions. Cards are visual only. Booking stays on the main site."
+  />
   <section className="nf-page">
-    <p className="nf-kicker">Adult training</p>
-    <h1 className="nf-title">Your game. Your next level.</h1>
-    <p className="nf-lead">Group memberships and private sessions, restyled from Lessons. Cards are visual only — booking stays on the main site.</p>
-
     <div className="nf-mosaic" style={{ minHeight: 320 }}>
       <img alt="Adult coaching at AGC" src={PHOTO} />
       <article className="nf-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

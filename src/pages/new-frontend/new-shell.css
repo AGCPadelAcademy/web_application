@@ -16,13 +16,64 @@
 
 .nf a { color: inherit; text-decoration: none; }
 
-.nf.nf-home {
+.nf.nf-home,
+.nf.nf-inner {
   background: #c2cea5;
 }
 
 .nf-home .nf-nav {
   margin-top: 10px;
 }
+
+.nf-mast {
+  background: transparent;
+  text-align: center;
+  padding: 10px 0 36px;
+  overflow: hidden;
+}
+.nf-mast-kicker {
+  margin: 0;
+  padding: 0 5vw;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #40543c;
+}
+.nf-mast-title {
+  margin: 12px 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.nf-mast-title > span {
+  display: flex;
+  width: max-content;
+  animation: nfMarquee 24s linear infinite;
+}
+.nf-mast-title span span {
+  display: block;
+  flex: none;
+  padding-right: 28px;
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  font-size: clamp(34px, 5.4vw, 82px);
+  line-height: 1.18;
+  color: #253529;
+}
+.nf-mast-lead {
+  max-width: 540px;
+  margin: 18px auto 0;
+  padding: 0 6vw;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #3f4f38;
+}
+@keyframes nfMarquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.nf-page { padding: 56px 6% 100px; background: var(--nf-cream); border-radius: 36px 36px 0 0; }
 
 .nf-nav {
   position: sticky;
@@ -99,7 +150,6 @@
 .nf-cta:hover { transform: translateY(-2px); }
 .nf-hamb { display: none; }
 
-.nf-page { padding: 88px 6% 100px; }
 .nf-kicker {
   font-size: 11px;
   font-weight: 800;
@@ -238,8 +288,13 @@
   .nf-nav { margin: 8px 3% 0; padding: 8px 12px; }
   .nf-cta { display: none; }
   .nf-foot-grid { grid-template-columns: 1fr; }
-  .nf-page { padding: 64px 5% 72px; }
+  .nf-page { padding: 48px 5% 72px; border-radius: 28px 28px 0 0; }
   .nf-mosaic,
   .nf-ages { grid-template-columns: 1fr; }
   .nf-shot img { height: 180px; }
+  .nf-mast-title span span { font-size: clamp(32px, 8vw, 54px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-mast-title > span { animation: none; }
 }

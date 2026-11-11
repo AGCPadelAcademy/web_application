@@ -37,7 +37,7 @@ const NewLayout = () => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={`nf ${isHome ? 'nf-home' : ''} flex flex-col flex-grow`}>
+    <div className={`nf ${isHome ? 'nf-home' : 'nf-inner'} flex flex-col flex-grow`}>
       <Helmet>
         <title>AGC Padel Academy — New</title>
         <meta name="description" content="AGC Padel Academy new frontend concept." />

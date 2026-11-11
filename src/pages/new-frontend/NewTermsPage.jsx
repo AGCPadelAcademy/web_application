@@ -1,8 +1,13 @@
+import NewMasthead from './NewMasthead';
+
 const NewTermsPage = () => (
+  <>
+  <NewMasthead
+    kicker="Villmergen, Switzerland  /  Terms"
+    title="TERMS"
+    lead="Headings from the live Terms page, laid out in the new shell. This is a reading layout, not a legal rewrite."
+  />
   <section className="nf-page">
-    <p className="nf-kicker">Legal</p>
-    <h1 className="nf-title">Terms, restyled.</h1>
-    <p className="nf-lead">Headings from the live Terms page, laid out in the new shell. This is a reading layout, not a legal rewrite.</p>
     <div className="nf-grid" style={{ maxWidth: 760 }}>
       <article className="nf-card">
         <h3>General conditions</h3>
@@ -18,6 +23,7 @@ const NewTermsPage = () => (
       </article>
     </div>
   </section>
+  </>
 );
 
 export default NewTermsPage;

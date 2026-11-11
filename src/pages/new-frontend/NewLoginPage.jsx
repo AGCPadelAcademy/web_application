@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import NewMasthead from './NewMasthead';
 
 const NewLoginPage = () => {
   const onSubmit = (event) => {
@@ -6,10 +7,13 @@ const NewLoginPage = () => {
   };
 
   return (
+    <>
+    <NewMasthead
+      kicker="Villmergen, Switzerland  /  Login"
+      title="LOGIN"
+      lead="Looks like the academy login. It does not authenticate. Use the main Login page for a real session."
+    />
     <section className="nf-page">
-      <p className="nf-kicker">Account</p>
-      <h1 className="nf-title">Login, as a concept.</h1>
-      <p className="nf-lead">Looks like the academy login. It does not authenticate. Use the main Login page for a real session.</p>
       <div className="nf-grid nf-grid-2">
         <form className="nf-card nf-form" onSubmit={onSubmit}>
           <h3>Sign in</h3>
@@ -26,6 +30,7 @@ const NewLoginPage = () => {
         </article>
       </div>
     </section>
+    </>
   );
 };
 

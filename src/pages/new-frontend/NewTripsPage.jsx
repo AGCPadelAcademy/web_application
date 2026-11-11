@@ -1,16 +1,18 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import NewMasthead from './NewMasthead';
 
 const NewTripsPage = () => (
   <>
   <Helmet>
     <title>AGC Padel Academy — Trips</title>
   </Helmet>
+  <NewMasthead
+    kicker="Villmergen, Switzerland  /  Trips"
+    title="TRIPS"
+    lead="A week of morning padel, Delta light, hotel, and transfers. Visual only. No booking from this page."
+  />
   <section className="nf-page">
-    <p className="nf-kicker">Trips</p>
-    <h1 className="nf-title">Ebro Delta, played properly.</h1>
-    <p className="nf-lead">A week of morning padel, Delta light, hotel, and transfers. Visual replica of the trips story. No booking from this page.</p>
-
     <div className="nf-mosaic" style={{ minHeight: 420 }}>
       <img alt="Ebro Delta" src="https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/delta-hIX8c.jpg" />
       <div style={{ display: 'grid', gap: 12 }}>

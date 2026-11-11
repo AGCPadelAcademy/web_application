@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import NewMasthead from './NewMasthead';
 
 const IMG = {
   kids: 'https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/foto-grup-la-rapita-xiquetys-camp-LKCMQ.jpeg',
@@ -18,11 +19,12 @@ const NewKidsPage = () => (
   <Helmet>
     <title>AGC Padel Academy — Kids Academy</title>
   </Helmet>
+  <NewMasthead
+    kicker="Villmergen, Switzerland  /  Kids Academy"
+    title="KIDS ACADEMY"
+    lead="Kids camps work like the academy weeks: pick a date, request a place, we group by age. This page is visual only."
+  />
   <section className="nf-page">
-    <p className="nf-kicker">Kids Academy</p>
-    <h1 className="nf-title">Little players. Big weeks.</h1>
-    <p className="nf-lead">Kids camps work like the academy weeks on the main site: pick a date, request a place, we group by age. This page is visual only.</p>
-
     <div className="nf-ages">
       <article><p className="nf-kicker">First steps</p><b>4–6</b></article>
       <article><p className="nf-kicker">Mini</p><b>7–9</b></article>

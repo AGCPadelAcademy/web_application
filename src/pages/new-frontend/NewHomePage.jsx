@@ -16,8 +16,10 @@ const WhatsAppMark = () => (
 const WhatsAppBubble = () => {
   const inner = (
     <>
-      <WhatsAppMark />
-      <span className="nf-whatsapp-note">{WHATSAPP_LABEL}</span>
+      <span className="nf-whatsapp-note" aria-hidden="true">{WHATSAPP_LABEL}</span>
+      <span className="nf-whatsapp-mark">
+        <WhatsAppMark />
+      </span>
     </>
   );
 
@@ -30,7 +32,7 @@ const WhatsAppBubble = () => {
   }
 
   return (
-    <a className="nf-whatsapp" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
+    <a className="nf-whatsapp" href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label={WHATSAPP_LABEL}>
       {inner}
     </a>
   );

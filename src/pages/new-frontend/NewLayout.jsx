@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Moon, Sun, Menu } from 'lucide-react';
@@ -35,6 +35,12 @@ const NewLayout = () => {
   const [themeIcon, setThemeIcon] = useState('sun');
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('nf-scroll');
+    return () => root.classList.remove('nf-scroll');
+  }, []);
 
   return (
     <div className={`nf ${isHome ? 'nf-home' : 'nf-inner'} flex flex-col flex-grow`}>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Moon, Sun, Menu } from 'lucide-react';
@@ -29,18 +29,92 @@ const LANGUAGES = [
   { code: 'IT', name: 'Italiano' },
 ];
 
+const placeOverlayThumb = (thumb, setShown) => {
+  const scroller = document.scrollingElement || document.documentElement;
+  const scrollHeight = scroller.scrollHeight;
+  const clientHeight = scroller.clientHeight;
+  const overflows = scrollHeight > clientHeight + 1;
+  setShown((current) => (current === overflows ? current : overflows));
+  if (!thumb || !overflows) return;
+  const thumbHeight = Math.max(36, (clientHeight / scrollHeight) * clientHeight);
+  const maxScroll = scrollHeight - clientHeight;
+  const travel = Math.max(clientHeight - thumbHeight, 0);
+  const top = maxScroll > 0 ? (scroller.scrollTop / maxScroll) * travel : 0;
+  thumb.style.height = `${thumbHeight}px`;
+  thumb.style.transform = `translateY(${top}px)`;
+};
+
+const OverlayScrollbar = () => {
+  const thumbRef = useRef(null);
+  const [shown, setShown] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('nf-overlay');
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => placeOverlayThumb(thumbRef.current, setShown));
+    };
+    schedule();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    const observer = new ResizeObserver(schedule);
+    observer.observe(root);
+    if (document.body) observer.observe(document.body);
+    return () => {
+      cancelAnimationFrame(frame);
+      root.classList.remove('nf-overlay');
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer.disconnect();
+    };
+  }, [pathname]);
+
+  useLayoutEffect(() => {
+    placeOverlayThumb(thumbRef.current, setShown);
+  }, [shown, pathname]);
+
+  const onPointerDown = (event) => {
+    if (event.button !== 0) return;
+    const thumb = thumbRef.current;
+    const scroller = document.scrollingElement || document.documentElement;
+    if (!thumb) return;
+    event.preventDefault();
+    thumb.setPointerCapture(event.pointerId);
+    const startY = event.clientY;
+    const startScroll = scroller.scrollTop;
+    const thumbHeight = thumb.getBoundingClientRect().height;
+    const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+    const travel = Math.max(scroller.clientHeight - thumbHeight, 1);
+    const move = (pointerEvent) => {
+      const next = startScroll + ((pointerEvent.clientY - startY) / travel) * maxScroll;
+      scroller.scrollTop = Math.min(Math.max(next, 0), maxScroll);
+    };
+    const end = () => {
+      thumb.removeEventListener('pointermove', move);
+      thumb.removeEventListener('pointerup', end);
+      thumb.removeEventListener('pointercancel', end);
+    };
+    thumb.addEventListener('pointermove', move);
+    thumb.addEventListener('pointerup', end);
+    thumb.addEventListener('pointercancel', end);
+  };
+
+  return (
+    <div className={shown ? 'nf-overlay-bar' : 'nf-overlay-bar is-off'} aria-hidden="true">
+      <div ref={thumbRef} className="nf-overlay-thumb" onPointerDown={onPointerDown} />
+    </div>
+  );
+};
+
 const NewLayout = () => {
   const { pathname } = useLocation();
   const isHome = pathname === '/new';
   const [themeIcon, setThemeIcon] = useState('sun');
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.add('nf-scroll');
-    return () => root.classList.remove('nf-scroll');
-  }, []);
 
   return (
     <div className={`nf ${isHome ? 'nf-home' : 'nf-inner'} flex flex-col flex-grow`}>
@@ -153,6 +227,7 @@ const NewLayout = () => {
         </div>
         <div className="nf-legal">© 2026 AGC Padel Academy · Concept pages, visual only.</div>
       </footer>
+      <OverlayScrollbar />
     </div>
   );
 };

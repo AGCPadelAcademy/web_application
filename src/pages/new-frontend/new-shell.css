@@ -1,6 +1,47 @@
-html.nf-scroll {
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+html.nf-overlay,
+html.nf-overlay body {
+  scrollbar-width: none;
+}
+
+html.nf-overlay::-webkit-scrollbar,
+html.nf-overlay body::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+
+.nf-overlay-bar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.nf-overlay-bar.is-off {
+  display: none;
+}
+
+.nf-overlay-thumb {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: 8px;
+  border-radius: 999px;
+  background: rgba(37, 53, 41, 0.78);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.nf-overlay-thumb:hover,
+.nf-overlay-thumb:active {
+  width: 10px;
+  right: 2px;
+  background: #253529;
 }
 
 .nf {

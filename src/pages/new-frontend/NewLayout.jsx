@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Moon, Sun, Menu } from 'lucide-react';
+import { Moon, Sun, Menu, User } from 'lucide-react';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -109,12 +110,33 @@ const OverlayScrollbar = () => {
   );
 };
 
+const AccountLinks = ({ onNavigate, className }) => {
+  const { user, profile, role, signOut } = useAuth();
+  if (!user) {
+    return <Link to="/new/login" className={className} onClick={onNavigate}>Login</Link>;
+  }
+  const first = profile?.full_name?.split(' ')[0] || 'there';
+  return (
+    <>
+      <p className="nf-account-hello">Hello, {first}</p>
+      <Link to="/new/profile" className={className} onClick={onNavigate}>My Profile</Link>
+      <Link to="/new/children" className={className} onClick={onNavigate}>My Children</Link>
+      <Link to="/new/payments" className={className} onClick={onNavigate}>My Payments</Link>
+      {role === 'coach' && <Link to="/new/coach/roster" className={className} onClick={onNavigate}>Session roster</Link>}
+      {role === 'admin' && <Link to="/new/admin" className={className} onClick={onNavigate}>Admin</Link>}
+      <button type="button" className="nf-text-btn" onClick={() => { onNavigate?.(); signOut(); }}>Sign Out</button>
+    </>
+  );
+};
+
 const NewLayout = () => {
   const { pathname } = useLocation();
+  const { user, loading } = useAuth();
   const isHome = pathname === '/new';
   const [themeIcon, setThemeIcon] = useState('sun');
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [open, setOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   return (
     <div className={`nf ${isHome ? 'nf-home' : 'nf-inner'} flex flex-col flex-grow`}>
@@ -184,7 +206,26 @@ const NewLayout = () => {
               )}
             </span>
           </Button>
-          <Link to="/new/login" className="nf-cta">Login</Link>
+          {loading ? null : user ? (
+            <div className="nf-account">
+              <button
+                type="button"
+                className="nf-icon-btn"
+                aria-label="Open profile menu"
+                aria-expanded={accountOpen}
+                onClick={() => setAccountOpen((current) => !current)}
+              >
+                <User className="h-4 w-4" />
+              </button>
+              {accountOpen && (
+                <div className="nf-account-menu">
+                  <AccountLinks onNavigate={() => setAccountOpen(false)} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link to="/new/login" className="nf-cta">Login</Link>
+          )}
           <button type="button" className="nf-icon-btn nf-hamb" aria-label="Open menu" onClick={() => setOpen((v) => !v)}>
             <Menu className="h-4 w-4" />
           </button>
@@ -197,7 +238,7 @@ const NewLayout = () => {
               {item.label}
             </Link>
           ))}
-          <Link to="/new/login" onClick={() => setOpen(false)}>Login</Link>
+          <AccountLinks className={undefined} onNavigate={() => setOpen(false)} />
         </div>
       )}
       <main className="flex-grow">
@@ -207,9 +248,9 @@ const NewLayout = () => {
         <div className="nf-foot-grid">
           <div>
             <h3>AGC Padel Academy</h3>
-            <p>Riedstrasse 6, 6330 Cham, Switzerland</p>
-            <p>+41 79 799 04 58</p>
-            <p>info@agc-padelacademy.com</p>
+            <p>Durisolstrasse 3, 5612 Villmergen, Switzerland</p>
+            <p>+41 76 611 40 61</p>
+            <p>agcpadelacademy@gmail.com</p>
           </div>
           <div>
             <p><Link to="/new">Home</Link></p>
@@ -225,7 +266,7 @@ const NewLayout = () => {
             <p><a href="https://www.instagram.com/agc.padelacademy/" target="_blank" rel="noopener noreferrer">Instagram</a></p>
           </div>
         </div>
-        <div className="nf-legal">© 2026 AGC Padel Academy · Concept pages, visual only.</div>
+        <div className="nf-legal">© {new Date().getFullYear()} AGC Padel Academy. All rights reserved.</div>
       </footer>
       <OverlayScrollbar />
     </div>

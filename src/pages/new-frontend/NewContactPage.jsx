@@ -1,51 +1,71 @@
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/customSupabaseClient';
 import NewMasthead from './NewMasthead';
 
-const PHOTO = 'https://horizons-cdn.hostinger.com/31db3b70-3837-4417-85cd-c2228d2043cf/albert-ensenyan-pilota-agc-Mii0Q.jpg';
+const EMPTY = { name: '', email: '', phone: '', subject: '', message: '' };
 
 const NewContactPage = () => {
-  const onSubmit = (event) => {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState(EMPTY);
+  const [sending, setSending] = useState(false);
+
+  const onChange = (event) => {
+    setFormData((current) => ({ ...current, [event.target.name]: event.target.value }));
+  };
+
+  const onSubmit = async (event) => {
     event.preventDefault();
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke('submit-contact-form', { body: formData });
+      if (error) throw error;
+      toast({ title: 'Message sent', description: 'Thank you for contacting us. We have received your message successfully.' });
+      setFormData(EMPTY);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({ title: 'Error', description: 'There was a problem sending your message. Please try again.', variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
     <>
-    <Helmet>
-      <title>AGC Padel Academy — Contact</title>
-    </Helmet>
-    <NewMasthead
-      title="Contact"
-      lead="A visual form. It does not send mail. Use the main Contact page when a real message has to go through."
-    />
-    <section className="nf-page">
-      <div className="nf-grid nf-grid-2">
-        <form className="nf-card nf-form" onSubmit={onSubmit}>
-          <label htmlFor="nf-name">Name</label>
-          <input id="nf-name" name="name" autoComplete="name" />
-          <label htmlFor="nf-email">Email</label>
-          <input id="nf-email" name="email" type="email" autoComplete="email" />
-          <label htmlFor="nf-topic">About</label>
-          <input id="nf-topic" name="topic" placeholder="Kids, adults, trips, tournaments…" />
-          <label htmlFor="nf-message">Message</label>
-          <textarea id="nf-message" name="message" />
-          <button type="submit" className="nf-pill border-0 cursor-pointer">Show send (visual only)</button>
-        </form>
-        <div>
-          <article className="nf-card nf-shot" style={{ marginBottom: 16 }}>
-            <img alt="AGC on court" src={PHOTO} />
-            <div className="nf-shot-body">
-              <h3>Visit</h3>
-              <p>Riedstrasse 6, 6330 Cham, Switzerland</p>
-              <p className="mt-3">+41 79 799 04 58</p>
-              <p>info@agc-padelacademy.com</p>
-              <p className="mt-3">
-                <a href="https://www.instagram.com/agc.padelacademy/" target="_blank" rel="noopener noreferrer">Instagram</a>
-              </p>
-            </div>
+      <Helmet>
+        <title>AGC Padel Academy — Contact</title>
+      </Helmet>
+      <NewMasthead
+        title="Contact"
+        lead="Send a message to the academy. Name, email, phone, subject, and message are required."
+      />
+      <section className="nf-page">
+        <div className="nf-grid nf-grid-2">
+          <form className="nf-card nf-form" onSubmit={onSubmit}>
+            <label htmlFor="nf-name">Name</label>
+            <input id="nf-name" name="name" autoComplete="name" required value={formData.name} onChange={onChange} />
+            <label htmlFor="nf-email">Email</label>
+            <input id="nf-email" name="email" type="email" autoComplete="email" required value={formData.email} onChange={onChange} />
+            <label htmlFor="nf-phone">Phone</label>
+            <input id="nf-phone" name="phone" type="tel" autoComplete="tel" required value={formData.phone} onChange={onChange} />
+            <label htmlFor="nf-subject">Subject</label>
+            <input id="nf-subject" name="subject" required value={formData.subject} onChange={onChange} />
+            <label htmlFor="nf-message">Message</label>
+            <textarea id="nf-message" name="message" required value={formData.message} onChange={onChange} />
+            <button type="submit" className="nf-pill border-0" disabled={sending}>{sending ? 'Sending…' : 'Send message'}</button>
+          </form>
+          <article className="nf-card">
+            <h3>Visit</h3>
+            <p>Durisolstrasse 3, 5612 Villmergen</p>
+            <p>+41 76 611 40 61</p>
+            <p>agcpadelacademy@gmail.com</p>
+            <p>
+              <a href="https://www.instagram.com/agc.padelacademy/" target="_blank" rel="noopener noreferrer">Instagram</a>
+            </p>
           </article>
         </div>
-      </div>
-    </section>
+      </section>
     </>
   );
 };

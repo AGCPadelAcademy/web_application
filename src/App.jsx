@@ -14,6 +14,16 @@ import NewTournamentsPage from '@/pages/new-frontend/NewTournamentsPage';
 import NewContactPage from '@/pages/new-frontend/NewContactPage';
 import NewTermsPage from '@/pages/new-frontend/NewTermsPage';
 import NewLoginPage from '@/pages/new-frontend/NewLoginPage';
+import NewCampDetailPage from '@/pages/new-frontend/NewCampDetailPage';
+import NewResetPasswordPage from '@/pages/new-frontend/NewResetPasswordPage';
+import NewAuthCallbackPage from '@/pages/new-frontend/NewAuthCallbackPage';
+import NewProfilePage from '@/pages/new-frontend/NewProfilePage';
+import NewChildrenPage from '@/pages/new-frontend/NewChildrenPage';
+import NewChildProfilePage from '@/pages/new-frontend/NewChildProfilePage';
+import NewPaymentsPage from '@/pages/new-frontend/NewPaymentsPage';
+import NewAdminPage from '@/pages/new-frontend/NewAdminPage';
+import NewCoachRosterPage from '@/pages/new-frontend/NewCoachRosterPage';
+import NewProtectedRoute from '@/pages/new-frontend/NewProtectedRoute';
 import LessonsPage from '@/pages/LessonsPage';
 import TripsPage from '@/pages/TripsPage';
 import TournamentsPage from '@/pages/TournamentsPage';
@@ -63,6 +73,7 @@ function App() {
             <Route path="new" element={<NewLayout />}>
               <Route index element={<NewHomePage />} />
               <Route path="kids" element={<NewKidsPage />} />
+              <Route path="kids/:slug" element={<NewCampDetailPage />} />
               <Route path="adults" element={<NewAdultsPage />} />
               <Route path="trips" element={<NewTripsPage />} />
               <Route path="tournaments" element={<NewTournamentsPage />} />
@@ -71,6 +82,14 @@ function App() {
               <Route path="camps" element={<Navigate to="/new/kids" replace />} />
               <Route path="terms" element={<NewTermsPage />} />
               <Route path="login" element={<NewLoginPage />} />
+              <Route path="reset-password" element={<NewResetPasswordPage />} />
+              <Route path="auth/callback" element={<NewAuthCallbackPage />} />
+              <Route path="profile" element={<NewProtectedRoute><NewProfilePage /></NewProtectedRoute>} />
+              <Route path="children" element={<NewProtectedRoute><NewChildrenPage /></NewProtectedRoute>} />
+              <Route path="children/:childId" element={<NewProtectedRoute><NewChildProfilePage /></NewProtectedRoute>} />
+              <Route path="payments" element={<NewProtectedRoute><NewPaymentsPage /></NewProtectedRoute>} />
+              <Route path="admin" element={<NewProtectedRoute requireAdmin><NewAdminPage /></NewProtectedRoute>} />
+              <Route path="coach/roster" element={<NewProtectedRoute allowedRoles={['coach']}><NewCoachRosterPage /></NewProtectedRoute>} />
             </Route>
             <Route path="lessons" element={<LessonsPage />} />
             <Route path="trips" element={<TripsPage />} />

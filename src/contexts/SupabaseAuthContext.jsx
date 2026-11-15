@@ -7,6 +7,8 @@ const AuthContext = createContext(undefined);
 
 const AUTH_REDIRECT_URL =
   typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : 'https://agcpadelacademy.com/auth/callback';
+const MAIN_RESET_PATH = '/reset-password';
+const NEW_RESET_PATH = '/new/reset-password';
 
 const ensureProfile = async (user) => {
   if (!user) return null;
@@ -65,9 +67,12 @@ export const AuthProvider = ({ children }) => {
         // Recovery links establish a session automatically (magic-link-like).
         // If the user landed anywhere other than the reset form, send them there
         // so they actually choose a new password instead of just being logged in.
-        if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/reset-password') {
-          window.location.replace('/reset-password');
-          return;
+        if (event === 'PASSWORD_RECOVERY') {
+          const path = window.location.pathname;
+          if (path !== MAIN_RESET_PATH && path !== NEW_RESET_PATH) {
+            window.location.replace(path.startsWith('/new') ? NEW_RESET_PATH : MAIN_RESET_PATH);
+            return;
+          }
         }
         await handleSession(session);
       }
@@ -76,12 +81,12 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, [handleSession]);
 
-  const signUp = useCallback(async (email, password, fullName, phone) => {
+  const signUp = useCallback(async (email, password, fullName, phone, emailRedirectTo = AUTH_REDIRECT_URL) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: AUTH_REDIRECT_URL,
+        emailRedirectTo,
         data: {
           full_name: fullName,
           phone: phone,
@@ -174,11 +179,11 @@ export const AuthProvider = ({ children }) => {
     return { error };
   }, [toast]);
 
-  const resendConfirmation = useCallback(async (email) => {
+  const resendConfirmation = useCallback(async (email, emailRedirectTo = AUTH_REDIRECT_URL) => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: AUTH_REDIRECT_URL },
+      options: { emailRedirectTo },
     });
 
     if (error) {
@@ -199,9 +204,9 @@ export const AuthProvider = ({ children }) => {
     return { error: null };
   }, [toast]);
 
-  const resetPassword = useCallback(async (email) => {
+  const resetPassword = useCallback(async (email, redirectTo = `${window.location.origin}${MAIN_RESET_PATH}`) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo,
     });
 
     if (error) {

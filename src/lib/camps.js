@@ -98,6 +98,24 @@ export function formatCampWindow(iso) {
   return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
+/** Academy calendar date (`YYYY-MM-DD`) in Europe/Zurich. */
+export function academyToday(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Zurich',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/** Admin list: published, draft (not yet ended), or ended (unpublished after end_date). */
+export function campAdminGroup(camp, today = academyToday()) {
+  if (camp?.is_published) return 'published';
+  const end = typeof camp?.end_date === 'string' ? camp.end_date.slice(0, 10) : '';
+  if (end && end < today) return 'ended';
+  return 'draft';
+}
+
 export function campRegistrationMessage(camp, now = new Date()) {
   const status = deriveCampStatus(camp, now);
   if (status === 'full') return CAMP_FULL_LABEL;
@@ -206,6 +224,10 @@ export function upsertCampExtra(campId, extra) {
 
 export function removeCampExtra(extraId) {
   return invokeCampFunction('camp-admin', { action: 'remove_extra', extra_id: extraId });
+}
+
+export function removeCamp(campId) {
+  return invokeCampFunction('camp-admin', { action: 'delete_camp', camp_id: campId });
 }
 
 export function listAdminCamps() {
@@ -366,6 +388,8 @@ export function mapCampError(message) {
     member_price_unavailable: 'This camp has no member price.',
     refund_agreement_required: 'Paid registrations cannot be cancelled here.',
     forbidden: 'You do not have permission to do that.',
+    camp_has_registrations: 'This camp has registrations, so it cannot be deleted.',
+    not_found: 'That camp was not found.',
   };
   return map[code] || code || 'Camp request failed';
 }

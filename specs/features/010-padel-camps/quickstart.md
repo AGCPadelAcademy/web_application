@@ -201,6 +201,14 @@ Requires migration `0026_f125_unpublish_ended_camps` applied.
 | 18.2 | The next Zurich day | `is_published` is false. The Camp is absent from `/camps`. Existing registrations remain |
 | 18.3 | Admin saves that Camp still marked published, without moving the end date forward | The save stores it unpublished |
 
+## 19. Admin lists and delete (2026-11-19)
+
+| Step | Action | Expected |
+|---|---|---|
+| 19.1 | Admin opens Camps and switches Published, Drafts, Ended | Published shows `is_published`. Drafts are unpublished camps whose end date is today or later. Ended are unpublished camps whose end date has passed |
+| 19.2 | Admin deletes a camp with no registrations | The camp disappears. Confirm first |
+| 19.3 | Admin deletes a camp that has a registration | Refused. The camp and its invoice stay |
+
 ## Acceptance mapping
 
 Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Scenario 17 covers C9: Junior week 1 and week 2 open at 3 places remaining, show 3 through 13 registrations, then 2, 1, and the waitlist at 16. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).

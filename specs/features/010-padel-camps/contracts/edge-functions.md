@@ -74,6 +74,7 @@ All functions live at `https://<project-ref>.supabase.co/functions/v1/<name>` an
 
 - `POST { "action": "upsert_camp", "camp": {…} }` — create/update Camp configuration; publish/unpublish. **(Amended 2026-09-09, C3)** Payload may include optional `camp_type` (trimmed text or null). No new Edge Function.
 - `POST { "action": "upsert_extra", "camp_id", "extra": {…} }` / `{ "action": "remove_extra", "extra_id" }` — extras management.
+- `POST { "action": "delete_camp", "camp_id" }` — deletes a Camp with no registrations, including its extras, waitlist rows, and flyer objects. `409 camp_has_registrations` when any registration exists. `404 not_found` when the Camp is missing.
 - `POST { "action": "list_registrations", "camp_id", "status"? }` — returns registrations with Camp, child, age, parent, phone, email, level, extras, total, payment status, registration date, and remaining places.
 - `POST { "action": "export_registrations", "camp_id" }` — returns the authorized registration rows as JSON (the FR-035 field set only); the frontend serializes them to CSV/Excel-compatible output in `src/lib/camps.js` (analysis A4).
 - `POST { "action": "list_waitlist", "camp_id" }` — deterministic order (`created_at` asc).

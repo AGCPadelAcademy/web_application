@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FlyerLightbox from '@/components/modals/FlyerLightbox';
 import { validateImageFile } from '@/lib/imageValidation';
 import {
+  campAdminGroup,
   campDateTimeLocalValue,
   campDateTimeToIso,
   campFlyerSignedUrl,
@@ -19,6 +20,7 @@ import {
   listCampRegistrations,
   listCampWaitlist,
   mapCampError,
+  removeCamp,
   removeCampExtra,
   removeCampFlyer,
   serializeRegistrationsCsv,
@@ -57,6 +59,8 @@ const CampManagementPanel = () => {
   const [camps, setCamps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [listGroup, setListGroup] = useState('published');
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyCamp);
   const [extraForm, setExtraForm] = useState(emptyExtra);
@@ -88,6 +92,11 @@ const CampManagementPanel = () => {
     () => camps.find((camp) => camp.id === selectedId) || null,
     [camps, selectedId],
   );
+  const visibleCamps = useMemo(
+    () => camps.filter((camp) => campAdminGroup(camp) === listGroup),
+    [camps, listGroup],
+  );
+  const groupCount = (group) => camps.filter((camp) => campAdminGroup(camp) === group).length;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,6 +200,7 @@ const CampManagementPanel = () => {
         }
       }
       setFlyerFile(null);
+      if (result?.camp) setListGroup(campAdminGroup(result.camp));
       toast({ title: 'Camp saved' });
       await load();
     } catch (error) {
@@ -263,6 +273,23 @@ const CampManagementPanel = () => {
     }
   };
 
+  const deleteCamp = async () => {
+    if (!selectedId || deleting) return;
+    const name = form.name || 'this camp';
+    if (!window.confirm(`Delete “${name}”? Camps with registrations are kept so their invoices stay.`)) return;
+    setDeleting(true);
+    try {
+      await removeCamp(selectedId);
+      toast({ title: 'Camp deleted' });
+      resetForm();
+      await load();
+    } catch (error) {
+      toast({ title: 'Delete failed', description: mapCampError(error.message), variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const field = (name, label, type = 'text') => (
     <div className="space-y-1">
       <Label htmlFor={name}>{label}</Label>
@@ -291,7 +318,29 @@ const CampManagementPanel = () => {
           >
             <Plus className="w-4 h-4 mr-2" /> New camp
           </Button>
-          {loading ? <Loader2 className="w-5 h-5 animate-spin text-green-500" /> : camps.map((camp) => (
+          <div className="grid grid-cols-3 gap-1">
+            {[
+              ['published', 'Published'],
+              ['draft', 'Drafts'],
+              ['ended', 'Ended'],
+            ].map(([group, label]) => (
+              <button
+                key={group}
+                type="button"
+                onClick={() => setListGroup(group)}
+                className={`rounded-md px-1 py-1.5 text-xs font-medium ${listGroup === group ? 'bg-green-500 text-black' : 'bg-gray-950 text-gray-300 border border-gray-800'}`}
+              >
+                {label} ({groupCount(group)})
+              </button>
+            ))}
+          </div>
+          {loading ? <Loader2 className="w-5 h-5 animate-spin text-green-500" /> : visibleCamps.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              {listGroup === 'published' && 'No published camps.'}
+              {listGroup === 'draft' && 'No drafts. Drafts are unpublished camps whose end date is still today or later.'}
+              {listGroup === 'ended' && 'No ended camps. These are unpublished because the end date has passed.'}
+            </p>
+          ) : visibleCamps.map((camp) => (
             <button
               key={camp.id}
               type="button"
@@ -299,7 +348,7 @@ const CampManagementPanel = () => {
               className={`w-full text-left rounded-lg border px-3 py-2 ${selectedId === camp.id ? 'border-green-500 bg-green-500/10' : 'border-gray-800'}`}
             >
               <p className="font-medium text-white">{camp.name}</p>
-              <p className="text-xs text-gray-400">{camp.start_date} → {camp.end_date} {camp.is_published ? '· published' : '· draft'}</p>
+              <p className="text-xs text-gray-400">{camp.start_date} → {camp.end_date} · {campAdminGroup(camp)}</p>
             </button>
           ))}
         </CardContent>
@@ -314,8 +363,19 @@ const CampManagementPanel = () => {
 
         <TabsContent value="edit">
           <Card className="bg-gray-900 border-gray-800">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle>{selected ? 'Edit camp' : 'Create camp'}</CardTitle>
+              {selectedId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={deleting}
+                  onClick={deleteCamp}
+                  className="border-red-900 text-red-300 hover:bg-red-950"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <form onSubmit={saveCamp} className="grid gap-4 md:grid-cols-2">

@@ -217,6 +217,32 @@ Deno.serve(async (req: Request) => {
       return json({ removed: true });
     }
 
+    if (action === "delete_camp") {
+      const campId = typeof body.camp_id === "string" ? body.camp_id : "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campId)) {
+        return json({ error: "camp_id required" }, 422);
+      }
+      const camps = await dbSelect("camps", `id=eq.${campId}&select=id,flyer_path`);
+      const camp = camps[0];
+      if (!camp) return json({ error: "not_found" }, 404);
+      const registrations = await dbSelect(
+        "camp_registrations",
+        `camp_id=eq.${campId}&select=id&limit=1`,
+      );
+      if (registrations.length > 0) return json({ error: "camp_has_registrations" }, 409);
+      const flyerPath = typeof camp.flyer_path === "string" ? camp.flyer_path : "";
+      const storageRes = await fetch(`${SUPABASE_URL}/storage/v1/object/camp-flyers`, {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ prefixes: flyerPath ? [campId, flyerPath] : [campId] }),
+      });
+      if (!storageRes.ok) {
+        log({ event: "flyer_cleanup_failed", status: storageRes.status });
+      }
+      await dbWrite("camps", "DELETE", undefined, `?id=eq.${campId}`);
+      return json({ removed: true });
+    }
+
     if (action === "list_camps") {
       const camps = await dbSelect("camps", "select=*&order=start_date.desc");
       const extras = await dbSelect("camp_extras", "select=*&order=sort_order.asc");

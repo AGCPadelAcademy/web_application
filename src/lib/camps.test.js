@@ -35,6 +35,7 @@ import {
   campInvoicePreviewFromSubmit,
   clearCampDraft,
   CSV_REGISTRATION_FIELDS,
+  campAdminGroup,
   campDateTimeLocalValue,
   campDateTimeToIso,
   campRegistrationMessage,
@@ -100,6 +101,23 @@ describe('registration window local time', () => {
     expect(campRegistrationMessage(camp, now)).toMatch(/^Registration opens /);
     expect(deriveCampStatus(camp, new Date('2026-11-20T07:00:00.000Z'))).toBe('open');
     expect(campRegistrationMessage({ ...camp, registration_opens_at: null }, now)).toBe('Registration open');
+  });
+});
+
+describe('admin camp groups', () => {
+  const today = '2026-11-19';
+
+  it('keeps a published camp in published even after its end date', () => {
+    expect(campAdminGroup({ is_published: true, end_date: '2026-11-18' }, today)).toBe('published');
+  });
+
+  it('treats an unpublished camp as a draft through its end date', () => {
+    expect(campAdminGroup({ is_published: false, end_date: '2026-11-19' }, today)).toBe('draft');
+    expect(campAdminGroup({ is_published: false, end_date: '2026-12-30' }, today)).toBe('draft');
+  });
+
+  it('treats an unpublished camp as ended the day after its end date', () => {
+    expect(campAdminGroup({ is_published: false, end_date: '2026-11-18' }, today)).toBe('ended');
   });
 });
 
@@ -361,5 +379,6 @@ describe('mapCampError age range (C7)', () => {
     expect(mapCampError('age_out_of_range')).not.toMatch(/outside the camp age range/i);
     expect(mapCampError('camp_full')).toBe('This camp is full.');
     expect(mapCampError('duplicate_registration')).toBe('This child is already registered for this camp.');
+    expect(mapCampError('camp_has_registrations')).toBe('This camp has registrations, so it cannot be deleted.');
   });
 });

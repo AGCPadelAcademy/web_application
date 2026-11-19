@@ -35,6 +35,9 @@ import {
   campInvoicePreviewFromSubmit,
   clearCampDraft,
   CSV_REGISTRATION_FIELDS,
+  campDateTimeLocalValue,
+  campDateTimeToIso,
+  campRegistrationMessage,
   deriveCampStatus,
   distinctCampTypes,
   extrasTotal,
@@ -74,6 +77,29 @@ describe('deriveCampStatus', () => {
       registration_opens_at: '2026-08-01T00:00:00Z',
       registration_deadline_at: '2026-10-01T00:00:00Z',
     }, now)).toBe('open');
+  });
+});
+
+describe('registration window local time', () => {
+  it('stores a datetime-local value as an absolute instant and reads it back', () => {
+    const iso = campDateTimeToIso('2026-11-20T08:00');
+    expect(iso).toBe(new Date('2026-11-20T08:00').toISOString());
+    expect(campDateTimeLocalValue(iso)).toBe('2026-11-20T08:00');
+    expect(campDateTimeToIso('')).toBeNull();
+    expect(campDateTimeLocalValue(null)).toBe('');
+  });
+
+  it('says when a future open time will allow registration', () => {
+    const now = new Date('2026-11-19T20:26:00Z');
+    const camp = {
+      is_full: false,
+      registration_opens_at: '2026-11-20T07:00:00.000Z',
+      registration_deadline_at: '2026-12-27T23:59:00.000Z',
+    };
+    expect(deriveCampStatus(camp, now)).toBe('closed');
+    expect(campRegistrationMessage(camp, now)).toMatch(/^Registration opens /);
+    expect(deriveCampStatus(camp, new Date('2026-11-20T07:00:00.000Z'))).toBe('open');
+    expect(campRegistrationMessage({ ...camp, registration_opens_at: null }, now)).toBe('Registration open');
   });
 });
 

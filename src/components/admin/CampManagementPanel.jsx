@@ -9,9 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FlyerLightbox from '@/components/modals/FlyerLightbox';
 import { validateImageFile } from '@/lib/imageValidation';
 import {
+  campDateTimeLocalValue,
+  campDateTimeToIso,
   campFlyerSignedUrl,
   convertWaitlistEntry,
   exportCampRegistrations,
+  campRegistrationMessage,
   listAdminCamps,
   listCampRegistrations,
   listCampWaitlist,
@@ -115,8 +118,8 @@ const CampManagementPanel = () => {
       camp_type: camp.camp_type ?? '',
       daily_start_time: camp.daily_start_time ?? '',
       daily_end_time: camp.daily_end_time ?? '',
-      registration_opens_at: camp.registration_opens_at ? String(camp.registration_opens_at).slice(0, 16) : '',
-      registration_deadline_at: camp.registration_deadline_at ? String(camp.registration_deadline_at).slice(0, 16) : '',
+      registration_opens_at: campDateTimeLocalValue(camp.registration_opens_at),
+      registration_deadline_at: campDateTimeLocalValue(camp.registration_deadline_at),
     });
     setFlyerFile(null);
     setLocalFlyerPreview(null);
@@ -175,8 +178,8 @@ const CampManagementPanel = () => {
         member_price_amount: form.member_price_amount === '' ? null : Number(form.member_price_amount),
         camp_type: (form.camp_type || '').trim() === '' ? null : form.camp_type.trim(),
         max_capacity: Number(form.max_capacity),
-        registration_opens_at: form.registration_opens_at || null,
-        registration_deadline_at: form.registration_deadline_at || null,
+        registration_opens_at: campDateTimeToIso(form.registration_opens_at),
+        registration_deadline_at: campDateTimeToIso(form.registration_deadline_at),
       };
       const result = await upsertCamp(payload);
       const campId = selectedId || result?.camp?.id;
@@ -328,8 +331,8 @@ const CampManagementPanel = () => {
                 {field('price_amount', 'Usual price (CHF)', 'number')}
                 {field('member_price_amount', 'Academy member price (CHF, optional)', 'number')}
                 {field('max_capacity', 'Capacity', 'number')}
-                {field('registration_opens_at', 'Registration opens', 'datetime-local')}
-                {field('registration_deadline_at', 'Registration deadline', 'datetime-local')}
+                {field('registration_opens_at', 'Registration opens (your local time)', 'datetime-local')}
+                {field('registration_deadline_at', 'Registration deadline (your local time)', 'datetime-local')}
                 <div className="md:col-span-2 space-y-2">
                   <Label htmlFor="flyer">Camp flyer (optional)</Label>
                   <div className="flex items-start gap-4">
@@ -391,6 +394,30 @@ const CampManagementPanel = () => {
                   <input type="checkbox" checked={form.is_published} onChange={(e) => setForm((c) => ({ ...c, is_published: e.target.checked }))} />
                   Published
                 </label>
+                <div className="md:col-span-2 text-sm text-gray-400 space-y-2">
+                  <p>
+                    {form.is_published
+                      ? `${campRegistrationMessage({
+                        is_full: false,
+                        registration_opens_at: campDateTimeToIso(form.registration_opens_at),
+                        registration_deadline_at: campDateTimeToIso(form.registration_deadline_at),
+                      })}. Leave the open time empty to allow registration as soon as the camp is published.`
+                      : 'The camp stays hidden until it is published. Publishing does not open registration while a future open time is set.'}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-gray-700"
+                    onClick={() => setForm((current) => ({
+                      ...current,
+                      is_published: true,
+                      registration_opens_at: '',
+                    }))}
+                  >
+                    Open registration now
+                  </Button>
+                  <p>Open registration now publishes the camp and clears a future open time. Save the camp to apply it.</p>
+                </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={form.waitlist_enabled} onChange={(e) => setForm((c) => ({ ...c, waitlist_enabled: e.target.checked }))} />
                   Waitlist enabled

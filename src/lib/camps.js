@@ -71,6 +71,42 @@ export function deriveCampStatus(camp, now = new Date()) {
   return 'open';
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, '0');
+}
+
+/** Value for a datetime-local input, in the browser's local time. */
+export function campDateTimeLocalValue(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+}
+
+/** datetime-local value (local wall clock) as an ISO instant. */
+export function campDateTimeToIso(localValue) {
+  if (!localValue) return null;
+  const date = new Date(localValue);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+export function formatCampWindow(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+export function campRegistrationMessage(camp, now = new Date()) {
+  const status = deriveCampStatus(camp, now);
+  if (status === 'full') return CAMP_FULL_LABEL;
+  if (status === 'open') return 'Registration open';
+  const opens = camp?.registration_opens_at ? new Date(camp.registration_opens_at) : null;
+  if (opens && now < opens) return `Registration opens ${formatCampWindow(camp.registration_opens_at)}`;
+  return 'Registration closed';
+}
+
 export function formatCampPrice(amount, currency = 'CHF') {
   const value = Number(amount);
   if (Number.isNaN(value)) return '';

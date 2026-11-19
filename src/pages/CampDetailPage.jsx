@@ -15,6 +15,7 @@ import { listChildren } from '@/lib/children';
 import {
   CAMP_FULL_LABEL,
   CAMPS_TERMS_VERSION,
+  campRegistrationMessage,
   campDisplayTotal,
   campInvoicePreviewFromSubmit,
   clearCampDraft,
@@ -223,10 +224,10 @@ const CampDetailPage = () => {
         {(camp.min_age != null || camp.max_age != null) && <p className="mb-2 text-sm">Ages {camp.min_age ?? '—'}–{camp.max_age ?? '—'}</p>}
         {camp.eligibility_text && <p className="mb-2 text-sm text-gray-300">{camp.eligibility_text}</p>}
         {camp.description && <p className="text-gray-300 mb-6">{camp.description}</p>}
-        <p className="font-semibold mb-6">{status === 'full' ? CAMP_FULL_LABEL : status === 'open' ? 'Registration open' : 'Registration closed'}</p>
+        <p className="font-semibold mb-6">{campRegistrationMessage(camp)}</p>
 
         {status === 'closed' && (
-          <Button disabled className="bg-gray-800 text-gray-500">Registration closed</Button>
+          <Button disabled className="bg-gray-800 text-gray-500">{campRegistrationMessage(camp)}</Button>
         )}
 
         {(status === 'open' || status === 'full') && (

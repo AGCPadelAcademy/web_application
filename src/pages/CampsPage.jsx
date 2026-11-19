@@ -6,6 +6,7 @@ import FlyerLightbox from '@/components/modals/FlyerLightbox';
 import {
   CAMP_FULL_LABEL,
   CAMP_CARD_FLYER_FRAME_CLASS,
+  campRegistrationMessage,
   deriveCampStatus,
   distinctCampTypes,
   fetchPublicCamps,
@@ -14,12 +15,6 @@ import {
   FUNNEL_EVENTS,
   trackCampFunnelEvent,
 } from '@/lib/camps';
-
-const statusLabel = (status) => {
-  if (status === 'full') return CAMP_FULL_LABEL;
-  if (status === 'closed') return 'Registration closed';
-  return 'Registration open';
-};
 
 const CampsPage = () => {
   const [camps, setCamps] = useState([]);
@@ -94,7 +89,7 @@ const CampsPage = () => {
                 {camp.eligibility_text && <p className="text-sm text-gray-400 mb-2">{camp.eligibility_text}</p>}
                 {camp.description && <p className="text-sm text-gray-300 mb-4 flex-1">{camp.description}</p>}
                 <p className={`text-sm font-semibold mb-4 ${status === 'full' ? 'text-amber-400' : status === 'open' ? 'text-green-400' : 'text-gray-400'}`}>
-                  {statusLabel(status)}
+                  {campRegistrationMessage(camp)}
                   {status !== 'full' && camp.places_remaining != null ? ` · ${camp.places_remaining} places left` : ''}
                 </p>
                 {status === 'full' ? (

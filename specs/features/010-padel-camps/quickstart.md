@@ -191,6 +191,16 @@ Requires migration `0023_f125_junior_places_countdown` applied. Do not change th
 | 17.3 | Junior camp has 14, then 15, then 16 active registrations | The card shows 2, then 1, then full (`Complet / Ausgebucht`). The 16th registration is the last. Another is refused (`camp_full`). Waitlist, if enabled, can open |
 | 17.4 | Mini or Competition camp reaches its configured capacity | No extra places. The next registration is refused |
 
+## 18. Ended camps unpublish themselves (2026-11-19)
+
+Requires migration `0026_f125_unpublish_ended_camps` applied.
+
+| Step | Action | Expected |
+|---|---|---|
+| 18.1 | A published Camp’s end date is today (Europe/Zurich) | The Camp stays on `/camps` |
+| 18.2 | The next Zurich day | `is_published` is false. The Camp is absent from `/camps`. Existing registrations remain |
+| 18.3 | Admin saves that Camp still marked published, without moving the end date forward | The save stores it unpublished |
+
 ## Acceptance mapping
 
 Scenarios 1–9 cover SC-001…SC-012 and the spec’s user-story acceptance criteria. Scenario 14 covers C5 listing order and payment-card dates. Scenario 15 covers C6 add-child return, extra descriptions/edit, and flyer chrome. Scenario 16 covers C7: age range does not refuse registration, and age information stays visible. Scenario 17 covers C9: Junior week 1 and week 2 open at 3 places remaining, show 3 through 13 registrations, then 2, 1, and the waitlist at 16. Traceability is maintained in `tasks.md` per requirement (FR-001…FR-040).

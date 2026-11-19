@@ -55,7 +55,7 @@ Admin-managed reusable Camp configuration (FR-001/FR-002).
 | `max_capacity` | integer | NOT NULL, CHECK `max_capacity > 0` | |
 | `registration_opens_at` | timestamptz | NULL | when NULL, open immediately while published |
 | `registration_deadline_at` | timestamptz | NULL | after this, registration refused |
-| `is_published` | boolean | NOT NULL DEFAULT false | |
+| `is_published` | boolean | NOT NULL DEFAULT false | Cleared automatically the Europe/Zurich day after inclusive `end_date` (`unpublish_ended_camps`, daily 23:05 UTC) |
 | `waitlist_enabled` | boolean | NOT NULL DEFAULT false | |
 | `practical_info` | text | NULL | used in confirmation email |
 | `created_at` / `updated_at` | timestamptz | NOT NULL DEFAULT `now()` | |

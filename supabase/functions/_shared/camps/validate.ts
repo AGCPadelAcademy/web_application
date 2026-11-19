@@ -48,6 +48,16 @@ function asNumber(value: unknown): number | null {
   return null;
 }
 
+/** Academy calendar date (`YYYY-MM-DD`) in Europe/Zurich. */
+export function academyToday(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Zurich',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
 export function slugifyCampName(name: string): string {
   return name
     .toLowerCase()
@@ -58,6 +68,7 @@ export function slugifyCampName(name: string): string {
 
 export function validateCampPayload(
   input: unknown,
+  now = new Date(),
 ): { ok: true; camp: CampUpsertInput } | { ok: false; error: string } {
   if (!input || typeof input !== 'object') return { ok: false, error: 'invalid_camp' };
   const raw = input as Record<string, unknown>;
@@ -107,7 +118,7 @@ export function validateCampPayload(
       max_capacity: capacity,
       registration_opens_at: asString(raw.registration_opens_at),
       registration_deadline_at: asString(raw.registration_deadline_at),
-      is_published: raw.is_published === true,
+      is_published: raw.is_published === true && end >= academyToday(now),
       waitlist_enabled: raw.waitlist_enabled === true,
       practical_info: asString(raw.practical_info),
     },

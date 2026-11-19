@@ -404,6 +404,7 @@ const CampManagementPanel = () => {
                       })}. Leave the open time empty to allow registration as soon as the camp is published.`
                       : 'The camp stays hidden until it is published. Publishing does not open registration while a future open time is set.'}
                   </p>
+                  <p>The day after the end date, publication turns off on its own. The end date itself stays published.</p>
                   <Button
                     type="button"
                     variant="outline"

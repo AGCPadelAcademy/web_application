@@ -29,6 +29,22 @@ Deno.test('rejects invalid date order, negative price, and non-positive capacity
   assertEquals(validateCampPayload(validCamp).ok, true);
 });
 
+Deno.test('keeps a camp published on its end date and clears publication the next Zurich day', () => {
+  const onEndDate = validateCampPayload(
+    { ...validCamp, is_published: true },
+    new Date('2026-10-16T21:30:00Z'),
+  );
+  assertEquals(onEndDate.ok, true);
+  if (onEndDate.ok) assertEquals(onEndDate.camp.is_published, true);
+
+  const dayAfter = validateCampPayload(
+    { ...validCamp, is_published: true },
+    new Date('2026-10-16T22:30:00Z'),
+  );
+  assertEquals(dayAfter.ok, true);
+  if (dayAfter.ok) assertEquals(dayAfter.camp.is_published, false);
+});
+
 Deno.test('rejects extra with negative price', () => {
   assertEquals(validateExtraPayload({ name: 'Lunch', price_amount: -5 }).ok, false);
   assertEquals(validateExtraPayload({ name: 'Lunch', price_amount: 25 }).ok, true);
